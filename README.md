@@ -11,7 +11,7 @@ A native macOS dashboard for running many coding agents (Claude Code and Codex) 
 ## Run
 
 ```sh
-agentdeck/script/run
+script/run
 ```
 
 Requires macOS 14+ and the `claude` / `codex` CLIs on your login shell's PATH.
