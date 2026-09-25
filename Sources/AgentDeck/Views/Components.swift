@@ -15,6 +15,20 @@ struct AgentBadge: View {
     private var tint: Color { agent == .claude ? .orange : .teal }
 }
 
+struct BranchLabel: View {
+    let worktree: Worktree
+    var isRemoved = false
+
+    var body: some View {
+        Label(worktree.branch, systemImage: "arrow.triangle.branch")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .strikethrough(isRemoved)
+            .lineLimit(1)
+            .help(isRemoved ? "Worktree deleted; the branch is kept." : worktree.path)
+    }
+}
+
 struct StatusPill: View {
     let status: SessionStatus
 

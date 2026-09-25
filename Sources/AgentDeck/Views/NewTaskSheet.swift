@@ -5,6 +5,7 @@ struct NewTaskSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @AppStorage("lastAgent") private var agent: AgentKind = .claude
+    @AppStorage("useWorktree") private var useWorktree = true
     @State private var project: Project
     @State private var task = ""
     @State private var launchError: String?
@@ -42,6 +43,11 @@ struct NewTaskSheet: View {
                 Button("Add folder…", action: addFolder)
             }
 
+            if isGitProject {
+                Toggle("Run in its own git worktree", isOn: $useWorktree)
+                    .help("Creates \(Worktrees.folder)/<task> on a new agentdeck/<task> branch from the current HEAD, so agents in the same repo don't edit the same files.")
+            }
+
             if let launchError {
                 Text(launchError).foregroundStyle(.red).font(.callout)
             }
@@ -67,13 +73,22 @@ struct NewTaskSheet: View {
         return choices
     }
 
+    private var isGitProject: Bool {
+        project.path.flatMap(Worktrees.repositoryRoot(of:)) != nil
+    }
+
     private func addFolder() {
         if let url = FolderPicker.choose(startingAt: project.path) { project = store.addFavorite(url) }
     }
 
     private func start() {
         do {
-            try store.launch(task: task.trimmingCharacters(in: .whitespacesAndNewlines), agent: agent, project: project)
+            try store.launch(
+                task: task.trimmingCharacters(in: .whitespacesAndNewlines),
+                agent: agent,
+                project: project,
+                isolated: isGitProject && useWorktree
+            )
             dismiss()
         } catch {
             launchError = error.localizedDescription

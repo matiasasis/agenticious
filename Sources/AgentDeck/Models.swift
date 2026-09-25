@@ -100,25 +100,34 @@ final class AgentSession: ObservableObject, Identifiable {
     let project: Project
     let directory: URL
     let startedAt = Date()
+    /// Set when the agent runs in its own git worktree instead of the project checkout.
+    let worktree: Worktree?
 
     @Published var status: SessionStatus = .starting
     @Published var chunks: [Chunk] = []
     @Published var lastActivity = Date()
+    @Published var worktreeRemoved = false
 
     var planSource: PlanSource = .none
     var terminalView: LocalProcessTerminalView?
     var terminalBridge: TerminalBridge?
 
-    init(task: String, agent: AgentKind, project: Project, directory: URL) {
+    init(task: String, agent: AgentKind, project: Project, directory: URL, worktree: Worktree? = nil) {
         self.task = task
         self.agent = agent
         self.project = project
         self.directory = directory
+        self.worktree = worktree
     }
 
     var completedChunks: Int { chunks.filter { $0.status == .done }.count }
 
     var allChunksDone: Bool { !chunks.isEmpty && completedChunks == chunks.count }
+
+    var hasExited: Bool {
+        if case .exited = status { return true }
+        return false
+    }
 
     var hasOpenChunks: Bool { chunks.contains { $0.status != .done } }
 
