@@ -1,6 +1,11 @@
 import Foundation
 
 /// Turns raw agent events into dashboard state: status, the "needs you" reason, and the chunk boxes.
+///
+/// What counts as "needs you" (orange, sound, dock badge):
+/// - Claude shows a permission prompt (`Notification` hook of type `permission_prompt`)
+/// - the agent calls the `need_human` tool
+/// A turn that simply ended (`Stop`, Claude's idle reminder, Codex's turn-complete) is only "your turn".
 @MainActor
 enum EventInterpreter {
     static func apply(_ name: String, _ payload: [String: Any], to session: AgentSession) {
@@ -10,13 +15,38 @@ enum EventInterpreter {
         case "PostToolUse":
             toolFinished(payload, in: session)
         case "Notification":
-            session.status = .needsYou(payload["message"] as? String ?? "Needs your input")
+            notified(payload, session: session)
         case "Stop", "codex-notify":
             turnFinished(session)
         case "mcp":
             agentReported(payload, in: session)
         default:
             break
+        }
+    }
+
+    /// Claude's Stop hook can refuse to stop. If the agent never posted a plan, or its plan still has open chunks,
+    /// send it back once to report, so the step boxes don't stay empty or grey after it has answered.
+    static func stopHookReply(_ payload: [String: Any], for session: AgentSession) -> [String: Any]? {
+        let alreadyNudged = payload["stop_hook_active"] as? Bool ?? false
+        guard !alreadyNudged, !session.status.isFinished, let reason = stopNudge(for: session) else { return nil }
+
+        return ["decision": "block", "reason": reason]
+    }
+
+    private static func stopNudge(for session: AgentSession) -> String? {
+        let closing = "Then call finish if the whole task is complete, or need_human if you're waiting on the human. " +
+            "Don't repeat your previous answer."
+
+        switch session.planSource {
+        case .none:
+            return "AgentDeck: you haven't posted a plan. Call set_plan with the steps you took (1-2 is fine for a quick " +
+                "question), mark each finished one done with update_chunk. " + closing
+        case .agent where session.hasOpenChunks:
+            return "AgentDeck: your plan still has chunks that aren't marked done. Call update_chunk for each chunk " +
+                "you finished. " + closing
+        default:
+            return nil
         }
     }
 
@@ -29,6 +59,20 @@ enum EventInterpreter {
 
         session.status = .working
         if tool == "TodoWrite" { mirrorTodoList(payload, in: session) }
+    }
+
+    private static func notified(_ payload: [String: Any], session: AgentSession) {
+        let message = payload["message"] as? String ?? "Needs your input"
+
+        if isIdleReminder(payload, message: message) {
+            if !session.status.needsAttention && !session.status.isFinished { session.status = .yourTurn }
+        } else {
+            session.status = .needsYou(message)
+        }
+    }
+
+    private static func isIdleReminder(_ payload: [String: Any], message: String) -> Bool {
+        payload["notification_type"] as? String == "idle_prompt" || message.localizedCaseInsensitiveContains("waiting for your input")
     }
 
     private static func mirrorTodoList(_ payload: [String: Any], in session: AgentSession) {
@@ -51,9 +95,9 @@ enum EventInterpreter {
     }
 
     private static func turnFinished(_ session: AgentSession) {
-        if case .done = session.status { return }
+        guard !session.status.isFinished, !session.status.needsAttention else { return }
 
-        session.status = session.allChunksDone ? .done(nil) : .needsYou("Turn finished, waiting for you")
+        session.status = session.allChunksDone ? .done(nil) : .yourTurn
     }
 
     // MARK: - agentdeck MCP tools
@@ -65,7 +109,7 @@ enum EventInterpreter {
         case "set_plan": setPlan(arguments, in: session)
         case "update_chunk": updateChunk(arguments, in: session)
         case "need_human": session.status = .needsYou(arguments["reason"] as? String ?? "Needs your input")
-        case "finish": session.status = .done(arguments["summary"] as? String)
+        case "finish": finish(arguments, in: session)
         default: break
         }
     }
@@ -89,5 +133,12 @@ enum EventInterpreter {
         session.chunks[position].status = ChunkStatus(rawValue: arguments["status"] as? String ?? "") ?? .inProgress
         session.chunks[position].note = arguments["note"] as? String
         if !session.status.needsAttention { session.status = .working }
+    }
+
+    private static func finish(_ arguments: [String: Any], in session: AgentSession) {
+        for index in session.chunks.indices where session.chunks[index].status != .done {
+            session.chunks[index].status = .done
+        }
+        session.status = .done(arguments["summary"] as? String)
     }
 }

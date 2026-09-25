@@ -9,12 +9,15 @@ struct AgentEvent: Sendable {
 }
 
 /// Tiny loopback HTTP server. Agents report in with `POST /hook/<session-id>/<event-name>` and a JSON body.
+/// The handler may answer with a JSON body, which is how a Claude hook gets its reply (see `stopHookReply`).
 final class EventServer: @unchecked Sendable {
+    typealias Handler = @Sendable (AgentEvent, @escaping @Sendable (Data?) -> Void) -> Void
+
     private let listener: NWListener
     private let queue = DispatchQueue(label: "agentdeck.events")
-    private let onEvent: @Sendable (AgentEvent) -> Void
+    private let onEvent: Handler
 
-    init(port: UInt16, onEvent: @escaping @Sendable (AgentEvent) -> Void) throws {
+    init(port: UInt16, onEvent: @escaping Handler) throws {
         let parameters = NWParameters.tcp
         parameters.requiredInterfaceType = .loopback
         parameters.allowLocalEndpointReuse = true
@@ -40,8 +43,7 @@ final class EventServer: @unchecked Sendable {
             if let data { buffer.append(data) }
 
             if let request = HTTPRequest(parsing: buffer) {
-                self.route(request)
-                self.reply(on: connection)
+                self.route(request) { body in self.reply(on: connection, body: body) }
             } else if isComplete || error != nil {
                 connection.cancel()
             } else {
@@ -50,16 +52,18 @@ final class EventServer: @unchecked Sendable {
         }
     }
 
-    private func route(_ request: HTTPRequest) {
+    private func route(_ request: HTTPRequest, reply: @escaping @Sendable (Data?) -> Void) {
         let parts = request.path.split(separator: "/").map(String.init)
-        guard parts.count == 3, parts[0] == "hook", let id = UUID(uuidString: parts[1]) else { return }
+        guard parts.count == 3, parts[0] == "hook", let id = UUID(uuidString: parts[1]) else { return reply(nil) }
 
-        onEvent(AgentEvent(sessionID: id, name: parts[2], body: request.body))
+        onEvent(AgentEvent(sessionID: id, name: parts[2], body: request.body), reply)
     }
 
-    private func reply(on connection: NWConnection) {
-        let response = "HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
-        connection.send(content: Data(response.utf8), completion: .contentProcessed { _ in connection.cancel() })
+    private func reply(on connection: NWConnection, body: Data?) {
+        let head = body.map { "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: \($0.count)\r\n" }
+            ?? "HTTP/1.1 204 No Content\r\nContent-Length: 0\r\n"
+        let response = Data((head + "Connection: close\r\n\r\n").utf8) + (body ?? Data())
+        connection.send(content: response, completion: .contentProcessed { _ in connection.cancel() })
     }
 }
 

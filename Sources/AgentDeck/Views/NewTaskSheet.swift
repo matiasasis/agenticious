@@ -1,15 +1,17 @@
-import AppKit
 import SwiftUI
 
 struct NewTaskSheet: View {
     @EnvironmentObject private var store: SessionStore
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.openWindow) private var openWindow
 
-    @AppStorage("lastDirectory") private var directoryPath = FileManager.default.homeDirectoryForCurrentUser.path
     @AppStorage("lastAgent") private var agent: AgentKind = .claude
+    @State private var project: Project
     @State private var task = ""
     @State private var launchError: String?
+
+    init(project: Project) {
+        _project = State(initialValue: project)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -21,7 +23,7 @@ struct NewTaskSheet: View {
                     .font(.body)
                     .frame(minHeight: 140)
                     .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
-                Text("This becomes the big title on the agent's card. The agent is told to split it into chunks.")
+                Text("This becomes the agent's big title. The agent is told to split it into steps.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -32,11 +34,12 @@ struct NewTaskSheet: View {
             .pickerStyle(.segmented)
 
             HStack {
-                Label(directoryPath, systemImage: "folder")
-                    .lineLimit(1)
-                    .truncationMode(.head)
-                Spacer()
-                Button("Choose…", action: chooseDirectory)
+                Picker("Project", selection: $project) {
+                    ForEach(projectChoices) { choice in
+                        Label(choice.name, systemImage: choice.symbol).tag(choice)
+                    }
+                }
+                Button("Add folder…", action: addFolder)
             }
 
             if let launchError {
@@ -57,23 +60,21 @@ struct NewTaskSheet: View {
         .frame(width: 560)
     }
 
-    private func chooseDirectory() {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.directoryURL = URL(fileURLWithPath: directoryPath)
-        if panel.runModal() == .OK, let url = panel.url { directoryPath = url.path }
+    /// Favorites, "No project", and the preset project in case it isn't a favorite.
+    private var projectChoices: [Project] {
+        var choices = store.favorites + [.none]
+        if !choices.contains(project) { choices.insert(project, at: 0) }
+        return choices
+    }
+
+    private func addFolder() {
+        if let url = FolderPicker.choose(startingAt: project.path) { project = store.addFavorite(url) }
     }
 
     private func start() {
         do {
-            let session = try store.launch(
-                task: task.trimmingCharacters(in: .whitespacesAndNewlines),
-                agent: agent,
-                directory: URL(fileURLWithPath: directoryPath)
-            )
+            try store.launch(task: task.trimmingCharacters(in: .whitespacesAndNewlines), agent: agent, project: project)
             dismiss()
-            openWindow(value: session.id)
         } catch {
             launchError = error.localizedDescription
         }

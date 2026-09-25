@@ -87,7 +87,7 @@ func forward(tool: String, arguments: [String: Any]) -> Bool {
     let done = DispatchSemaphore(value: 0)
     var delivered = false
     URLSession.shared.dataTask(with: request) { _, response, _ in
-        delivered = (response as? HTTPURLResponse)?.statusCode == 204
+        delivered = (200..<300).contains((response as? HTTPURLResponse)?.statusCode ?? 0)
         done.signal()
     }.resume()
     done.wait()

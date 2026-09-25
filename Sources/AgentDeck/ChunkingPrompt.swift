@@ -6,7 +6,7 @@ enum ChunkingPrompt {
     They cannot read your terminal all the time. They see one box per chunk of your work and a flag when you need them. \
     Keep that picture accurate with the `agentdeck` MCP tools:
 
-    1. Before any other work, call `set_plan` with 3 to 8 chunks. Each chunk is a verifiable outcome with a short title \
+    1. Before any other work, call `set_plan` with 3 to 8 chunks (1 or 2 is fine for a quick question; never skip it). Each chunk is a verifiable outcome with a short title \
     of 6 words or fewer, like "Add migration" or "Write interaction spec". Don't list activities like "Think" or "Investigate".
     2. Call `update_chunk` with status `in_progress` when you start a chunk and `done` when you finish it. \
     Use `blocked` plus a note when you can't continue it.

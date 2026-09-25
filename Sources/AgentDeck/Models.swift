@@ -14,10 +14,26 @@ enum AgentKind: String, CaseIterable, Identifiable {
     }
 }
 
+/// A folder agents work in, or `none` for questions that don't belong to any codebase.
+struct Project: Identifiable, Hashable {
+    let path: String?
+
+    static let none = Project(path: nil)
+
+    var id: String { path ?? "∅" }
+
+    var name: String { path.map { URL(fileURLWithPath: $0).lastPathComponent } ?? "No project" }
+
+    var symbol: String { path == nil ? "lightbulb" : "folder" }
+}
+
 enum SessionStatus: Equatable {
     case starting
     case working
+    /// Blocked on the human: a permission prompt, or the agent explicitly called `need_human`.
     case needsYou(String)
+    /// The agent finished its turn and is idle, waiting for the next message. Nothing is blocked.
+    case yourTurn
     case done(String?)
     case exited(Int32?)
 
@@ -26,6 +42,7 @@ enum SessionStatus: Equatable {
         case .starting: "Starting"
         case .working: "Working"
         case .needsYou: "Needs you"
+        case .yourTurn: "Your turn"
         case .done: "Done"
         case .exited: "Exited"
         }
@@ -36,13 +53,21 @@ enum SessionStatus: Equatable {
         return false
     }
 
-    /// Lower sorts first on the dashboard: whatever is blocked on the human floats to the top.
+    var isFinished: Bool {
+        switch self {
+        case .done, .exited: true
+        default: false
+        }
+    }
+
+    /// Lower sorts first: whatever is blocked on the human floats to the top.
     var sortRank: Int {
         switch self {
         case .needsYou: 0
-        case .working, .starting: 1
-        case .done: 2
-        case .exited: 3
+        case .yourTurn: 1
+        case .working, .starting: 2
+        case .done: 3
+        case .exited: 4
         }
     }
 }
@@ -72,6 +97,7 @@ final class AgentSession: ObservableObject, Identifiable {
     let id = UUID()
     let task: String
     let agent: AgentKind
+    let project: Project
     let directory: URL
     let startedAt = Date()
 
@@ -83,13 +109,20 @@ final class AgentSession: ObservableObject, Identifiable {
     var terminalView: LocalProcessTerminalView?
     var terminalBridge: TerminalBridge?
 
-    init(task: String, agent: AgentKind, directory: URL) {
+    init(task: String, agent: AgentKind, project: Project, directory: URL) {
         self.task = task
         self.agent = agent
+        self.project = project
         self.directory = directory
     }
 
     var completedChunks: Int { chunks.filter { $0.status == .done }.count }
 
     var allChunksDone: Bool { !chunks.isEmpty && completedChunks == chunks.count }
+
+    var hasOpenChunks: Bool { chunks.contains { $0.status != .done } }
+
+    var currentChunk: Chunk? {
+        chunks.first { $0.status == .inProgress || $0.status == .blocked } ?? chunks.first { $0.status == .pending }
+    }
 }

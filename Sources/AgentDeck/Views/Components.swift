@@ -20,20 +20,34 @@ struct StatusPill: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Circle().fill(color).frame(width: 8, height: 8)
+            StatusDot(status: status)
             Text(status.label)
         }
         .font(.caption.weight(.semibold))
         .padding(.horizontal, 8)
         .padding(.vertical, 3)
-        .background(color.opacity(0.15), in: Capsule())
+        .background(status.color.opacity(0.15), in: Capsule())
     }
+}
 
-    private var color: Color {
-        switch status {
+struct StatusDot: View {
+    let status: SessionStatus
+
+    var body: some View {
+        Circle()
+            .fill(status.color)
+            .frame(width: 8, height: 8)
+            .help(status.label)
+    }
+}
+
+extension SessionStatus {
+    var color: Color {
+        switch self {
         case .starting: .gray
         case .working: .blue
         case .needsYou: .orange
+        case .yourTurn: .purple
         case .done: .green
         case .exited: .secondary
         }
@@ -55,14 +69,38 @@ struct ChunkStrip: View {
             HStack(spacing: 4) {
                 ForEach(chunks) { chunk in
                     RoundedRectangle(cornerRadius: 3)
-                        .fill(chunk.status.color.opacity(chunk.status == .pending ? 0.25 : 0.9))
-                        .frame(height: 10)
+                        .fill(chunk.status.color.opacity(chunk.status == .pending ? 0.3 : 0.9))
+                        .frame(height: 8)
                         .help("\(chunk.id). \(chunk.title)")
                 }
             }
         } else {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 8)], spacing: 8) {
                 ForEach(chunks) { chunk in ChunkBox(chunk: chunk) }
+            }
+        }
+    }
+}
+
+/// The steps as a short checklist, each coloured by its status, for cards.
+struct ChunkList: View {
+    let chunks: [Chunk]
+    let limit: Int
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(chunks.prefix(limit)) { chunk in
+                Label {
+                    Text(chunk.title)
+                        .foregroundStyle(chunk.status == .pending ? .secondary : .primary)
+                } icon: {
+                    Image(systemName: chunk.status.symbol).foregroundStyle(chunk.status.color)
+                }
+                .font(.callout)
+                .lineLimit(1)
+            }
+            if chunks.count > limit {
+                Text("+\(chunks.count - limit) more").font(.caption).foregroundStyle(.secondary)
             }
         }
     }

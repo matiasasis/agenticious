@@ -8,22 +8,13 @@ struct AgentDeckApp: App {
     @StateObject private var usage = UsageMonitor()
 
     var body: some Scene {
-        Window("AgentDeck", id: "dashboard") {
-            DashboardView()
+        Window("AgentDeck", id: "main") {
+            MainView()
                 .environmentObject(store)
                 .environmentObject(usage)
-                .frame(minWidth: 720, minHeight: 480)
+                .frame(minWidth: 960, minHeight: 600)
         }
-
-        WindowGroup("Agent", for: UUID.self) { $sessionID in
-            if let sessionID, let session = store.session(sessionID) {
-                SessionDetailView(session: session)
-                    .environmentObject(store)
-            } else {
-                ContentUnavailableView("Session closed", systemImage: "xmark.circle")
-            }
-        }
-        .defaultSize(width: 1100, height: 760)
+        .defaultSize(width: 1400, height: 880)
 
         MenuBarExtra {
             MenuBarContent()

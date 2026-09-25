@@ -45,10 +45,11 @@ struct AgentLauncher {
     // MARK: - Environment
 
     private func baseEnvironment(for session: AgentSession) -> [String: String] {
-        var variables = ProcessInfo.processInfo.environment
-        // If AgentDeck itself was started from a Claude Code terminal, don't let the child think it is nested.
-        variables.removeValue(forKey: "CLAUDECODE")
-        variables.removeValue(forKey: "CLAUDE_CODE_ENTRYPOINT")
+        // If AgentDeck was started from inside a Claude Code session, its markers would make every agent a
+        // "child session" with transcript saving off. The login shell re-exports any CLAUDE_CODE_* the user sets.
+        var variables = ProcessInfo.processInfo.environment.filter { key, _ in
+            key != "CLAUDECODE" && !key.hasPrefix("CLAUDE_CODE_")
+        }
         variables["TERM"] = "xterm-256color"
         variables["COLORTERM"] = "truecolor"
         variables["AGENTDECK_SESSION"] = session.id.uuidString
@@ -75,15 +76,17 @@ struct AgentLauncher {
                 "UserPromptSubmit": [hookEntry(session, "UserPromptSubmit")],
                 "PostToolUse": [hookEntry(session, "PostToolUse", matcher: "*")],
                 "Notification": [hookEntry(session, "Notification")],
-                "Stop": [hookEntry(session, "Stop")],
+                "Stop": [hookEntry(session, "Stop", passReplyToClaude: true)],
             ],
             // Reporting progress must never cost the human a permission prompt.
             "permissions": ["allow": ["mcp__agentdeck"]],
         ]
     }
 
-    private func hookEntry(_ session: AgentSession, _ event: String, matcher: String? = nil) -> [String: Any] {
-        let command = "curl -s -m 2 -X POST --data-binary @- '\(hookURL(session, event))' >/dev/null 2>&1 || true"
+    /// With `passReplyToClaude`, the app's HTTP response becomes the hook's stdout, which Claude reads as a decision.
+    private func hookEntry(_ session: AgentSession, _ event: String, matcher: String? = nil, passReplyToClaude: Bool = false) -> [String: Any] {
+        let output = passReplyToClaude ? "2>/dev/null" : ">/dev/null 2>&1"
+        let command = "curl -s -m 5 -X POST --data-binary @- '\(hookURL(session, event))' \(output) || true"
         var entry: [String: Any] = ["hooks": [["type": "command", "command": command]]]
         if let matcher { entry["matcher"] = matcher }
         return entry
