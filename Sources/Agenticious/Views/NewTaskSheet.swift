@@ -18,6 +18,7 @@ struct NewTaskSheet: View {
     @AppStorage("useWorktree") private var useWorktree = true
     @State private var project: Project
     @State private var template: TaskTemplate
+    @StateObject private var repository = WorkspaceRepository()
     @State private var loadedPreset = false
     @State private var showingModels = false
     @FocusState private var missionFocused: Bool
@@ -75,6 +76,7 @@ struct NewTaskSheet: View {
             lastTaskPreset = id
         }
         .onChange(of: project) { _, project in lastWorkspace = project.path ?? "" }
+        .task(id: project.path) { await repository.check(project.path) }
     }
 
     private var header: some View {
@@ -154,6 +156,9 @@ struct NewTaskSheet: View {
             }
             thinkingEffort
             workspacePicker
+            if !repository.isReady(for: project.path) {
+                ProgressView("Checking workspace…").controlSize(.small).font(.caption)
+            }
             if isGitProject {
                 Toggle(isOn: $useWorktree) {
                     HStack(spacing: 10) {
@@ -317,7 +322,8 @@ struct NewTaskSheet: View {
     private var trimmedValue: String { templateValue.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     private var canStart: Bool {
-        !template.isFieldRequired || !taskInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        repository.isReady(for: project.path) &&
+            (!template.isFieldRequired || !taskInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
 
     private var taskInput: String { template.isCustom ? task : templateValue }
@@ -356,7 +362,7 @@ struct NewTaskSheet: View {
     }
 
     private var isGitProject: Bool {
-        project.path.flatMap(Worktrees.repositoryRoot(of:)) != nil
+        repository.isRepository(project.path)
     }
 
     private func addFolder() {
@@ -364,6 +370,7 @@ struct NewTaskSheet: View {
     }
 
     private func start() {
+        guard canStart else { return }
         do {
             let prompt = try TaskPrompt(template: template, input: taskInput, notes: notes, skillPaths: skillPaths)
             try store.launch(
