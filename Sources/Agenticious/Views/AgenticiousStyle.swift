@@ -9,7 +9,6 @@ enum AgenticiousStyle {
 
 struct ControlRoomHero: View {
     let isEmpty: Bool
-    let createAgent: () -> Void
 
     var body: some View {
         ViewThatFits(in: .horizontal) {
@@ -35,11 +34,6 @@ struct ControlRoomHero: View {
                 Text("Big ideas. Strange powers. Work getting done.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
-                Button(action: createAgent) {
-                    Label("Summon an agent", systemImage: "plus")
-                }
-                .buttonStyle(AgenticiousButtonStyle())
-                .padding(.top, 4)
             }
             .padding(30)
             .frame(maxWidth: .infinity, alignment: .leading)

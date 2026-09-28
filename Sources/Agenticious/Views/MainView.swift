@@ -304,9 +304,7 @@ private struct OverviewView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
                 if store.agentList == .queue {
-                    ControlRoomHero(isEmpty: store.visibleSessions.isEmpty) {
-                        store.composer = Composer(project: store.composerProject)
-                    }
+                    ControlRoomHero(isEmpty: store.visibleSessions.isEmpty)
                 } else {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Finished agents").font(.system(size: 30, weight: .bold, design: .rounded))
