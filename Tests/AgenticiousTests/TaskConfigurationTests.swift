@@ -78,6 +78,18 @@ final class TaskConfigurationTests: XCTestCase {
         XCTAssertEqual(try TaskPrompt(template: optional, input: "", notes: "", skillPaths: []).title, "Fix CI")
     }
 
+    func testResolveAndMergePreservesSingleMultipleAndSourceInputs() throws {
+        let preset = try XCTUnwrap(TaskTemplate.defaults.first { $0.id == "reviewComments" })
+        for input in ["14901", "14901, 14903", "https://github.com/example/project/pull/1\nhttps://github.com/example/project/pull/2",
+                      "https://example.com/discussions/review-batch"] {
+            let task = try TaskPrompt(template: preset, input: input, notes: "Keep the scope explicit", skillPaths: [])
+            XCTAssertTrue(task.instructions.contains(input))
+            XCTAssertTrue(task.instructions.contains("Keep the scope explicit"))
+            XCTAssertFalse(task.instructions.contains("{{input}}"))
+            XCTAssertEqual(task.title, "Resolve & merge: \(input)")
+        }
+    }
+
     func testInputIsRetainedWhenPromptHasNoPlaceholder() throws {
         let preset = TaskTemplate(name: "Explain", prompt: "Explain this carefully.")
         let prompt = try TaskPrompt(template: preset, input: "An unusual API", notes: "", skillPaths: [])

@@ -111,7 +111,8 @@ struct NewTaskSheet: View {
             VStack(alignment: .leading, spacing: 12) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(template.fieldLabel).font(.headline)
-                    TextField(template.fieldPlaceholder, text: $templateValue)
+                    TextField(template.fieldPlaceholder, text: $templateValue, axis: .vertical)
+                        .lineLimit(1...5)
                         .textFieldStyle(.plain)
                         .font(.title3)
                         .padding(12)

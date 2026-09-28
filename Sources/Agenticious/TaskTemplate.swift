@@ -45,20 +45,34 @@ struct TaskTemplate: Codable, Identifiable, Equatable {
                      Commit on a feature branch, push, and open a draft pull request linked to the ticket.
                      If the ticket or a required tool is unavailable, ask the human for help.
                      """),
-        TaskTemplate(id: "reviewComments", name: "Resolve & merge", summary: "Address review feedback, wait for CI, then merge the pull request.",
-                     symbol: "arrow.triangle.merge", fieldLabel: "Pull request", fieldPlaceholder: "PR number or URL",
-                     titlePattern: "Address comments and merge PR {{input}}", prompt: """
-                     Address review comments on pull request {{input}} and get it merged.
-                     Follow the project's review conventions. Implement applicable feedback, test and push fixes,
-                     and reply to each review thread. Explain any feedback that cannot be applied.
+        TaskTemplate(id: "reviewComments", name: "Resolve & merge", summary: "Address feedback, resolve conflicts, and get one or multiple PRs green and merged.",
+                     symbol: "arrow.triangle.merge", fieldLabel: "Pull request(s)",
+                     fieldPlaceholder: "PR numbers, URLs, or a link containing multiple PRs",
+                     titlePattern: "Resolve & merge: {{input}}", prompt: """
+                     Resolve review feedback and merge every pull request identified by this input:
+                     {{input}}
+
+                     Accept a single PR, a list of PR numbers or URLs, or a source link containing PR references.
+                     For a source link, read its complete content and all comments/replies, including paginated results.
+                     Collect every PR explicitly linked there; deduplicate by repository and PR number, and list the
+                     resulting scope before making changes. Do not expand scope to unrelated linked discussions.
+                     Resolve bare PR numbers against the selected project. If the repository or scope is ambiguous,
+                     or the source cannot be read completely, ask the human instead of guessing or silently omitting PRs.
+                     Check each PR's current state. Report already-merged PRs separately; closed-unmerged PRs are blockers.
+                     Identify stacked PR dependencies and process them in dependency order, rechecking each target branch after merges.
+
+                     For each open PR, follow the project's review conventions. Implement applicable feedback,
+                     test and push fixes, and reply to each review thread. Explain feedback that cannot be applied.
                      Resolve merge conflicts with the target branch, preserving the intended changes on both sides.
                      Test the resolution and push it before checking CI again.
                      Inspect failing CI logs. For failures confirmed to be flaky, rerun the failed tests or CI jobs
                      and watch the rerun. If the same failure keeps recurring, investigate and fix it rather than
                      blindly retrying. Fix genuine regressions without skipping or weakening tests.
-                     Verify all required CI checks are green on the latest commit, then merge with the repository's normal method.
-                     Do not bypass required checks or approvals. Ask the human when a conflict's intended behavior
-                     is unclear or another blocker cannot be resolved.
+                     Verify required CI checks are green on the latest commit and required approvals are satisfied,
+                     then merge with the repository's normal method. Do not bypass required checks or approvals.
+                     Ask the human when intended behavior is unclear or a blocker cannot be resolved; continue independent PRs.
+                     Track every PR through completion and report its clickable URL, final state, and any blockers.
+                     Only report the whole task complete after verifying that every PR in scope is merged.
                      """),
         TaskTemplate(id: "reviewPR", name: "Review PR", summary: "Review a pull request and post actionable feedback.",
                      symbol: "text.magnifyingglass", fieldLabel: "Pull request", fieldPlaceholder: "PR number or URL",
