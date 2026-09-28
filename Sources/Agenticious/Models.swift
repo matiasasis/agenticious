@@ -113,6 +113,7 @@ final class AgentSession: ObservableObject, Identifiable {
     /// Nil leaves the CLI's own default in place.
     let model: ModelChoice?
     let effort: String?
+    let taskType: TaskType?
 
     @Published var isMarkedFinished = false
     @Published var status: SessionStatus = .starting
@@ -130,7 +131,7 @@ final class AgentSession: ObservableObject, Identifiable {
 
     init(
         id: UUID = UUID(), task: String, prompt: String? = nil, agent: AgentKind, project: Project, directory: URL,
-        startedAt: Date = Date(), worktree: Worktree? = nil, model: ModelChoice? = nil, effort: String? = nil
+        startedAt: Date = Date(), worktree: Worktree? = nil, model: ModelChoice? = nil, effort: String? = nil, taskType: TaskType? = nil
     ) {
         self.id = id
         self.startedAt = startedAt
@@ -142,6 +143,7 @@ final class AgentSession: ObservableObject, Identifiable {
         self.worktree = worktree
         self.model = model
         self.effort = effort
+        self.taskType = taskType
         recordPullRequests(in: task + "\n" + self.prompt)
     }
 
@@ -154,6 +156,13 @@ final class AgentSession: ObservableObject, Identifiable {
     func recordPullRequests(in text: String) {
         let additions = PullRequestReference.extract(from: text).filter { !pullRequests.contains($0) }
         for reference in additions where !pullRequests.contains(reference) { pullRequests.append(reference) }
+    }
+
+    var displayedTaskType: TaskType { taskType ?? TaskType.legacy(title: task) }
+
+    var canMarkFinished: Bool {
+        if case .done = status { return !isMarkedFinished }
+        return false
     }
 
     var completedChunks: Int { chunks.filter { $0.status == .done }.count }

@@ -3,6 +3,20 @@ import XCTest
 
 final class AgentListTests: XCTestCase {
     @MainActor
+    func testOnlyDoneTasksCanBeMarkedFinished() {
+        let session = AgentSession(task: "Work", agent: .claude, project: .none, directory: URL(fileURLWithPath: "/tmp"))
+        session.chunks = [Chunk(id: 1, title: "Completed step", status: .done)]
+        for status in [SessionStatus.starting, .working, .waiting, .yourTurn, .needsYou("Approve"), .interrupted, .exited(0), .exited(1)] {
+            session.status = status
+            XCTAssertFalse(session.canMarkFinished)
+        }
+        session.status = .done(nil)
+        XCTAssertTrue(session.canMarkFinished)
+        session.isMarkedFinished = true
+        XCTAssertFalse(session.canMarkFinished)
+    }
+
+    @MainActor
     func testStatusChangesDoNotMoveSessions() async {
         let session = AgentSession(task: "Work", agent: .claude, project: .none, directory: URL(fileURLWithPath: "/tmp"))
         let groups = [ProjectGroup(project: .none, sessions: [session], isFavorite: false)]
@@ -36,6 +50,7 @@ final class AgentListTests: XCTestCase {
         do {
             let legacy = try Database(url: url)
             try legacy.execute("ALTER TABLE sessions DROP COLUMN is_marked_finished")
+            try legacy.execute("ALTER TABLE sessions DROP COLUMN task_type")
             legacy.schemaVersion = 2
         }
         let migrated = try SessionDatabase(url: url)

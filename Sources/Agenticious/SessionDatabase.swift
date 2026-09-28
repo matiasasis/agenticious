@@ -62,6 +62,10 @@ struct SessionDatabase {
             try database.execute("ALTER TABLE sessions ADD COLUMN is_marked_finished INTEGER NOT NULL DEFAULT 0")
             database.schemaVersion = 3
         }
+        if database.schemaVersion < 4 {
+            try database.execute("ALTER TABLE sessions ADD COLUMN task_type TEXT")
+            database.schemaVersion = 4
+        }
     }
 
     // MARK: - Writing
@@ -75,8 +79,8 @@ struct SessionDatabase {
                 INSERT OR REPLACE INTO sessions (
                     id, task, prompt, agent, project_path, directory, started_at, last_activity,
                     worktree_root, worktree_path, worktree_branch, worktree_removed,
-                    model_id, model_name, effort, status, status_detail, plan_source, conversation_id, pull_requests, is_marked_finished
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    model_id, model_name, effort, status, status_detail, plan_source, conversation_id, pull_requests, is_marked_finished, task_type
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 session.id.uuidString, session.task, session.prompt, session.agent.rawValue, session.project.path,
                 session.directory.path, session.startedAt.timeIntervalSince1970, session.lastActivity.timeIntervalSince1970,
@@ -84,7 +88,8 @@ struct SessionDatabase {
                 session.model?.id, session.model?.name, session.effort, status, detail,
                 Self.encode(session.planSource), session.conversationID,
                 String(decoding: try JSONEncoder().encode(session.pullRequests.map { $0.url.absoluteString }), as: UTF8.self),
-                session.isMarkedFinished
+                session.isMarkedFinished,
+                try session.taskType.map { String(decoding: try JSONEncoder().encode($0), as: UTF8.self) }
             )
             try database.execute("DELETE FROM chunks WHERE session_id = ?", session.id.uuidString)
             for chunk in session.chunks {
@@ -123,7 +128,8 @@ struct SessionDatabase {
                 startedAt: Date(timeIntervalSince1970: row.double("started_at") ?? 0),
                 worktree: Self.worktree(row),
                 model: Self.model(row, agent: agent),
-                effort: row.string("effort")
+                effort: row.string("effort"),
+                taskType: row.string("task_type")?.data(using: .utf8).flatMap { try? JSONDecoder().decode(TaskType.self, from: $0) }
             )
             let status = Self.decode(row.string("status"), detail: row.string("status_detail"))
             session.status = status.isFinished ? status : .interrupted

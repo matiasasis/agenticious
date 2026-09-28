@@ -104,6 +104,7 @@ final class SessionStore: ObservableObject {
     func count(in list: AgentList) -> Int { sessions.filter { list.includes(isMarkedFinished: $0.isMarkedFinished) }.count }
 
     func markFinished(_ session: AgentSession, finished: Bool) {
+        guard !finished || session.canMarkFinished else { return }
         if finished { notifications.playSound("Pop") }
         session.isMarkedFinished = finished
         save(session)
@@ -161,12 +162,14 @@ final class SessionStore: ObservableObject {
 
     @discardableResult
     func launch(
-        task: String, prompt: String? = nil, agent: AgentKind, model: ModelChoice? = nil, effort: String? = nil, project: Project, isolated: Bool = false
+        task: String, prompt: String? = nil, agent: AgentKind, model: ModelChoice? = nil, effort: String? = nil,
+        project: Project, isolated: Bool = false, taskType: TaskType? = nil
     ) throws -> AgentSession {
         let worktree = try isolated ? project.path.map { try Worktrees.create(in: $0, for: task) } : nil
         let directory = try worktree.map { directory(inside: $0, for: project) } ?? directory(for: project)
         let session = AgentSession(
-            task: task, prompt: prompt, agent: agent, project: project, directory: directory, worktree: worktree, model: model, effort: effort
+            task: task, prompt: prompt, agent: agent, project: project, directory: directory,
+            worktree: worktree, model: model, effort: effort, taskType: taskType
         )
         if agent == .claude { session.conversationID = session.id.uuidString.lowercased() }
         let spec = try AgentLauncher(port: port).spec(for: session)

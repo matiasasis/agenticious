@@ -14,6 +14,45 @@ final class TaskConfigurationTests: XCTestCase {
     }
 
     @MainActor
+    func testTaskTypePersistsIndependentOfTitleAndPresetEdits() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        var template = TaskTemplate(name: "Investigate", symbol: "magnifyingglass")
+        let session = AgentSession(task: "Unrelated title", agent: .claude, project: .none, directory: folder,
+                                   taskType: TaskType(template: template))
+        template.symbol = "hammer"
+        let database = try SessionDatabase(url: folder.appendingPathComponent("test.sqlite"))
+        try database.save(session)
+        let restored = try XCTUnwrap(database.load().first)
+        XCTAssertEqual(restored.displayedTaskType.name, "Investigate")
+        XCTAssertEqual(restored.displayedTaskType.symbol, "magnifyingglass")
+    }
+
+    @MainActor
+    func testLegacyTaskTypesAndSchemaMigration() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let url = folder.appendingPathComponent("test.sqlite")
+        do {
+            let database = try SessionDatabase(url: url)
+            for title in ["Review PRs: 123", "Resolve & merge: 123", "Implement SK-123", "Fix CI 123", "Address comments and merge PR 123", "Explain the code"] {
+                try database.save(AgentSession(task: title, agent: .claude, project: .none, directory: folder))
+            }
+            let legacy = try Database(url: url)
+            try legacy.execute("ALTER TABLE sessions DROP COLUMN task_type")
+            legacy.schemaVersion = 3
+        }
+        let sessions = try SessionDatabase(url: url).load()
+        let symbols = Dictionary(uniqueKeysWithValues: sessions.map { ($0.task, $0.displayedTaskType.symbol) })
+        XCTAssertEqual(symbols["Review PRs: 123"], "text.magnifyingglass")
+        XCTAssertEqual(symbols["Resolve & merge: 123"], "arrow.triangle.merge")
+        XCTAssertEqual(symbols["Implement SK-123"], "hammer")
+        XCTAssertEqual(symbols["Fix CI 123"], "wrench.and.screwdriver")
+        XCTAssertEqual(symbols["Address comments and merge PR 123"], "arrow.triangle.merge")
+        XCTAssertEqual(symbols["Explain the code"], "sparkles")
+    }
+
+    @MainActor
     func testPresetsSurviveRelaunchAndDeletion() async throws {
         let url = directory.appendingPathComponent("presets.json")
         let store = TaskPresetStore(url: url)

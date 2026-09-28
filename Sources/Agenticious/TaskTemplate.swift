@@ -148,3 +148,22 @@ struct TaskTemplate: Codable, Identifiable, Equatable {
                      """)
     ]
 }
+
+struct TaskType: Codable, Equatable {
+    let name: String
+    let symbol: String
+
+    init(template: TaskTemplate) {
+        name = template.name
+        symbol = template.symbol
+    }
+
+    static func legacy(title: String) -> TaskType {
+        let prefixes = [("Implement ", "implementTicket"), ("Resolve & merge:", "reviewComments"),
+                        ("Address comments and merge PR ", "reviewComments"),
+                        ("Review PRs:", "reviewPR"), ("Review PR ", "reviewPR"), ("Review PR:", "reviewPR"),
+                        ("Fix CI ", "fixCI")]
+        let id = prefixes.first { title.hasPrefix($0.0) }?.1
+        return TaskType(template: TaskTemplate.defaults.first { $0.id == id } ?? .custom)
+    }
+}
