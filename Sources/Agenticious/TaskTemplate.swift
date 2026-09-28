@@ -53,7 +53,10 @@ struct TaskTemplate: Codable, Identifiable, Equatable {
                      and reply to each review thread. Explain any feedback that cannot be applied.
                      Resolve merge conflicts with the target branch, preserving the intended changes on both sides.
                      Test the resolution and push it before checking CI again.
-                     Wait for CI on the latest commit before merging with the repository's normal method.
+                     Inspect failing CI logs. For failures confirmed to be flaky, rerun the failed tests or CI jobs
+                     and watch the rerun. If the same failure keeps recurring, investigate and fix it rather than
+                     blindly retrying. Fix genuine regressions without skipping or weakening tests.
+                     Verify all required CI checks are green on the latest commit, then merge with the repository's normal method.
                      Do not bypass required checks or approvals. Ask the human when a conflict's intended behavior
                      is unclear or another blocker cannot be resolved.
                      """),
