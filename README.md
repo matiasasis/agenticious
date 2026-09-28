@@ -15,6 +15,12 @@ A native macOS dashboard for running many coding agents (Claude Code and Codex) 
 script/run
 ```
 
+`script/run` builds a signed local `.build/Agenticious.app` bundle, required for macOS notifications.
+After updating, quit the previous app when its agents are no longer running, then run the script again.
+In **Customize → Preferences**, enable macOS notifications and accept the system permission prompt.
+Notifications open the relevant agent; sounds and notifications can be toggled separately. Existing
+settings from the bare executable are imported on first bundled launch.
+
 Requires macOS 14+ and the `claude` / `codex` CLIs on your login shell's PATH.
 
 ## How it knows what the agent is doing

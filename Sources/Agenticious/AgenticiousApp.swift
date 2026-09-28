@@ -7,7 +7,18 @@ struct AgenticiousApp: App {
     @StateObject private var store = SessionStore()
 
     init() {
+        Self.importUnbundledSettings()
         Self.importSettingsFromAgentDeck()
+    }
+
+    private static func importUnbundledSettings() {
+        let defaults = UserDefaults.standard
+        guard Bundle.main.bundleIdentifier == "com.agenticious.app",
+              !defaults.bool(forKey: "importedUnbundledSettings") else { return }
+        for (key, value) in defaults.persistentDomain(forName: "Agenticious") ?? [:] {
+            if defaults.object(forKey: key) == nil { defaults.set(value, forKey: key) }
+        }
+        defaults.set(true, forKey: "importedUnbundledSettings")
     }
 
     /// The app was called AgentDeck, and a bare executable's defaults domain is its name, so settings saved
@@ -25,6 +36,7 @@ struct AgenticiousApp: App {
         Window("Agenticious", id: "main") {
             MainView()
                 .environmentObject(store)
+                .environmentObject(store.notifications)
                 .environmentObject(store.usage)
                 .environmentObject(store.diagnostics)
                 .environmentObject(store.presets)
@@ -48,6 +60,7 @@ struct AgenticiousApp: App {
                 Image(nsImage: AgenticiousMenuIcon.image)
                 if store.attentionCount > 0 { Text("\(store.attentionCount)") }
             }
+            .modifier(NotificationNavigation(store: store, notifications: store.notifications))
             .accessibilityLabel("Agenticious, \(store.attentionCount) agents need attention")
         }
     }
@@ -62,4 +75,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+}
+
+private struct NotificationNavigation: ViewModifier {
+    let store: SessionStore
+    @ObservedObject var notifications: AgentNotifications
+    @Environment(\.openWindow) private var openWindow
+
+    func body(content: Content) -> some View {
+        content.onReceive(notifications.$requestedSession) { id in
+            guard let id else { return }
+            Task { @MainActor in
+                if store.session(id) != nil { store.selection = .session(id) }
+                openWindow(id: "main")
+                NSApp.activate(ignoringOtherApps: true)
+                notifications.requestedSession = nil
+            }
+        }
+    }
 }

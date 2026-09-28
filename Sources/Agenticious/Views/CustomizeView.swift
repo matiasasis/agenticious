@@ -36,6 +36,7 @@ private struct PreferencesView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 Text("Make yourself at home.").font(.system(size: 30, weight: .bold, design: .rounded))
+                NotificationPreferencesView()
                 VStack(alignment: .leading, spacing: 20) {
                     Toggle("Show branch names in the agent sidebar", isOn: $showBranches)
                     Divider()

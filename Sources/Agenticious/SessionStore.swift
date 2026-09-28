@@ -64,6 +64,7 @@ final class SessionStore: ObservableObject {
     @Published var alert: String?
 
     let port: UInt16
+    let notifications = AgentNotifications()
     let usage = UsageMonitor()
     let diagnostics = ProviderDiagnostics()
     let presets = TaskPresetStore()
@@ -72,6 +73,7 @@ final class SessionStore: ObservableObject {
     private var database: SessionDatabase?
     private var subscriptions: [UUID: AnyCancellable] = [:]
     private var unsaved: Set<UUID> = []
+    private var expectedStops: Set<UUID> = []
     private var snapshotter: WindowSnapshotter?
     private var commandLineOptionsPending = true
 
@@ -102,6 +104,7 @@ final class SessionStore: ObservableObject {
     func count(in list: AgentList) -> Int { sessions.filter { list.includes(isMarkedFinished: $0.isMarkedFinished) }.count }
 
     func markFinished(_ session: AgentSession, finished: Bool) {
+        if finished { notifications.playSound("Pop") }
         session.isMarkedFinished = finished
         save(session)
         if finished { show(.queue) }
@@ -204,6 +207,7 @@ final class SessionStore: ObservableObject {
     }
 
     func stop(_ session: AgentSession) {
+        if session.isRunning { expectedStops.insert(session.id) }
         session.terminalView?.terminate()
     }
 
@@ -255,8 +259,12 @@ final class SessionStore: ObservableObject {
         let terminal = LocalProcessTerminalView(frame: NSRect(x: 0, y: 0, width: 900, height: 500))
         let bridge = TerminalBridge { [weak self, weak session] exitCode in
             guard let session else { return }
+            let oldStatus = session.status
             session.isRunning = false
             if case .done = session.status {} else { session.status = .exited(exitCode) }
+            if self?.expectedStops.remove(session.id) == nil {
+                self?.notifyTransition(from: oldStatus, for: session)
+            }
             self?.updateBadge()
         }
 
@@ -266,6 +274,7 @@ final class SessionStore: ObservableObject {
         session.terminalView = terminal
         session.terminalBridge = bridge
         session.isRunning = true
+        notifications.playSound("Tink")
     }
 
     /// Re-publish every session change so lists re-sort when an agent flips to "needs you", and save it.
@@ -335,11 +344,16 @@ final class SessionStore: ObservableObject {
             return try? JSONSerialization.data(withJSONObject: reply)
         }
 
-        let neededAttention = session.status.needsAttention
+        let oldStatus = session.status
         EventInterpreter.apply(event.name, payload, to: session)
-        if !neededAttention && session.status.needsAttention { NSSound(named: "Glass")?.play() }
+        notifyTransition(from: oldStatus, for: session)
         updateBadge()
         return nil
+    }
+
+    private func notifyTransition(from oldStatus: SessionStatus, for session: AgentSession) {
+        guard let event = AgentAlert.transition(from: oldStatus, to: session.status) else { return }
+        notifications.notify(event, sessionID: session.id, task: session.task)
     }
 
     /// Claude redraws its status line after every message, so this doubles as the feed for the toolbar's Claude limits.

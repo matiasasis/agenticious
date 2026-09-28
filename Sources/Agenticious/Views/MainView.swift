@@ -48,6 +48,7 @@ struct MainView: View {
         guard let options = store.takeCommandLineOptions() else { return }
         if let template = options.newAgentTemplate { store.composer = Composer(project: defaultProject, template: store.presets.preset(id: template)) }
         if options.showSettings { store.selection = .settings }
+        if options.showPreferences { store.selection = .preferences }
         if options.showSkills { store.selection = .skills }
         if options.showProviders { store.selection = .providers }
         if options.showFinished { store.show(.finished) }

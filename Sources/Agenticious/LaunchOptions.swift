@@ -14,6 +14,7 @@ struct LaunchOptions {
     let directory: URL?
     let snapshotDirectory: URL?
     let newAgentTemplate: String?
+    let showPreferences: Bool
     let showSettings: Bool
     let showSkills: Bool
     let showProviders: Bool
@@ -33,6 +34,7 @@ struct LaunchOptions {
         effort = value("--effort")
         directory = value("--dir").map { URL(fileURLWithPath: $0) }
         snapshotDirectory = value("--snapshot-dir").map { URL(fileURLWithPath: $0) }
+        showPreferences = arguments.contains("--preferences")
         showSettings = arguments.contains("--settings")
         showSkills = arguments.contains("--skills")
         showProviders = arguments.contains("--providers")
