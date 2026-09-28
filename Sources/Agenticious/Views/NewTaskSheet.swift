@@ -26,7 +26,9 @@ struct NewTaskSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("New agent").font(.title2.bold())
+            Label("Summon an agent", systemImage: "sparkles")
+                .font(.system(size: 26, weight: .bold, design: .rounded))
+                .foregroundStyle(AgenticiousStyle.lime)
 
             Picker("Template", selection: $template) {
                 ForEach(TaskTemplate.allCases) { Text($0.name).tag($0) }
@@ -108,6 +110,7 @@ struct NewTaskSheet: View {
         }
         .padding(24)
         .frame(width: 760)
+        .background(AgenticiousStyle.ink)
     }
 
     private func editor(_ text: Binding<String>, minHeight: CGFloat) -> some View {

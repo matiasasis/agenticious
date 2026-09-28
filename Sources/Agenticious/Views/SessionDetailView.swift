@@ -39,7 +39,8 @@ struct SessionDetailView: View {
                 ChunkStrip(chunks: session.chunks, style: .expanded, isRunning: session.isRunning)
                 statusBanner
             }
-            .padding()
+            .padding(20)
+            .background(AgenticiousStyle.panel)
 
             Divider()
 

@@ -12,7 +12,10 @@ struct MainView: View {
         } detail: {
             detail
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .background(AgenticiousStyle.ink)
         }
+        .tint(AgenticiousStyle.lime)
+        .preferredColorScheme(.dark)
         .toolbar {
             ToolbarItem(placement: .primaryAction) { UsageBar() }
             ToolbarItem(placement: .primaryAction) {
@@ -85,6 +88,21 @@ private struct Sidebar: View {
             }
         }
         .listStyle(.sidebar)
+        .scrollContentBackground(.hidden)
+        .background(AgenticiousStyle.ink)
+        .safeAreaInset(edge: .top) {
+            HStack(spacing: 10) {
+                Image("AppIcon", bundle: .module).resizable().frame(width: 44, height: 44)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("AGENTICIOUS").font(.system(size: 17, weight: .black, design: .rounded))
+                    Text("A LITTLE CHAOS. A LOT DONE.")
+                        .font(.system(size: 8, weight: .bold, design: .monospaced))
+                        .tracking(1).foregroundStyle(AgenticiousStyle.lime)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(16)
+        }
         .safeAreaInset(edge: .bottom) {
             Button("Add project folder…", systemImage: "folder.badge.plus", action: addProject)
                 .buttonStyle(.borderless)
@@ -201,43 +219,54 @@ private struct OverviewView: View {
     private let columns = [GridItem(.adaptive(minimum: 320), spacing: 16)]
 
     var body: some View {
-        if store.sessions.isEmpty {
-            ContentUnavailableView {
-                Label("No agents running", systemImage: "square.grid.2x2")
-            } description: {
-                Text("Pick a project on the left and give an agent a task.")
-            } actions: {
-                Button("New Agent") { store.composer = Composer(project: store.favorites.first ?? .none) }
-                    .buttonStyle(.borderedProminent)
-            }
-        } else {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 28) {
-                    if let error = store.serverError {
-                        Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red)
-                    }
-                    ForEach(store.projectGroups.filter { !$0.sessions.isEmpty }) { group in
-                        VStack(alignment: .leading, spacing: 12) {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 26) {
+                ControlRoomHero(isEmpty: store.sessions.isEmpty) {
+                    store.composer = Composer(project: store.favorites.first ?? .none)
+                }
+                HStack(spacing: 12) {
+                    DashboardMetric(title: "AGENTS", value: store.sessions.count, color: AgenticiousStyle.violet)
+                    DashboardMetric(title: "RUNNING", value: store.sessions.filter(\.isRunning).count, color: AgenticiousStyle.lime)
+                    DashboardMetric(title: "NEEDS YOU", value: store.attentionCount, color: .orange)
+                }
+                if let error = store.serverError {
+                    Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red)
+                }
+                if store.sessions.isEmpty {
+                    Label("Your next big idea deserves a small army. Pick a project and start an agent.", systemImage: "sparkles")
+                        .foregroundStyle(.secondary)
+                        .padding(.vertical, 8)
+                }
+                ForEach(store.projectGroups.filter { !$0.sessions.isEmpty }) { group in
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack {
                             Label(group.project.name, systemImage: group.project.symbol)
                                 .font(.title3.bold())
-                            LazyVGrid(columns: columns, spacing: 16) {
-                                ForEach(group.sessions) { session in
+                            Rectangle().fill(AgenticiousStyle.violet.opacity(0.25)).frame(height: 1)
+                            Text("\(group.sessions.count) AGENTS")
+                                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                        }
+                        LazyVGrid(columns: columns, spacing: 16) {
+                            ForEach(group.sessions) { session in
+                                Button { store.selection = .session(session.id) } label: {
                                     SessionCard(session: session)
-                                        .onTapGesture { store.selection = .session(session.id) }
-                                        .contextMenu { SessionMenu(session: session) }
                                 }
+                                .buttonStyle(.plain)
+                                .contextMenu { SessionMenu(session: session) }
                             }
                         }
                     }
                 }
-                .padding(20)
             }
+            .padding(24)
         }
     }
 }
 
 struct SessionCard: View {
     @ObservedObject var session: AgentSession
+    @State private var isHovered = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -272,13 +301,15 @@ struct SessionCard: View {
             .font(.caption)
             .foregroundStyle(.secondary)
         }
-        .padding()
-        .background(.background.secondary, in: RoundedRectangle(cornerRadius: 12))
+        .padding(20)
+        .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 18))
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(session.status.needsAttention ? Color.orange : Color.clear, lineWidth: 2)
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(session.status.needsAttention ? Color.orange : AgenticiousStyle.violet.opacity(isHovered ? 0.8 : 0.25), lineWidth: 1)
         )
-        .contentShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: AgenticiousStyle.violet.opacity(isHovered ? 0.14 : 0), radius: 16)
+        .contentShape(RoundedRectangle(cornerRadius: 18))
+        .onHover { isHovered = $0 }
     }
 }
 

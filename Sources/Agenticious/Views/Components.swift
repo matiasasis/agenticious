@@ -60,9 +60,9 @@ extension SessionStatus {
     var color: Color {
         switch self {
         case .starting: .gray
-        case .working: .blue
+        case .working: AgenticiousStyle.lime
         case .needsYou: .orange
-        case .yourTurn: .purple
+        case .yourTurn: AgenticiousStyle.violet
         case .done: .green
         case .exited: .secondary
         case .interrupted: .brown
@@ -155,7 +155,7 @@ extension ChunkStatus {
     var color: Color {
         switch self {
         case .pending: .gray
-        case .inProgress: .blue
+        case .inProgress: AgenticiousStyle.lime
         case .done: .green
         case .blocked: .orange
         }
