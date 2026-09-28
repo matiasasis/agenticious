@@ -63,7 +63,7 @@ uncommitted changes, and the branch is always kept.
 
 ## Task presets and skills
 
-Open **Settings** in the sidebar (or press `⌘,`) to create, edit, or delete task presets. Each preset has a name,
+Open **Customize → Task presets** at the bottom of the sidebar (or press `⌘,`) to create, edit, or delete task presets. Each preset has a name,
 description, input hint, title, prompt, and optional skills. Use `{{input}}` in the title or prompt for the task's
 input. Notes and selected skill references are appended automatically. The Custom task is editable and always
 remains available. Changes affect new tasks; existing conversations keep their original prompts.
@@ -72,7 +72,7 @@ Presets are saved per user in `~/Library/Application Support/Agenticious/task-pr
 file is preserved and reported instead of silently overwritten. The included presets are generic starting points,
 so customize their prompts and skill choices for your workflow.
 
-**Skills** browses `SKILL.md` files from personal `.agents/skills`, `.codex/skills` (respecting `CODEX_HOME`),
+**Customize → Skills** browses `SKILL.md` files from personal `.agents/skills`, `.codex/skills` (respecting `CODEX_HOME`),
 `.claude/skills`, `/etc/codex/skills`, project skill folders up to the repository root, and Codex/Claude plugin
 caches. Add other locations with **Search folders**. Symlinked folders are followed and identical files are
 shown once. Cached plugins are labeled as such: a cached skill does not mean its plugin or tools are enabled.
@@ -94,8 +94,14 @@ For UI inspection, `--settings`, `--skills`, and `--new-agent [preset-id]` can b
 - System notifications (needs a proper `.app` bundle)
 - Codex approval prompts don't trigger a hook yet, so they only show up if the agent calls `need_human`
 
+### Navigation and menu bar
+
+The sidebar groups agents by workspace. Each card shows its provider, status, task, and completed steps; select a card to return to its terminal, or right-click for session actions. Use the folder button beside **Workspaces** to add a project.
+
+**Customize** keeps task presets, skills, and preferences together while the agent sidebar stays visible. Preferences can hide sidebar branch names and set the default worktree behavior for new agents. The macOS menu bar uses a monochrome Agenticious face, with a count only when agents need your attention.
+
 ### Provider diagnostics
 
-Open **Providers** to check Claude Code and Codex account access and MCP status in your home folder or a selected project. The sidebar badge and toolbar warning icon link to the results. Checks run at launch and on refresh; changing the folder runs a fresh check. Authentication and connection failures include recovery instructions.
+Open the connection-status button beside the usage meters, then **Manage providers**, to check Claude Code and Codex account access and MCP status in your home folder or a selected project. The toolbar warning icon opens a compact provider summary. Checks run at launch and on refresh; changing the folder runs a fresh check. Authentication and connection failures include recovery instructions.
 
 Claude checks MCP connections; Codex reports configured authentication without claiming the server is reachable. Session-only MCP overrides and worktree configuration can differ from these folder checks. Raw command output, server URLs, and credentials are not shown. Run the displayed provider commands in that folder for full details, then refresh after fixing an issue.

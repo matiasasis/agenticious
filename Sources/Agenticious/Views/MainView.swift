@@ -37,10 +37,8 @@ struct MainView: View {
     private var detail: some View {
         if store.selection == .providers {
             ProvidersView()
-        } else if store.selection == .settings {
-            TaskSettingsView()
-        } else if store.selection == .skills {
-            SkillLibraryView()
+        } else if [.settings, .skills, .preferences].contains(store.selection) {
+            CustomizeView()
         } else if let session = store.selectedSession {
             SessionDetailView(session: session)
                 .id(session.id)
@@ -74,37 +72,49 @@ struct MainView: View {
 
 private struct Sidebar: View {
     @EnvironmentObject private var store: SessionStore
-    @EnvironmentObject private var diagnostics: ProviderDiagnostics
     @State private var collapsed: Set<Project.ID> = []
 
     var body: some View {
-        List(selection: $store.selection) {
-            Label("All agents", systemImage: "square.grid.2x2")
-                .badge(store.attentionCount)
-                .tag(Selection.overview)
-            Label("Skills", systemImage: "books.vertical").tag(Selection.skills)
-            Label("Providers", systemImage: "network").badge(diagnostics.attentionCount).tag(Selection.providers)
-            Label("Settings", systemImage: "slider.horizontal.3").tag(Selection.settings)
-
-            // Plain rows rather than Sections: a sidebar Section's collapse arrow appears on hover and shoves the + aside.
-            ForEach(store.projectGroups) { group in
-                let isCollapsed = collapsed.contains(group.id)
-
-                ProjectHeader(group: group, isCollapsed: isCollapsed) {
-                    if isCollapsed { collapsed.remove(group.id) } else { collapsed.insert(group.id) }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                Button { store.selection = .overview } label: {
+                    HStack {
+                        Label("All agents", systemImage: "square.grid.2x2")
+                        Spacer()
+                        Text("\(store.sessions.count)").monospacedDigit()
+                    }
+                    .font(.callout.weight(.semibold)).padding(12)
+                    .foregroundStyle(store.selection == .overview ? AgenticiousStyle.lime : .primary)
+                    .background(store.selection == .overview ? AgenticiousStyle.lime.opacity(0.1) : AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 12))
                 }
-
-                if !isCollapsed {
-                    ForEach(group.sessions) { session in
-                        SessionRow(session: session)
-                            .tag(Selection.session(session.id))
-                            .contextMenu { SessionMenu(session: session) }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(store.selection == .overview ? .isSelected : [])
+                HStack {
+                    Text("WORKSPACES").font(.system(size: 10, weight: .bold, design: .monospaced)).tracking(1)
+                    Spacer()
+                    Button("Add project folder…", systemImage: "folder.badge.plus", action: addProject)
+                        .labelStyle(.iconOnly).buttonStyle(.plain).help("Add project folder")
+                }.foregroundStyle(.secondary).padding(.horizontal, 4)
+                ForEach(store.projectGroups) { group in
+                    let isCollapsed = collapsed.contains(group.id)
+                    VStack(spacing: 8) {
+                        ProjectHeader(group: group, isCollapsed: isCollapsed) {
+                            if isCollapsed { collapsed.remove(group.id) } else { collapsed.insert(group.id) }
+                        }
+                        if !isCollapsed {
+                            ForEach(group.sessions) { session in
+                                Button { store.selection = .session(session.id) } label: {
+                                    SessionRow(session: session, isSelected: store.selection == .session(session.id))
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityAddTraits(store.selection == .session(session.id) ? .isSelected : [])
+                                .contextMenu { SessionMenu(session: session) }
+                            }
+                        }
                     }
                 }
-            }
+            }.padding(12)
         }
-        .listStyle(.sidebar)
-        .scrollContentBackground(.hidden)
         .background(AgenticiousStyle.ink)
         .safeAreaInset(edge: .top) {
             HStack(spacing: 10) {
@@ -120,10 +130,22 @@ private struct Sidebar: View {
             .padding(16)
         }
         .safeAreaInset(edge: .bottom) {
-            Button("Add project folder…", systemImage: "folder.badge.plus", action: addProject)
-                .buttonStyle(AgenticiousButtonStyle(isCompact: true))
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            Button { store.selection = .settings } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "slider.horizontal.3").font(.title3).foregroundStyle(AgenticiousStyle.violet)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Customize").font(.callout.weight(.semibold))
+                        Text("Task presets, skills & preferences").font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
+                }
+                .padding(14)
+                .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(AgenticiousStyle.violet.opacity(0.25)))
+            }
+            .buttonStyle(.plain).padding(12)
+            .background(AgenticiousStyle.ink)
         }
     }
 
@@ -150,11 +172,11 @@ private struct ProjectHeader: View {
                         .frame(width: 12)
                         .opacity(group.sessions.isEmpty ? 0 : 1)
                     Label(group.project.name, systemImage: group.project.symbol)
-                        .font(.title2.weight(.semibold))
+                        .font(.callout.weight(.semibold))
                         .lineLimit(1)
-                    if isCollapsed && !group.sessions.isEmpty {
+                    if !group.sessions.isEmpty {
                         Text("\(group.sessions.count)")
-                            .font(.callout)
+                            .font(.caption.monospacedDigit())
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -169,9 +191,9 @@ private struct ProjectHeader: View {
                 .labelStyle(.iconOnly)
                 .font(.title3.weight(.semibold))
                 .contentShape(Rectangle())
-                .buttonStyle(AgenticiousButtonStyle(isCompact: true))
+                .buttonStyle(AgenticiousButtonStyle(isPrimary: false, isCompact: true))
         }
-        .padding(.top, 10)
+        .padding(.horizontal, 2)
         .contextMenu {
             if group.isFavorite {
                 Button("Remove from favorites") { store.removeFavorite(group.project) }
@@ -184,25 +206,42 @@ private struct ProjectHeader: View {
 
 private struct SessionRow: View {
     @ObservedObject var session: AgentSession
+    let isSelected: Bool
+    @AppStorage("sidebarShowBranches") private var showBranches = true
+    @State private var isHovered = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 6) {
                 StatusDot(status: session.status)
-                Text(session.task)
-                    .font(.title3.weight(.medium))
-                    .lineLimit(2)
+                Text(session.status.label).foregroundStyle(session.status.color)
+                Spacer(minLength: 4)
+                Text(session.agent.displayName).foregroundStyle(.secondary)
+            }.font(.system(size: 10, weight: .semibold))
+            Text(session.task)
+                .font(.system(size: 13, weight: .semibold))
+                .lineLimit(3).multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if !session.chunks.isEmpty {
+                HStack(spacing: 8) {
+                    ChunkStrip(chunks: session.chunks, style: .compact, isRunning: session.isRunning)
+                    Text("\(session.completedChunks)/\(session.chunks.count)")
+                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
+                }
             }
-            ChunkStrip(chunks: session.chunks, style: .compact, isRunning: session.isRunning)
-            if let worktree = session.worktree { BranchLabel(worktree: worktree, isRemoved: session.worktreeRemoved) }
+            if showBranches, let worktree = session.worktree {
+                BranchLabel(worktree: worktree, isRemoved: session.worktreeRemoved)
+            }
             if case let .needsYou(reason) = session.status {
-                Text(reason)
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-                    .lineLimit(1)
+                Text(reason).font(.caption).foregroundStyle(.orange).lineLimit(2)
             }
         }
-        .padding(.vertical, 4)
+        .padding(12)
+        .background(isSelected ? AgenticiousStyle.violet.opacity(0.14) : AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(isSelected ? AgenticiousStyle.violet : AgenticiousStyle.violet.opacity(isHovered ? 0.4 : 0.12)))
+        .contentShape(RoundedRectangle(cornerRadius: 12))
+        .onHover { isHovered = $0 }
+        .help(session.task)
     }
 }
 

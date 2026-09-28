@@ -83,18 +83,54 @@ private struct ProviderCard: View {
 }
 
 struct ProviderStatusButton: View {
+    @State private var showingStatus = false
     @EnvironmentObject private var store: SessionStore
     @EnvironmentObject private var diagnostics: ProviderDiagnostics
 
     var body: some View {
         Button {
-            store.selection = .providers
+            showingStatus.toggle()
         } label: {
             Label(diagnostics.attentionCount > 0 ? "\(diagnostics.attentionCount) warnings" : "Providers",
                   systemImage: diagnostics.attentionCount > 0 ? "exclamationmark.triangle.fill" : "network")
                 .foregroundStyle(diagnostics.attentionCount > 0 ? Color.orange : AgenticiousStyle.violet)
         }
         .help("\(diagnostics.attentionCount) provider warnings · \(diagnostics.project.path ?? "Home folder")")
+        .popover(isPresented: $showingStatus) {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Provider connections").font(.headline)
+                Text(diagnostics.project.name == "No project" ? "Home folder" : diagnostics.project.name)
+                    .font(.caption).foregroundStyle(.secondary)
+                ForEach(AgentKind.allCases) { agent in
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            AgentBadge(agent: agent)
+                            Spacer()
+                            let count = diagnostics.reports[agent]?.attentionCount ?? 0
+                            Text(diagnostics.isChecking ? "Checking…" : diagnostics.reports[agent] == nil ? "Not checked" : count > 0 ? "\(count) need attention" : "No warnings reported")
+                                .font(.caption).foregroundStyle(count > 0 ? Color.orange : .secondary)
+                        }
+                        ForEach(Array((diagnostics.reports[agent]?.checks.filter(\.needsAttention) ?? []).prefix(3))) { check in
+                            Text(check.id + ": " + check.message).font(.caption).foregroundStyle(.orange)
+                                .lineLimit(2)
+                        }
+                    }
+                }
+                Text("Codex reports configured authentication; live connections are not checked.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Divider()
+                HStack {
+                    Button("Refresh", systemImage: "arrow.clockwise") { Task { await diagnostics.refresh() } }
+                        .disabled(diagnostics.isChecking)
+                        .buttonStyle(AgenticiousButtonStyle(isPrimary: false, isCompact: true))
+                    Spacer()
+                    Button("Manage providers") {
+                        showingStatus = false
+                        store.selection = .providers
+                    }.buttonStyle(AgenticiousButtonStyle(isCompact: true))
+                }
+            }.padding(20).frame(width: 360).background(AgenticiousStyle.ink)
+        }
         .task { if diagnostics.reports.isEmpty { await diagnostics.refresh() } }
     }
 }

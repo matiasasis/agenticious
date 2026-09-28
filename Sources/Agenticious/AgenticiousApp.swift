@@ -43,7 +43,11 @@ struct AgenticiousApp: App {
             MenuBarContent()
                 .environmentObject(store)
         } label: {
-            Label("\(store.attentionCount)", systemImage: store.attentionCount > 0 ? "hand.raised.fill" : "square.grid.2x2")
+            HStack(spacing: 4) {
+                Image(nsImage: AgenticiousMenuIcon.image)
+                if store.attentionCount > 0 { Text("\(store.attentionCount)") }
+            }
+            .accessibilityLabel("Agenticious, \(store.attentionCount) agents need attention")
         }
     }
 }

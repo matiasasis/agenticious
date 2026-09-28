@@ -5,6 +5,7 @@ import SwiftTerm
 enum Selection: Hashable {
     case overview
     case settings
+    case preferences
     case skills
     case providers
     case session(UUID)
