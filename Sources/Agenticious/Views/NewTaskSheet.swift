@@ -14,6 +14,7 @@ struct NewTaskSheet: View {
     @State private var project: Project
     @State private var template: TaskTemplate
     @State private var loadedPreset = false
+    @FocusState private var missionFocused: Bool
     @State private var skillPaths: [String] = []
     @State private var task = ""
     @State private var templateValue = ""
@@ -52,6 +53,7 @@ struct NewTaskSheet: View {
         .background(AgenticiousStyle.ink)
         .tint(AgenticiousStyle.lime)
         .preferredColorScheme(.dark)
+        .defaultFocus($missionFocused, true)
         .onAppear {
             guard !loadedPreset else { return }
             loadedPreset = true
@@ -87,6 +89,7 @@ struct NewTaskSheet: View {
                 Text("The mission").font(.headline)
                 editor($task, minHeight: 140)
                     .accessibilityLabel("Task")
+                    .focused($missionFocused)
                 Text("Describe the outcome. Your agent will break it into steps.")
                     .font(.caption).foregroundStyle(.secondary)
             }
@@ -101,6 +104,7 @@ struct NewTaskSheet: View {
                         .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 10))
                         .overlay(RoundedRectangle(cornerRadius: 10).stroke(AgenticiousStyle.violet.opacity(0.3)))
                         .accessibilityLabel(template.fieldLabel)
+                        .focused($missionFocused)
                     Text("Title: \(template.title(for: trimmedValue.isEmpty && template.isFieldRequired ? "…" : trimmedValue))")
                         .font(.caption).foregroundStyle(.secondary)
                 }
@@ -115,36 +119,129 @@ struct NewTaskSheet: View {
         VStack(alignment: .leading, spacing: 16) {
             Label("Agent & workspace", systemImage: "slider.horizontal.3")
                 .font(.headline).foregroundStyle(AgenticiousStyle.violet)
-            Picker("Agent", selection: $agent) {
-                ForEach(AgentKind.allCases) { Text($0.displayName).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            HStack(spacing: 16) {
-                Picker("Model", selection: modelSelection) {
-                    ForEach(models) { Text($0.name).tag($0.id) }
+            HStack(spacing: 10) {
+                ForEach(AgentKind.allCases) { choice in
+                    SummonChoiceCard(
+                        title: choice.displayName,
+                        subtitle: choice == .claude ? "Claude models" : "OpenAI models",
+                        symbol: choice == .claude ? "sun.max" : "terminal",
+                        isSelected: agent == choice
+                    ) { agent = choice }
                 }
-                Picker("Effort", selection: effortSelection) {
-                    Text(defaultEffortName).tag("")
-                    ForEach(selectedModel.efforts, id: \.self) { Text(ModelCatalog.effortName($0)).tag($0) }
-                }
-                .frame(maxWidth: 200)
             }
-            HStack {
-                Picker("Project", selection: $project) {
-                    ForEach(projectChoices) { choice in
-                        Label(choice.name, systemImage: choice.symbol).tag(choice)
+            modelAndEffort
+            workspacePicker
+            if isGitProject {
+                Toggle(isOn: $useWorktree) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "arrow.triangle.branch")
+                            .foregroundStyle(AgenticiousStyle.violet)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Give this agent its own worktree").font(.callout.weight(.semibold))
+                            Text("A separate branch and folder for this mission.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
                     }
                 }
-                Button("Add folder…", action: addFolder)
-                    .buttonStyle(AgenticiousButtonStyle(isCompact: true))
-            }
-            if isGitProject {
-                Toggle("Run in its own git worktree", isOn: $useWorktree)
-                    .help("Creates \(Worktrees.folder)/<task> on a new agenticious/<task> branch from the current HEAD, so agents in the same repo don't edit the same files.")
+                .toggleStyle(.switch)
+                .padding(12)
+                .background(AgenticiousStyle.ink, in: RoundedRectangle(cornerRadius: 12))
+                .help("Creates \(Worktrees.folder)/<task> on a new agenticious/<task> branch from the current HEAD, so agents in the same repo don't edit the same files.")
             }
         }
         .padding(18)
         .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    private var modelAndEffort: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Menu {
+                Picker("Model", selection: modelSelection) {
+                    ForEach(models) { Text($0.name).tag($0.id) }
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "cpu").foregroundStyle(AgenticiousStyle.violet)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("MODEL").font(.system(size: 9, weight: .bold, design: .monospaced)).foregroundStyle(.secondary)
+                        Text(selectedModel.name).font(.callout.weight(.semibold))
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.up.chevron.down").font(.caption).foregroundStyle(AgenticiousStyle.violet)
+                }
+                .padding(12)
+                .background(AgenticiousStyle.ink, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(AgenticiousStyle.violet.opacity(0.25)))
+                .contentShape(RoundedRectangle(cornerRadius: 12))
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .accessibilityLabel("Model")
+            .accessibilityValue(selectedModel.name)
+            if !selectedModel.efforts.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("THINKING EFFORT").font(.system(size: 9, weight: .bold, design: .monospaced)).foregroundStyle(.secondary)
+                    ScrollView(.horizontal) {
+                        HStack(spacing: 6) {
+                            effortChip("", title: defaultEffortName)
+                            ForEach(selectedModel.efforts, id: \.self) { effort in
+                                effortChip(effort, title: ModelCatalog.effortName(effort))
+                            }
+                        }.padding(1)
+                    }.scrollIndicators(.hidden)
+                }
+            }
+        }
+    }
+
+    private func effortChip(_ value: String, title: String) -> some View {
+        Button { effortSelection.wrappedValue = value } label: {
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .padding(.horizontal, 12).padding(.vertical, 8)
+                .foregroundStyle(selectedEffort == value ? AgenticiousStyle.lime : .secondary)
+                .background(selectedEffort == value ? AgenticiousStyle.lime.opacity(0.1) : AgenticiousStyle.ink, in: Capsule())
+                .overlay(Capsule().stroke(selectedEffort == value ? AgenticiousStyle.lime : AgenticiousStyle.violet.opacity(0.25)))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Thinking effort: " + title)
+        .accessibilityAddTraits(selectedEffort == value ? .isSelected : [])
+    }
+
+    private var workspacePicker: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("WORKSPACE").font(.system(size: 9, weight: .bold, design: .monospaced)).foregroundStyle(.secondary)
+                Spacer()
+                Button("Browse…", systemImage: "folder.badge.plus", action: addFolder)
+                    .buttonStyle(AgenticiousButtonStyle(isPrimary: false, isCompact: true))
+            }
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal) {
+                    HStack(spacing: 8) {
+                        ForEach(projectChoices) { choice in
+                            SummonChoiceCard(
+                                title: choice.name,
+                                subtitle: choice.path.map { URL(fileURLWithPath: $0).deletingLastPathComponent().path } ?? "Ideas without a codebase",
+                                symbol: choice.symbol,
+                                isSelected: project == choice
+                            ) { project = choice }
+                            .frame(width: 200)
+                            .id(choice.id)
+                            .help(choice.path ?? "Run from your home folder")
+                        }
+                    }.padding(1)
+                }
+                .scrollIndicators(.hidden)
+                .onAppear { proxy.scrollTo(project.id, anchor: .center) }
+                .onChange(of: project) { _, selected in proxy.scrollTo(selected.id, anchor: .center) }
+            }
+            if let path = project.path {
+                Text(path).font(.caption.monospaced()).foregroundStyle(.secondary)
+                    .lineLimit(1).truncationMode(.middle).help(path)
+            }
+        }
     }
 
     private var footer: some View {
@@ -288,5 +385,45 @@ private struct TaskTemplatePicker: View {
                 .font(.callout).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
+    }
+}
+
+private struct SummonChoiceCard: View {
+    let title: String
+    let subtitle: String
+    let symbol: String
+    let isSelected: Bool
+    let action: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 9) {
+                HStack {
+                    Image(systemName: symbol).font(.title3)
+                    Spacer()
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .foregroundStyle(isSelected ? AgenticiousStyle.lime : AgenticiousStyle.violet.opacity(0.5))
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title).font(.callout.weight(.semibold)).lineLimit(1)
+                    Text(subtitle).font(.caption).foregroundStyle(.secondary)
+                        .lineLimit(1).truncationMode(.middle)
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .foregroundStyle(isSelected ? AgenticiousStyle.lime : .primary)
+            .background(isSelected ? AgenticiousStyle.lime.opacity(0.1) : AgenticiousStyle.ink, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12)
+                .stroke(isSelected ? AgenticiousStyle.lime : AgenticiousStyle.violet.opacity(isHovered ? 0.7 : 0.25)))
+            .contentShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title + ", " + subtitle)
+        .accessibilityValue(isSelected ? "Selected" : "Not selected")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
