@@ -16,6 +16,7 @@ struct LaunchOptions {
     let newAgentTemplate: String?
     let showSettings: Bool
     let showSkills: Bool
+    let showProviders: Bool
 
     static let current = LaunchOptions(arguments: CommandLine.arguments)
 
@@ -32,6 +33,7 @@ struct LaunchOptions {
         snapshotDirectory = value("--snapshot-dir").map { URL(fileURLWithPath: $0) }
         showSettings = arguments.contains("--settings")
         showSkills = arguments.contains("--skills")
+        showProviders = arguments.contains("--providers")
         newAgentTemplate = arguments.contains("--new-agent") ? value("--new-agent").flatMap { $0.hasPrefix("--") ? nil : $0 } ?? "custom" : nil
     }
 }

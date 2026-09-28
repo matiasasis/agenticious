@@ -93,3 +93,9 @@ For UI inspection, `--settings`, `--skills`, and `--new-agent [preset-id]` can b
 - Persist sessions across app restarts (`claude --resume`, `codex resume`)
 - System notifications (needs a proper `.app` bundle)
 - Codex approval prompts don't trigger a hook yet, so they only show up if the agent calls `need_human`
+
+### Provider diagnostics
+
+Open **Providers** to check Claude Code and Codex account access and MCP status in your home folder or a selected project. The sidebar badge and toolbar warning icon link to the results. Checks run at launch and on refresh; changing the folder runs a fresh check. Authentication and connection failures include recovery instructions.
+
+Claude checks MCP connections; Codex reports configured authentication without claiming the server is reachable. Session-only MCP overrides and worktree configuration can differ from these folder checks. Raw command output, server URLs, and credentials are not shown. Run the displayed provider commands in that folder for full details, then refresh after fixing an issue.

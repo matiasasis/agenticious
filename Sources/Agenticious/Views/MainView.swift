@@ -18,6 +18,7 @@ struct MainView: View {
         .preferredColorScheme(.dark)
         .toolbar {
             ToolbarItem(placement: .primaryAction) { UsageBar() }
+            ToolbarItem(placement: .primaryAction) { ProviderStatusButton() }
             ToolbarItem(placement: .primaryAction) {
                 Button("New Agent", systemImage: "plus") { store.composer = Composer(project: defaultProject) }
                     .keyboardShortcut("n")
@@ -34,7 +35,9 @@ struct MainView: View {
 
     @ViewBuilder
     private var detail: some View {
-        if store.selection == .settings {
+        if store.selection == .providers {
+            ProvidersView()
+        } else if store.selection == .settings {
             TaskSettingsView()
         } else if store.selection == .skills {
             SkillLibraryView()
@@ -56,6 +59,7 @@ struct MainView: View {
         if let template = options.newAgentTemplate { store.composer = Composer(project: defaultProject, template: store.presets.preset(id: template)) }
         if options.showSettings { store.selection = .settings }
         if options.showSkills { store.selection = .skills }
+        if options.showProviders { store.selection = .providers }
         guard let task = options.task else { return }
 
         let project = options.directory.map { store.addFavorite($0) } ?? .none
@@ -70,6 +74,7 @@ struct MainView: View {
 
 private struct Sidebar: View {
     @EnvironmentObject private var store: SessionStore
+    @EnvironmentObject private var diagnostics: ProviderDiagnostics
     @State private var collapsed: Set<Project.ID> = []
 
     var body: some View {
@@ -78,6 +83,7 @@ private struct Sidebar: View {
                 .badge(store.attentionCount)
                 .tag(Selection.overview)
             Label("Skills", systemImage: "books.vertical").tag(Selection.skills)
+            Label("Providers", systemImage: "network").badge(diagnostics.attentionCount).tag(Selection.providers)
             Label("Settings", systemImage: "slider.horizontal.3").tag(Selection.settings)
 
             // Plain rows rather than Sections: a sidebar Section's collapse arrow appears on hover and shoves the + aside.

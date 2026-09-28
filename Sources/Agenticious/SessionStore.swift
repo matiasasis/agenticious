@@ -6,6 +6,7 @@ enum Selection: Hashable {
     case overview
     case settings
     case skills
+    case providers
     case session(UUID)
 }
 
@@ -38,6 +39,7 @@ final class SessionStore: ObservableObject {
 
     let port: UInt16
     let usage = UsageMonitor()
+    let diagnostics = ProviderDiagnostics()
     let presets = TaskPresetStore()
     let skillLocations = SkillLocations()
     private var server: EventServer?

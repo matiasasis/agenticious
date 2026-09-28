@@ -26,6 +26,7 @@ struct AgenticiousApp: App {
             MainView()
                 .environmentObject(store)
                 .environmentObject(store.usage)
+                .environmentObject(store.diagnostics)
                 .environmentObject(store.presets)
                 .environmentObject(store.skillLocations)
                 .frame(minWidth: 960, minHeight: 600)
