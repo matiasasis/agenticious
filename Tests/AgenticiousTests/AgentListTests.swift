@@ -50,6 +50,7 @@ final class AgentListTests: XCTestCase {
         do {
             let legacy = try Database(url: url)
             try legacy.execute("ALTER TABLE sessions DROP COLUMN is_marked_finished")
+            try legacy.execute("ALTER TABLE sessions DROP COLUMN task_type")
             legacy.schemaVersion = 2
         }
         let migrated = try SessionDatabase(url: url)

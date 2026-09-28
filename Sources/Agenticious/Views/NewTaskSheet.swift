@@ -373,7 +373,8 @@ struct NewTaskSheet: View {
                 model: selectedModel.isDefault ? nil : selectedModel,
                 effort: selectedEffort.isEmpty ? nil : selectedEffort,
                 project: project,
-                isolated: isGitProject && useWorktree
+                isolated: isGitProject && useWorktree,
+                taskType: TaskType(template: template)
             )
             dismiss()
         } catch {

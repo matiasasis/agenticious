@@ -254,10 +254,13 @@ private struct SessionRow: View {
                 Spacer(minLength: 4)
                 Text(session.agent.displayName).foregroundStyle(.secondary)
             }.font(.system(size: 10, weight: .semibold))
-            Text(session.task)
-                .font(.system(size: 13, weight: .semibold))
-                .lineLimit(3).multilineTextAlignment(.leading)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(alignment: .top, spacing: 8) {
+                TaskTypeIcon(type: session.displayedTaskType)
+                Text(session.task)
+                    .font(.system(size: 13, weight: .semibold))
+                    .lineLimit(3).multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
             if !session.chunks.isEmpty {
                 HStack(spacing: 8) {
                     ChunkStrip(chunks: session.chunks, style: .compact, isRunning: session.isRunning)
@@ -368,10 +371,13 @@ struct SessionCard: View {
                 StatusPill(status: session.status)
             }
 
-            Text(session.task)
-                .font(.title3.weight(.semibold))
-                .lineLimit(3)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(alignment: .top, spacing: 10) {
+                TaskTypeIcon(type: session.displayedTaskType)
+                Text(session.task)
+                    .font(.title3.weight(.semibold))
+                    .lineLimit(3)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
 
             ChunkStrip(chunks: session.chunks, style: .compact, isRunning: session.isRunning)
             ChunkList(chunks: session.chunks, limit: 5)

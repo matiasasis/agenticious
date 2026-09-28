@@ -284,3 +284,17 @@ struct ControlRoomBar: View {
         .overlay(alignment: .bottom) { Rectangle().fill(AgenticiousStyle.violet.opacity(0.25)).frame(height: 1) }
     }
 }
+
+struct TaskTypeIcon: View {
+    let type: TaskType
+
+    var body: some View {
+        Image(systemName: NSImage(systemSymbolName: type.symbol, accessibilityDescription: nil) == nil ? "sparkles" : type.symbol)
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(AgenticiousStyle.violet)
+            .frame(width: 26, height: 26)
+            .background(AgenticiousStyle.violet.opacity(0.12), in: RoundedRectangle(cornerRadius: 7))
+            .help(type.name)
+            .accessibilityLabel(type.name)
+    }
+}
