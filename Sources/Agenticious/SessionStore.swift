@@ -104,6 +104,7 @@ final class SessionStore: ObservableObject {
     func count(in list: AgentList) -> Int { sessions.filter { list.includes(isMarkedFinished: $0.isMarkedFinished) }.count }
 
     func markFinished(_ session: AgentSession, finished: Bool) {
+        guard !finished || session.canMarkFinished else { return }
         if finished { notifications.playSound("Pop") }
         session.isMarkedFinished = finished
         save(session)
