@@ -4,7 +4,31 @@ import SwiftTerm
 
 enum Selection: Hashable {
     case overview
+    case settings
+    case preferences
+    case skills
+    case providers
     case session(UUID)
+}
+
+enum AgentList: String, CaseIterable, Identifiable {
+    case queue, finished
+
+    var id: Self { self }
+    var title: String { self == .queue ? "Queue" : "Finished" }
+
+    func includes(isMarkedFinished: Bool) -> Bool {
+        isMarkedFinished == (self == .finished)
+    }
+
+    @MainActor
+    func groups(from groups: [ProjectGroup]) -> [ProjectGroup] {
+        groups.compactMap { group in
+            let sessions = group.sessions.filter { includes(isMarkedFinished: $0.isMarkedFinished) }
+            guard !sessions.isEmpty || (self == .queue && (group.isFavorite || group.project == .none)) else { return nil }
+            return ProjectGroup(project: group.project, sessions: sessions, isFavorite: group.isFavorite)
+        }
+    }
 }
 
 struct ProjectGroup: Identifiable {
@@ -19,7 +43,7 @@ struct ProjectGroup: Identifiable {
 struct Composer: Identifiable {
     let id = UUID()
     let project: Project
-    var template = TaskTemplate.custom
+    var template: TaskTemplate?
 }
 
 @MainActor
@@ -30,16 +54,26 @@ final class SessionStore: ObservableObject {
     @Published private(set) var sessions: [AgentSession] = []
     @Published private(set) var favorites: [Project]
     @Published private(set) var serverError: String?
-    @Published var selection: Selection? = .overview
+    @Published var agentList: AgentList = .queue
+    @Published var selection: Selection? = .overview {
+        didSet {
+            if let selectedSession { agentList = selectedSession.isMarkedFinished ? .finished : .queue }
+        }
+    }
     @Published var composer: Composer?
     @Published var alert: String?
 
     let port: UInt16
+    let notifications = AgentNotifications()
     let usage = UsageMonitor()
+    let diagnostics = ProviderDiagnostics()
+    let presets = TaskPresetStore()
+    let skillLocations = SkillLocations()
     private var server: EventServer?
     private var database: SessionDatabase?
     private var subscriptions: [UUID: AnyCancellable] = [:]
     private var unsaved: Set<UUID> = []
+    private var expectedStops: Set<UUID> = []
     private var snapshotter: WindowSnapshotter?
     private var commandLineOptionsPending = true
 
@@ -53,7 +87,34 @@ final class SessionStore: ObservableObject {
 
     // MARK: - Reading
 
+    var composerProject: Project {
+        if let selectedSession { return selectedSession.project }
+        if let path = UserDefaults.standard.string(forKey: "lastWorkspace") {
+            if path.isEmpty { return .none }
+            if let favorite = favorites.first(where: { $0.path == path }) { return favorite }
+        }
+        return favorites.first ?? .none
+    }
+
     var attentionCount: Int { sessions.filter { $0.status.needsAttention }.count }
+
+    var visibleProjectGroups: [ProjectGroup] { agentList.groups(from: projectGroups) }
+    var visibleSessions: [AgentSession] { sessions.filter { agentList.includes(isMarkedFinished: $0.isMarkedFinished) } }
+
+    func count(in list: AgentList) -> Int { sessions.filter { list.includes(isMarkedFinished: $0.isMarkedFinished) }.count }
+
+    func markFinished(_ session: AgentSession, finished: Bool) {
+        if finished { notifications.playSound("Pop") }
+        session.isMarkedFinished = finished
+        save(session)
+        if finished { show(.queue) }
+        else { selection = .session(session.id) }
+    }
+
+    func show(_ list: AgentList) {
+        agentList = list
+        selection = .overview
+    }
 
     func session(_ id: UUID) -> AgentSession? { sessions.first { $0.id == id } }
 
@@ -130,6 +191,7 @@ final class SessionStore: ObservableObject {
             let spec = try AgentLauncher(port: port).spec(for: session, resuming: true)
             attachTerminal(to: session, running: spec)
             session.status = .yourTurn
+            session.isMarkedFinished = false
             selection = .session(session.id)
         } catch {
             alert = "Couldn't resume the agent: \(error.localizedDescription)"
@@ -145,6 +207,7 @@ final class SessionStore: ObservableObject {
     }
 
     func stop(_ session: AgentSession) {
+        if session.isRunning { expectedStops.insert(session.id) }
         session.terminalView?.terminate()
     }
 
@@ -196,8 +259,12 @@ final class SessionStore: ObservableObject {
         let terminal = LocalProcessTerminalView(frame: NSRect(x: 0, y: 0, width: 900, height: 500))
         let bridge = TerminalBridge { [weak self, weak session] exitCode in
             guard let session else { return }
+            let oldStatus = session.status
             session.isRunning = false
             if case .done = session.status {} else { session.status = .exited(exitCode) }
+            if self?.expectedStops.remove(session.id) == nil {
+                self?.notifyTransition(from: oldStatus, for: session)
+            }
             self?.updateBadge()
         }
 
@@ -207,6 +274,7 @@ final class SessionStore: ObservableObject {
         session.terminalView = terminal
         session.terminalBridge = bridge
         session.isRunning = true
+        notifications.playSound("Tink")
     }
 
     /// Re-publish every session change so lists re-sort when an agent flips to "needs you", and save it.
@@ -272,14 +340,20 @@ final class SessionStore: ObservableObject {
         session.lastActivity = Date()
 
         if event.name == "Stop", let reply = EventInterpreter.stopHookReply(payload, for: session) {
+            session.status = .working
             return try? JSONSerialization.data(withJSONObject: reply)
         }
 
-        let neededAttention = session.status.needsAttention
+        let oldStatus = session.status
         EventInterpreter.apply(event.name, payload, to: session)
-        if !neededAttention && session.status.needsAttention { NSSound(named: "Glass")?.play() }
+        notifyTransition(from: oldStatus, for: session)
         updateBadge()
         return nil
+    }
+
+    private func notifyTransition(from oldStatus: SessionStatus, for session: AgentSession) {
+        guard let event = AgentAlert.transition(from: oldStatus, to: session.status) else { return }
+        notifications.notify(event, sessionID: session.id, task: session.task)
     }
 
     /// Claude redraws its status line after every message, so this doubles as the feed for the toolbar's Claude limits.

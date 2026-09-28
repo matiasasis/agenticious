@@ -34,7 +34,7 @@ struct AgentLauncher {
             variables["AD_MCP_CMD"] = #"mcp_servers.agenticious.command="\#(tomlEscaped(mcpBinary))""#
             variables["AD_MCP_ENV"] = #"mcp_servers.agenticious.env={AGENTICIOUS_SESSION="\#(session.id.uuidString)",AGENTICIOUS_PORT="\#(port)"}"#
             variables["AD_NOTIFY"] = #"notify=['/bin/sh','-c','curl -s -m 2 -X POST --data-binary "$1" \#(hookURL(session, "codex-notify")) >/dev/null 2>&1','sh']"#
-            variables["AD_PROMPT"] = ChunkingPrompt.inlined(with: session.prompt)
+            variables["AD_PROMPT"] = "Agenticious session ID: \(session.id.uuidString)\n" + ChunkingPrompt.inlined(with: session.prompt)
             // Codex reports its thread id only when a turn completes. Without one, `codex resume` shows its picker for this folder.
             let conversation = !resuming ? #" -- "$AD_PROMPT""# : session.conversationID == nil ? "" : #" -- "$AD_CONVERSATION""#
             command = "exec codex" + (resuming ? " resume" : "") + #" -c "$AD_MCP_CMD" -c "$AD_MCP_ENV" -c "$AD_NOTIFY""#
@@ -97,6 +97,7 @@ struct AgentLauncher {
         [
             "hooks": [
                 "UserPromptSubmit": [hookEntry(session, "UserPromptSubmit")],
+                "PreToolUse": [hookEntry(session, "PreToolUse", matcher: "*")],
                 "PostToolUse": [hookEntry(session, "PostToolUse", matcher: "*")],
                 "Notification": [hookEntry(session, "Notification")],
                 "Stop": [hookEntry(session, "Stop", passReplyToClaude: true)],

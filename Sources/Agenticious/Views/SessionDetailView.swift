@@ -6,6 +6,7 @@ import SwiftUI
 struct SessionDetailView: View {
     @EnvironmentObject private var store: SessionStore
     @ObservedObject var session: AgentSession
+    @State private var showActivity = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -25,6 +26,7 @@ struct SessionDetailView: View {
                     Spacer()
                     if !session.isRunning {
                         Button("Resume", systemImage: "play.fill") { store.resume(session) }
+                            .buttonStyle(AgenticiousButtonStyle())
                             .disabled(!session.canResume)
                             .help("Reopen this agent's conversation where it left off.")
                     }
@@ -36,14 +38,30 @@ struct SessionDetailView: View {
                         .truncationMode(.head)
                 }
 
+                if !session.pullRequests.isEmpty { PullRequestLinks(references: session.pullRequests) }
+
                 ChunkStrip(chunks: session.chunks, style: .expanded, isRunning: session.isRunning)
                 statusBanner
             }
-            .padding()
+            .padding(20)
+            .background(AgenticiousStyle.panel)
 
             Divider()
 
-            if session.terminalView == nil {
+            HStack(spacing: 8) {
+                Button("Activity", systemImage: "text.bubble") { showActivity = true }
+                    .buttonStyle(AgenticiousButtonStyle(isPrimary: showActivity, isCompact: true))
+                Button("Terminal", systemImage: "terminal") { showActivity = false }
+                    .buttonStyle(AgenticiousButtonStyle(isPrimary: !showActivity, isCompact: true))
+                Spacer()
+                if session.status.needsAttention || session.status == .yourTurn {
+                    Button("Reply / approve in terminal", systemImage: "arrow.right") { showActivity = false }
+                        .buttonStyle(AgenticiousButtonStyle(isCompact: true))
+                }
+            }.padding(12).background(AgenticiousStyle.panel)
+            if showActivity {
+                ActivityView(session: session) { showActivity = false }
+            } else if session.terminalView == nil {
                 ContentUnavailableView(
                     "Not running", systemImage: "moon.zzz",
                     description: Text("Resume to reopen \(session.agent.displayName)'s conversation, with everything it already knows.")
@@ -51,6 +69,18 @@ struct SessionDetailView: View {
             } else {
                 TerminalContainer(session: session)
             }
+            HStack {
+                Text(session.isMarkedFinished ? "Saved in Finished. You can bring it back anytime." : "Keep this task in Queue until you’re ready to put it away.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Button(session.isMarkedFinished ? "Move to Queue" : "Mark as finished",
+                       systemImage: session.isMarkedFinished ? "arrow.uturn.backward" : "checkmark.circle") {
+                    store.markFinished(session, finished: !session.isMarkedFinished)
+                }
+                .buttonStyle(AgenticiousButtonStyle())
+                .help("Changes the task’s list without stopping its process or deleting its history.")
+            }
+            .padding(14).background(AgenticiousStyle.panel)
         }
     }
 
@@ -59,6 +89,9 @@ struct SessionDetailView: View {
         switch session.status {
         case let .needsYou(reason):
             Banner(title: "Needs you", text: reason, systemImage: "hand.raised.fill", color: .orange)
+        case .waiting:
+            Banner(title: "Waiting", text: "\(session.agent.displayName) has background work or a scheduled wakeup. No input needed.",
+                   systemImage: "clock", color: .teal)
         case .yourTurn:
             Banner(title: "Your turn", text: "\(session.agent.displayName) replied and is waiting for your next message.",
                    systemImage: "text.bubble", color: .purple)

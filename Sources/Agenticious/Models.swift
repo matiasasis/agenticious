@@ -30,6 +30,7 @@ struct Project: Identifiable, Hashable {
 enum SessionStatus: Equatable {
     case starting
     case working
+    case waiting
     /// Blocked on the human: a permission prompt, or the agent explicitly called `need_human`.
     case needsYou(String)
     /// The agent finished its turn and is idle, waiting for the next message. Nothing is blocked.
@@ -43,6 +44,7 @@ enum SessionStatus: Equatable {
         switch self {
         case .starting: "Starting"
         case .working: "Working"
+        case .waiting: "Waiting"
         case .needsYou: "Needs you"
         case .yourTurn: "Your turn"
         case .done: "Done"
@@ -68,7 +70,7 @@ enum SessionStatus: Equatable {
         switch self {
         case .needsYou: 0
         case .yourTurn: 1
-        case .working, .starting: 2
+        case .working, .starting, .waiting: 2
         case .interrupted: 3
         case .done: 4
         case .exited: 5
@@ -112,8 +114,10 @@ final class AgentSession: ObservableObject, Identifiable {
     let model: ModelChoice?
     let effort: String?
 
+    @Published var isMarkedFinished = false
     @Published var status: SessionStatus = .starting
     @Published var chunks: [Chunk] = []
+    @Published private(set) var pullRequests: [PullRequestReference] = []
     @Published var lastActivity = Date()
     @Published var worktreeRemoved = false
     @Published var isRunning = false
@@ -138,12 +142,18 @@ final class AgentSession: ObservableObject, Identifiable {
         self.worktree = worktree
         self.model = model
         self.effort = effort
+        recordPullRequests(in: task + "\n" + self.prompt)
     }
 
     /// "Opus · High", or nil when both are left at the CLI default.
     var modelSummary: String? {
         let parts = [model?.name, effort.map(ModelCatalog.effortName)].compactMap { $0 }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    func recordPullRequests(in text: String) {
+        let additions = PullRequestReference.extract(from: text).filter { !pullRequests.contains($0) }
+        for reference in additions where !pullRequests.contains(reference) { pullRequests.append(reference) }
     }
 
     var completedChunks: Int { chunks.filter { $0.status == .done }.count }

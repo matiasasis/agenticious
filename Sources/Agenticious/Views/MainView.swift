@@ -11,25 +11,27 @@ struct MainView: View {
                 .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 420)
         } detail: {
             detail
+                .safeAreaInset(edge: .top, spacing: 0) { ControlRoomBar(project: defaultProject) }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .background(AgenticiousStyle.ink)
         }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) { UsageBar() }
-            ToolbarItem(placement: .primaryAction) {
-                Button("New Agent", systemImage: "plus") { store.composer = Composer(project: defaultProject) }
-                    .keyboardShortcut("n")
-            }
-        }
+        .tint(AgenticiousStyle.lime)
+        .preferredColorScheme(.dark)
         .sheet(item: $store.composer) { NewTaskSheet(project: $0.project, template: $0.template) }
         .alert(store.alert ?? "", isPresented: Binding(get: { store.alert != nil }, set: { if !$0 { store.alert = nil } })) {
-            Button("OK", role: .cancel) {}
+            Button("OK") {}
+                .tint(AgenticiousStyle.lime)
         }
         .onAppear(perform: launchFromCommandLine)
     }
 
     @ViewBuilder
     private var detail: some View {
-        if let session = store.selectedSession {
+        if store.selection == .providers {
+            ProvidersView()
+        } else if [.settings, .skills, .preferences].contains(store.selection) {
+            CustomizeView()
+        } else if let session = store.selectedSession {
             SessionDetailView(session: session)
                 .id(session.id)
         } else {
@@ -39,12 +41,18 @@ struct MainView: View {
 
     /// New agents default to the project of whatever you're looking at.
     private var defaultProject: Project {
-        store.selectedSession?.project ?? store.favorites.first ?? .none
+        store.composerProject
     }
 
     private func launchFromCommandLine() {
         guard let options = store.takeCommandLineOptions() else { return }
-        if let template = options.newAgentTemplate { store.composer = Composer(project: defaultProject, template: template) }
+        if let template = options.newAgentTemplate { store.composer = Composer(project: defaultProject, template: store.presets.preset(id: template)) }
+        if options.showSettings { store.selection = .settings }
+        if options.showPreferences { store.selection = .preferences }
+        if options.showSkills { store.selection = .skills }
+        if options.showProviders { store.selection = .providers }
+        if options.showFinished { store.show(.finished) }
+        if let id = options.sessionToShow, store.session(id) != nil { store.selection = .session(id) }
         guard let task = options.task else { return }
 
         let project = options.directory.map { store.addFavorite($0) } ?? .none
@@ -62,34 +70,89 @@ private struct Sidebar: View {
     @State private var collapsed: Set<Project.ID> = []
 
     var body: some View {
-        List(selection: $store.selection) {
-            Label("All agents", systemImage: "square.grid.2x2")
-                .badge(store.attentionCount)
-                .tag(Selection.overview)
-
-            // Plain rows rather than Sections: a sidebar Section's collapse arrow appears on hover and shoves the + aside.
-            ForEach(store.projectGroups) { group in
-                let isCollapsed = collapsed.contains(group.id)
-
-                ProjectHeader(group: group, isCollapsed: isCollapsed) {
-                    if isCollapsed { collapsed.remove(group.id) } else { collapsed.insert(group.id) }
-                }
-
-                if !isCollapsed {
-                    ForEach(group.sessions) { session in
-                        SessionRow(session: session)
-                            .tag(Selection.session(session.id))
-                            .contextMenu { SessionMenu(session: session) }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack(spacing: 6) {
+                    ForEach(AgentList.allCases) { list in
+                        Button { store.show(list) } label: {
+                            HStack(spacing: 6) {
+                                Text(list.title)
+                                Text("\(store.count(in: list))").monospacedDigit().opacity(0.7)
+                            }
+                            .font(.callout.weight(.semibold))
+                            .frame(maxWidth: .infinity).padding(.vertical, 10)
+                            .foregroundStyle(store.agentList == list ? AgenticiousStyle.lime : .secondary)
+                            .background(store.agentList == list ? AgenticiousStyle.lime.opacity(0.1) : .clear, in: RoundedRectangle(cornerRadius: 10))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(store.agentList == list ? .isSelected : [])
                     }
                 }
-            }
+                .padding(4).background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 14))
+                if store.visibleSessions.isEmpty {
+                    Text(store.agentList == .queue ? "Queue clear. Summon an agent to get started." : "Agents you mark as finished will appear here.")
+                        .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 4)
+                }
+                HStack {
+                    Text("WORKSPACES").font(.system(size: 10, weight: .bold, design: .monospaced)).tracking(1)
+                    Spacer()
+                    Button("Add project folder…", systemImage: "folder.badge.plus", action: addProject)
+                        .labelStyle(.iconOnly).buttonStyle(.plain).help("Add project folder")
+                }.foregroundStyle(.secondary).padding(.horizontal, 4)
+                ForEach(store.visibleProjectGroups) { group in
+                    let isCollapsed = collapsed.contains(group.id)
+                    VStack(spacing: 8) {
+                        ProjectHeader(group: group, isCollapsed: isCollapsed) {
+                            if isCollapsed { collapsed.remove(group.id) } else { collapsed.insert(group.id) }
+                        }
+                        if !isCollapsed {
+                            ForEach(group.sessions) { session in
+                                Button { store.selection = .session(session.id) } label: {
+                                    SessionRow(session: session, isSelected: store.selection == .session(session.id))
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityAddTraits(store.selection == .session(session.id) ? .isSelected : [])
+                                .contextMenu { SessionMenu(session: session) }
+                            }
+                        }
+                    }
+                }
+            }.padding(12)
         }
-        .listStyle(.sidebar)
+        .background(AgenticiousStyle.ink)
+        .safeAreaInset(edge: .top) {
+            HStack(spacing: 10) {
+                if let icon = Bundle.module.url(forResource: "AppIcon", withExtension: "png").flatMap(NSImage.init(contentsOf:)) {
+                    Image(nsImage: icon).resizable().scaledToFit().frame(width: 44, height: 44)
+                        .accessibilityHidden(true)
+                }
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("AGENTICIOUS").font(.system(size: 17, weight: .black, design: .rounded))
+                    Text("A LITTLE CHAOS. A LOT DONE.")
+                        .font(.system(size: 8, weight: .bold, design: .monospaced))
+                        .tracking(1).foregroundStyle(AgenticiousStyle.lime)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(16)
+        }
         .safeAreaInset(edge: .bottom) {
-            Button("Add project folder…", systemImage: "folder.badge.plus", action: addProject)
-                .buttonStyle(.borderless)
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            Button { store.selection = .settings } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "slider.horizontal.3").font(.title3).foregroundStyle(AgenticiousStyle.violet)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Customize").font(.callout.weight(.semibold))
+                        Text("Task presets, skills & preferences").font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
+                }
+                .padding(14)
+                .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(AgenticiousStyle.violet.opacity(0.25)))
+            }
+            .buttonStyle(.plain).padding(12)
+            .background(AgenticiousStyle.ink)
         }
     }
 
@@ -116,11 +179,11 @@ private struct ProjectHeader: View {
                         .frame(width: 12)
                         .opacity(group.sessions.isEmpty ? 0 : 1)
                     Label(group.project.name, systemImage: group.project.symbol)
-                        .font(.title2.weight(.semibold))
+                        .font(.callout.weight(.semibold))
                         .lineLimit(1)
-                    if isCollapsed && !group.sessions.isEmpty {
+                    if !group.sessions.isEmpty {
                         Text("\(group.sessions.count)")
-                            .font(.callout)
+                            .font(.caption.monospacedDigit())
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -134,11 +197,10 @@ private struct ProjectHeader: View {
             Button("New agent here", systemImage: "plus") { store.composer = Composer(project: group.project) }
                 .labelStyle(.iconOnly)
                 .font(.title3.weight(.semibold))
-                .frame(width: 28, height: 28)
                 .contentShape(Rectangle())
-                .buttonStyle(.borderless)
+                .buttonStyle(AgenticiousButtonStyle(isPrimary: false, isCompact: true))
         }
-        .padding(.top, 10)
+        .padding(.horizontal, 2)
         .contextMenu {
             if group.isFavorite {
                 Button("Remove from favorites") { store.removeFavorite(group.project) }
@@ -151,25 +213,42 @@ private struct ProjectHeader: View {
 
 private struct SessionRow: View {
     @ObservedObject var session: AgentSession
+    let isSelected: Bool
+    @AppStorage("sidebarShowBranches") private var showBranches = true
+    @State private var isHovered = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 6) {
                 StatusDot(status: session.status)
-                Text(session.task)
-                    .font(.title3.weight(.medium))
-                    .lineLimit(2)
+                Text(session.status.label).foregroundStyle(session.status.color)
+                Spacer(minLength: 4)
+                Text(session.agent.displayName).foregroundStyle(.secondary)
+            }.font(.system(size: 10, weight: .semibold))
+            Text(session.task)
+                .font(.system(size: 13, weight: .semibold))
+                .lineLimit(3).multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if !session.chunks.isEmpty {
+                HStack(spacing: 8) {
+                    ChunkStrip(chunks: session.chunks, style: .compact, isRunning: session.isRunning)
+                    Text("\(session.completedChunks)/\(session.chunks.count)")
+                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
+                }
             }
-            ChunkStrip(chunks: session.chunks, style: .compact, isRunning: session.isRunning)
-            if let worktree = session.worktree { BranchLabel(worktree: worktree, isRemoved: session.worktreeRemoved) }
+            if showBranches, let worktree = session.worktree {
+                BranchLabel(worktree: worktree, isRemoved: session.worktreeRemoved)
+            }
             if case let .needsYou(reason) = session.status {
-                Text(reason)
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-                    .lineLimit(1)
+                Text(reason).font(.caption).foregroundStyle(.orange).lineLimit(2)
             }
         }
-        .padding(.vertical, 4)
+        .padding(12)
+        .background(isSelected ? AgenticiousStyle.violet.opacity(0.14) : AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(isSelected ? AgenticiousStyle.violet : AgenticiousStyle.violet.opacity(isHovered ? 0.4 : 0.12)))
+        .contentShape(RoundedRectangle(cornerRadius: 12))
+        .onHover { isHovered = $0 }
+        .help(session.task)
     }
 }
 
@@ -201,43 +280,64 @@ private struct OverviewView: View {
     private let columns = [GridItem(.adaptive(minimum: 320), spacing: 16)]
 
     var body: some View {
-        if store.sessions.isEmpty {
-            ContentUnavailableView {
-                Label("No agents running", systemImage: "square.grid.2x2")
-            } description: {
-                Text("Pick a project on the left and give an agent a task.")
-            } actions: {
-                Button("New Agent") { store.composer = Composer(project: store.favorites.first ?? .none) }
-                    .buttonStyle(.borderedProminent)
-            }
-        } else {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 28) {
-                    if let error = store.serverError {
-                        Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 26) {
+                if store.agentList == .queue {
+                    ControlRoomHero(isEmpty: store.visibleSessions.isEmpty) {
+                        store.composer = Composer(project: store.composerProject)
                     }
-                    ForEach(store.projectGroups.filter { !$0.sessions.isEmpty }) { group in
-                        VStack(alignment: .leading, spacing: 12) {
+                } else {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Finished agents").font(.system(size: 30, weight: .bold, design: .rounded))
+                        Text("Agents you marked as finished. Open any agent to revisit its work or move it back to Queue.")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                HStack(spacing: 12) {
+                    DashboardMetric(title: store.agentList == .queue ? "QUEUED" : "FINISHED", value: store.visibleSessions.count, color: AgenticiousStyle.violet)
+                    if store.agentList == .queue {
+                        DashboardMetric(title: "RUNNING", value: store.visibleSessions.filter(\.isRunning).count, color: AgenticiousStyle.lime)
+                        DashboardMetric(title: "NEEDS YOU", value: store.attentionCount, color: .orange)
+                    }
+                }
+                if let error = store.serverError {
+                    Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red)
+                }
+                if store.visibleSessions.isEmpty {
+                    Label(store.agentList == .queue ? "No agents in your queue. Finished work is saved in the Finished tab." : "No finished agents yet.", systemImage: "sparkles")
+                        .foregroundStyle(.secondary)
+                        .padding(.vertical, 8)
+                }
+                ForEach(store.visibleProjectGroups.filter { !$0.sessions.isEmpty }) { group in
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack {
                             Label(group.project.name, systemImage: group.project.symbol)
                                 .font(.title3.bold())
-                            LazyVGrid(columns: columns, spacing: 16) {
-                                ForEach(group.sessions) { session in
+                            Rectangle().fill(AgenticiousStyle.violet.opacity(0.25)).frame(height: 1)
+                            Text("\(group.sessions.count) AGENTS")
+                                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                        }
+                        LazyVGrid(columns: columns, spacing: 16) {
+                            ForEach(group.sessions) { session in
+                                Button { store.selection = .session(session.id) } label: {
                                     SessionCard(session: session)
-                                        .onTapGesture { store.selection = .session(session.id) }
-                                        .contextMenu { SessionMenu(session: session) }
                                 }
+                                .buttonStyle(.plain)
+                                .contextMenu { SessionMenu(session: session) }
                             }
                         }
                     }
                 }
-                .padding(20)
             }
+            .padding(24)
         }
     }
 }
 
 struct SessionCard: View {
     @ObservedObject var session: AgentSession
+    @State private var isHovered = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -272,13 +372,15 @@ struct SessionCard: View {
             .font(.caption)
             .foregroundStyle(.secondary)
         }
-        .padding()
-        .background(.background.secondary, in: RoundedRectangle(cornerRadius: 12))
+        .padding(20)
+        .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 18))
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(session.status.needsAttention ? Color.orange : Color.clear, lineWidth: 2)
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(session.status.needsAttention ? Color.orange : AgenticiousStyle.violet.opacity(isHovered ? 0.8 : 0.25), lineWidth: 1)
         )
-        .contentShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: AgenticiousStyle.violet.opacity(isHovered ? 0.14 : 0), radius: 16)
+        .contentShape(RoundedRectangle(cornerRadius: 18))
+        .onHover { isHovered = $0 }
     }
 }
 

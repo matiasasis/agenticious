@@ -60,9 +60,10 @@ extension SessionStatus {
     var color: Color {
         switch self {
         case .starting: .gray
-        case .working: .blue
+        case .working: AgenticiousStyle.lime
+        case .waiting: .teal
         case .needsYou: .orange
-        case .yourTurn: .purple
+        case .yourTurn: AgenticiousStyle.violet
         case .done: .green
         case .exited: .secondary
         case .interrupted: .brown
@@ -145,9 +146,10 @@ private struct ChunkBox: View {
             }
         }
         .padding(10)
-        .frame(maxWidth: .infinity, minHeight: 64, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: 108, maxHeight: 108, alignment: .topLeading)
         .background(chunk.status.color.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(chunk.status.color.opacity(0.5)))
+        .help([chunk.title, chunk.note].compactMap { $0 }.joined(separator: "\n"))
     }
 }
 
@@ -155,7 +157,7 @@ extension ChunkStatus {
     var color: Color {
         switch self {
         case .pending: .gray
-        case .inProgress: .blue
+        case .inProgress: AgenticiousStyle.lime
         case .done: .green
         case .blocked: .orange
         }
@@ -175,7 +177,7 @@ struct UsageBar: View {
     @EnvironmentObject private var usage: UsageMonitor
 
     var body: some View {
-        HStack(spacing: 18) {
+        HStack(spacing: 10) {
             if let claude = usage.claudeReading {
                 vendor("Claude", claude.limits, source: "Read \(claude.takenAt.formatted(.relative(presentation: .named))) " +
                     "from the status line of a Claude agent started here.")
@@ -199,6 +201,10 @@ struct UsageBar: View {
                 .font(.caption.weight(.semibold))
             ForEach(limits, id: \.windowMinutes) { LimitGauge(limit: $0, source: source) }
         }
+        .fixedSize(horizontal: true, vertical: false)
+        .padding(.horizontal, 10).padding(.vertical, 8)
+        .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(AgenticiousStyle.violet.opacity(0.25)))
     }
 }
 
@@ -211,11 +217,11 @@ private struct LimitGauge: View {
 
         VStack(alignment: .leading, spacing: 2) {
             Text("\(limit.windowLabel) \(Int(percent.rounded()))%")
-                .font(.caption)
-                .monospacedDigit()
+                .font(.system(size: 10))
+                .monospacedDigit().lineLimit(1)
             ProgressView(value: min(percent, 100), total: 100)
-                .tint(percent >= 90 ? .red : percent >= 70 ? .orange : .accentColor)
-                .frame(width: 80)
+                .tint(percent >= 90 ? .red : percent >= 70 ? .orange : AgenticiousStyle.lime)
+                .frame(width: 62)
         }
         .help([resetText, source].compactMap { $0 }.joined(separator: "\n"))
     }
@@ -226,5 +232,54 @@ private struct LimitGauge: View {
 
         let relative = resetsAt.formatted(.relative(presentation: .named))
         return "Resets \(relative) (\(resetsAt.formatted(date: .abbreviated, time: .shortened)))."
+    }
+}
+
+struct PullRequestLinks: View {
+    let references: [PullRequestReference]
+
+    var body: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 8) {
+                ForEach(references) { reference in
+                    Link(destination: reference.url) {
+                        Label(reference.label, systemImage: "arrow.triangle.pull")
+                            .font(.caption.weight(.semibold))
+                            .padding(.horizontal, 10).padding(.vertical, 6)
+                            .background(AgenticiousStyle.violet.opacity(0.12), in: Capsule())
+                    }
+                    .foregroundStyle(AgenticiousStyle.violet)
+                    .help(reference.url.absoluteString)
+                    .linkCursor()
+                }
+            }
+        }.scrollIndicators(.hidden)
+    }
+}
+
+struct ControlRoomBar: View {
+    @EnvironmentObject private var store: SessionStore
+    let project: Project
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) {
+                    Text("CONTROL ROOM").font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .tracking(1).foregroundStyle(AgenticiousStyle.violet)
+                    Spacer(minLength: 8)
+                    UsageBar()
+                }
+                UsageBar()
+            }
+            Spacer(minLength: 0)
+            ProviderStatusButton().buttonStyle(AgenticiousButtonStyle(isPrimary: false, isCompact: true)).labelStyle(.iconOnly)
+            Button("Summon agent", systemImage: "plus") { store.composer = Composer(project: project) }
+                .labelStyle(.iconOnly).keyboardShortcut("n")
+                .buttonStyle(AgenticiousButtonStyle(isCompact: true)).help("Summon an agent · ⌘N")
+        }
+        .padding(.horizontal, 18).padding(.vertical, 12)
+        .background(AgenticiousStyle.ink)
+        .overlay(alignment: .bottom) { Rectangle().fill(AgenticiousStyle.violet.opacity(0.25)).frame(height: 1) }
     }
 }

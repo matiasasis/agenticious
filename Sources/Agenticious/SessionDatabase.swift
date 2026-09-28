@@ -6,8 +6,8 @@ import Foundation
 struct SessionDatabase {
     private let database: Database
 
-    init() throws {
-        let url = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+    init(url: URL? = nil) throws {
+        let url = url ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Agenticious/agenticious.sqlite")
         database = try Database(url: url)
         try migrate()
@@ -54,6 +54,14 @@ struct SessionDatabase {
             }
             database.schemaVersion = 1
         }
+        if database.schemaVersion < 2 {
+            try database.execute("ALTER TABLE sessions ADD COLUMN pull_requests TEXT NOT NULL DEFAULT '[]'")
+            database.schemaVersion = 2
+        }
+        if database.schemaVersion < 3 {
+            try database.execute("ALTER TABLE sessions ADD COLUMN is_marked_finished INTEGER NOT NULL DEFAULT 0")
+            database.schemaVersion = 3
+        }
     }
 
     // MARK: - Writing
@@ -67,14 +75,16 @@ struct SessionDatabase {
                 INSERT OR REPLACE INTO sessions (
                     id, task, prompt, agent, project_path, directory, started_at, last_activity,
                     worktree_root, worktree_path, worktree_branch, worktree_removed,
-                    model_id, model_name, effort, status, status_detail, plan_source, conversation_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    model_id, model_name, effort, status, status_detail, plan_source, conversation_id, pull_requests, is_marked_finished
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 session.id.uuidString, session.task, session.prompt, session.agent.rawValue, session.project.path,
                 session.directory.path, session.startedAt.timeIntervalSince1970, session.lastActivity.timeIntervalSince1970,
                 session.worktree?.repositoryRoot, session.worktree?.path, session.worktree?.branch, session.worktreeRemoved,
                 session.model?.id, session.model?.name, session.effort, status, detail,
-                Self.encode(session.planSource), session.conversationID
+                Self.encode(session.planSource), session.conversationID,
+                String(decoding: try JSONEncoder().encode(session.pullRequests.map { $0.url.absoluteString }), as: UTF8.self),
+                session.isMarkedFinished
             )
             try database.execute("DELETE FROM chunks WHERE session_id = ?", session.id.uuidString)
             for chunk in session.chunks {
@@ -117,10 +127,15 @@ struct SessionDatabase {
             )
             let status = Self.decode(row.string("status"), detail: row.string("status_detail"))
             session.status = status.isFinished ? status : .interrupted
+            session.isMarkedFinished = row.bool("is_marked_finished")
             session.lastActivity = Date(timeIntervalSince1970: row.double("last_activity") ?? 0)
             session.worktreeRemoved = row.bool("worktree_removed")
             session.planSource = Self.decodePlanSource(row.string("plan_source"))
             session.conversationID = row.string("conversation_id")
+            if let data = row.string("pull_requests")?.data(using: .utf8),
+               let urls = try? JSONDecoder().decode([String].self, from: data) {
+                session.recordPullRequests(in: urls.joined(separator: "\n"))
+            }
             session.chunks = (chunks[id.uuidString] ?? []).compactMap { chunk in
                 guard let number = chunk.int("id") else { return nil }
                 return Chunk(
@@ -130,6 +145,8 @@ struct SessionDatabase {
                     note: chunk.string("note")
                 )
             }
+            for chunk in session.chunks { session.recordPullRequests(in: chunk.note ?? "") }
+            if case let .done(summary) = session.status { session.recordPullRequests(in: summary ?? "") }
             return session
         }
     }
@@ -153,6 +170,7 @@ struct SessionDatabase {
         switch status {
         case .starting: ("starting", nil)
         case .working: ("working", nil)
+        case .waiting: ("waiting", nil)
         case let .needsYou(reason): ("needs_you", reason)
         case .yourTurn: ("your_turn", nil)
         case let .done(summary): ("done", summary)
@@ -168,6 +186,7 @@ struct SessionDatabase {
         case "needs_you": .needsYou(detail ?? "")
         case "your_turn": .yourTurn
         case "working": .working
+        case "waiting": .waiting
         case "starting": .starting
         default: .interrupted
         }

@@ -15,6 +15,12 @@ A native macOS dashboard for running many coding agents (Claude Code and Codex) 
 script/run
 ```
 
+`script/run` builds a signed local `.build/Agenticious.app` bundle, required for macOS notifications.
+After updating, quit the previous app when its agents are no longer running, then run the script again.
+In **Customize → Preferences**, enable macOS notifications and accept the system permission prompt.
+Notifications open the relevant agent; sounds and notifications can be toggled separately. Existing
+settings from the bare executable are imported on first bundled launch.
+
 Requires macOS 14+ and the `claude` / `codex` CLIs on your login shell's PATH.
 
 ## How it knows what the agent is doing
@@ -29,7 +35,7 @@ agent ──agenticious MCP───┘
 |---|---|---|
 | Chunk plan | `agenticious` MCP tools (`set_plan`, `update_chunk`); falls back to mirroring its TodoWrite list | `agenticious` MCP tools |
 | Needs you | `Notification` hook (permission / idle), `need_human` tool | `need_human` tool |
-| Turn finished | `Stop` hook | `notify` (agent-turn-complete) |
+| Turn finished | `Stop` hook; background tasks or scheduled wakeups show as Waiting | `notify` (agent-turn-complete) |
 | Plan limits | `statusLine` command (`rate_limits`) | session logs |
 | Done | `finish` tool | `finish` tool |
 
@@ -61,8 +67,65 @@ out of `git status`. Because the folder sits inside the repo, Claude doesn't ask
 **Delete worktree** (right-click the agent) is enabled once the agent has exited. Git refuses if the worktree has
 uncommitted changes, and the branch is always kept.
 
+## Task presets and skills
+
+Open **Customize → Task presets** at the bottom of the sidebar (or press `⌘,`) to create, edit, or delete task presets. Each preset has a name,
+description, input hint, title, prompt, and optional skills. Use `{{input}}` in the title or prompt for the task's
+input. Notes and selected skill references are appended automatically. The Custom task is editable and always
+remains available. Changes affect new tasks; existing conversations keep their original prompts.
+
+Presets are saved per user in `~/Library/Application Support/Agenticious/task-presets.json`. A damaged saved
+file is preserved and reported instead of silently overwritten. The included presets are generic starting points,
+so customize their prompts and skill choices for your workflow.
+
+**Customize → Skills** browses `SKILL.md` files from personal `.agents/skills`, `.codex/skills` (respecting `CODEX_HOME`),
+`.claude/skills`, `/etc/codex/skills`, project skill folders up to the repository root, and Codex/Claude plugin
+caches. Add other locations with **Search folders**. Symlinked folders are followed and identical files are
+shown once. Cached plugins are labeled as such: a cached skill does not mean its plugin or tools are enabled.
+
+Select a skill to inspect its instructions or reveal its file. Create personal or project skills for Codex or
+Claude Code, and edit personal/project skill files in the app. Plugin-cache and system skills are read-only.
+Edits preserve the complete Markdown file and reject a save if another editor changed it in the meantime.
+
+Use **Choose skills** in a task or preset to attach skills. Agenticious asks the agent to read the selected
+absolute paths and resolve supporting resources from their skill folders. Missing or unreadable selected files
+prevent launch with an error; attaching a skill does not install its tools or enable its plugin.
+
+For UI inspection, `--settings`, `--skills`, and `--new-agent [preset-id]` can be combined with
+`--snapshot-dir /tmp/agenticious-shots`. Run configuration and skill tests with `swift test`.
+
 ## Next steps
 
 - Persist sessions across app restarts (`claude --resume`, `codex resume`)
 - System notifications (needs a proper `.app` bundle)
 - Codex approval prompts don't trigger a hook yet, so they only show up if the agent calls `need_human`
+
+### Navigation and menu bar
+
+The sidebar defaults to **Queue**, grouped by workspace. Tasks stay in **Queue** regardless of their status. Use **Mark as finished** at the bottom of an agent view to move it to **Finished** without deleting history or stopping its process. **Move to Queue** reverses that choice; resuming a finished session also returns it to Queue. Existing completed tasks return to Queue when upgrading to this manual behavior. Each card shows its provider, status, task, and completed steps; select a card to return to its terminal, or right-click for session actions. Use the folder button beside **Workspaces** to add a project.
+
+**Customize** keeps task presets, skills, and preferences together while the agent sidebar stays visible. Preferences can hide sidebar branch names and set the default worktree behavior for new agents. The macOS menu bar uses a monochrome Agenticious face, with a count only when agents need your attention.
+
+### Provider diagnostics
+
+Open the connection-status button beside the usage meters, then **Manage providers**, to check Claude Code and Codex account access and MCP status in your home folder or a selected project. The toolbar warning icon opens a compact provider summary. Checks run at launch and on refresh; changing the folder runs a fresh check. Authentication and connection failures include recovery instructions.
+
+Claude checks MCP connections; Codex reports configured authentication without claiming the server is reachable. Session-only MCP overrides and worktree configuration can differ from these folder checks. Raw command output, server URLs, and credentials are not shown. Run the displayed provider commands in that folder for full details, then refresh after fixing an issue.
+
+### Pull request links
+
+Agent details show saved PR links above the step cards. Full HTTPS PR URLs in task text, Claude tool results, progress notes, and completion summaries are captured automatically. Agents use `set_pull_requests` to attach verified links as soon as they identify or create a PR, including every PR in a stack. Bare numbers must first be resolved against the actual repository by the agent. Links are deduplicated and kept across app restarts, including in Finished sessions. Existing sessions can report links in progress notes even without the new MCP tool.
+
+Step cards use equal heights; hover a card to read its complete title and note.
+
+### Activity and terminal
+
+Agent details default to **Activity**, a structured view of provider messages and tool calls. Command/input blocks include copy controls and working-directory context; long inputs and output can be expanded, errors open automatically, and unknown result statuses remain neutral. Markdown emphasis, links, and fenced code blocks render separately. Use **Terminal** or **Respond in terminal** for replies, approvals, interactive prompts, and raw output. Switching tabs keeps the agent process alive.
+
+Activity reads the session's local Claude or Codex JSONL log every two seconds while visible. Claude sessions are matched by conversation ID. Codex uses its reported conversation ID or a unique marker added to new Agenticious prompts, never just the workspace folder. Older Codex sessions without a known ID may need to finish a turn before activity becomes available. Subagent logs and private reasoning records are not displayed. Provider log formats may change; when a log is unavailable, use the terminal.
+
+The view reads up to the latest 4 MiB, shows at most 200 entries, and labels content truncated beyond 32 KiB per field. Activity history comes from the provider's log, so disabling or deleting those logs also removes that history from this view. No additional transcript copy is saved by Agenticious.
+
+The summon sheet remembers the last task preset and workspace, plus provider, model, and effort (model and effort separately per provider). Opening a workspace's **+** button still selects that workspace explicitly. Removed favorites are not restored as the default workspace. The larger sheet adapts to the available display size and keeps model selection beside the compact provider choices.
+
+Provider icons are bundled from the installed official Claude desktop and ChatGPT/Codex applications, respectively (`TrayIconTemplate@3x.png` and `icon-codex-light.png`); their trademarks belong to Anthropic and OpenAI.

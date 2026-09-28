@@ -1,0 +1,82 @@
+import XCTest
+@testable import Agenticious
+
+final class ProviderDiagnosticsTests: XCTestCase {
+    func testBackgroundCommandsComplete() async {
+        await withTaskGroup(of: DiagnosticCommand.Result.self) { group in
+            for _ in 0..<4 {
+                group.addTask {
+                    DiagnosticCommand.run("/usr/bin/printf ready", directory: "/tmp", timeout: 5)
+                }
+            }
+            for await result in group {
+                XCTAssertNil(result.failure)
+                XCTAssertEqual(result.exitCode, 0)
+                XCTAssertEqual(result.output, "ready")
+            }
+        }
+    }
+
+    func testCommandFailureAndTimeout() {
+        let failed = DiagnosticCommand.run("/usr/bin/false", directory: "/tmp", timeout: 5)
+        XCTAssertNil(failed.failure)
+        XCTAssertEqual(failed.exitCode, 1)
+
+        let timedOut = DiagnosticCommand.run("/bin/sleep 10", directory: "/tmp", timeout: 1)
+        XCTAssertNotNil(timedOut.failure)
+    }
+
+    func testClaudeAuthentication() {
+        XCTAssertFalse(ProviderProbe.authentication(.claude, result: .init(output: "{\"loggedIn\":true}")).needsAttention)
+        XCTAssertTrue(ProviderProbe.authentication(.claude, result: .init(output: "{\"loggedIn\":false}", exitCode: 1)).needsAttention)
+        XCTAssertTrue(ProviderProbe.authentication(.claude, result: .init(output: "invalid")).needsAttention)
+    }
+
+    func testCodexAuthenticationDoesNotExposeCredentials() {
+        let check = ProviderProbe.authentication(.codex, result: .init(error: "Logged in using API key: secret"))
+        XCTAssertFalse(check.needsAttention)
+        XCTAssertFalse(check.message.contains("secret"))
+        XCTAssertTrue(ProviderProbe.authentication(.codex, result: .init(error: "Not logged in", exitCode: 1)).needsAttention)
+    }
+
+    func testCodexServerStates() {
+        let output = """
+        [{"name":"logged-out","enabled":true,"auth_status":"not_logged_in","token":"secret"},
+         {"name":"disabled","enabled":false,"auth_status":"not_logged_in"},
+         {"name":"oauth","auth_status":"o_auth"},
+         {"name":"local","auth_status":"unsupported"}]
+        """
+        let checks = ProviderProbe.servers(.codex, result: .init(output: output))
+        XCTAssertEqual(checks.filter(\.needsAttention).map(\.id), ["logged-out"])
+        XCTAssertEqual(checks[1].message, "Disabled")
+        XCTAssertTrue(checks[2].message.contains("connection not checked"))
+        XCTAssertTrue(checks[3].message.contains("Authentication not reported"))
+        XCTAssertFalse(checks.contains { $0.message.contains("secret") })
+    }
+
+    func testClaudeServerFailuresAndAuthentication() {
+        let output = """
+        Checking MCP server health…
+        docs: https://example.com/private?token=secret (HTTP) - ✔ Connected
+        login: https://example.com - ⚠ Needs authentication
+        broken: https://example.com - ✘ Failed to connect — secret
+        pending: ⏸ Pending approval
+        """
+        let checks = ProviderProbe.servers(.claude, result: .init(output: output))
+        XCTAssertEqual(checks.count, 4)
+        XCTAssertEqual(checks.filter(\.needsAttention).count, 3)
+        XCTAssertEqual(checks[0].message, "Connected")
+        XCTAssertFalse(checks.contains { $0.message.contains("secret") || $0.message.contains("https:") })
+    }
+
+    func testUnknownFailedAndEmptyChecks() {
+        for agent in AgentKind.allCases {
+            XCTAssertTrue(ProviderProbe.servers(agent, result: .init(failure: "Timed out"))[0].needsAttention)
+            XCTAssertTrue(ProviderProbe.servers(agent, result: .init(exitCode: 127))[0].needsAttention)
+            XCTAssertTrue(ProviderProbe.servers(agent, result: .init(output: "unexpected"))[0].needsAttention)
+        }
+        XCTAssertFalse(ProviderProbe.servers(.codex, result: .init(output: "[]"))[0].needsAttention)
+        XCTAssertFalse(ProviderProbe.servers(.claude, result: .init(output: "No MCP servers configured"))[0].needsAttention)
+        XCTAssertTrue(DiagnosticCommand.Result(error: "WARNING: broken config").hasWarning)
+    }
+}
