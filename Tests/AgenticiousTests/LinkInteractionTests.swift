@@ -29,4 +29,55 @@ final class LinkInteractionTests: XCTestCase {
         view.textStorage?.setAttributedString(LinkedMarkdownText.attributedText("No links here"))
         XCTAssertTrue(view.linkRects().isEmpty)
     }
+
+    @MainActor
+    func testCursorRegistrationClipsLinksAndRejectsInvisibleOrInvalidAreas() async {
+        let view = CursorRecordingView(frame: NSRect(x: 0, y: 0, width: 100, height: 100))
+        let window = NSWindow(contentRect: view.frame, styleMask: .borderless, backing: .buffered, defer: false)
+        window.contentView = view
+        defer { window.contentView = nil }
+        view.addVisibleLinkCursor(for: NSRect(x: 10, y: 90, width: 80, height: 30))
+        XCTAssertEqual(view.registeredRects, [NSRect(x: 10, y: 90, width: 80, height: 10)])
+        view.registeredRects = []
+        for rect in [NSRect(x: 0, y: 200, width: 80, height: 20),
+                     NSRect(x: 0, y: 100, width: 80, height: 20), .zero, .null,
+                     NSRect(x: CGFloat.nan, y: 0, width: 10, height: 10)] {
+            view.addVisibleLinkCursor(for: rect)
+        }
+        XCTAssertTrue(view.registeredRects.isEmpty)
+    }
+
+    @MainActor
+    func testCursorResetWhileScrollingAndResizingLinkedText() async {
+        let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 140, height: 60))
+        let view = LinkTextView(frame: NSRect(x: 0, y: 0, width: 140, height: 1000))
+        view.isVerticallyResizable = false
+        view.textStorage?.setAttributedString(LinkedMarkdownText.attributedText(
+            (0..<20).map { "Plain text \($0)\n[Pull request \($0)](https://example.com/pull/\($0))" }.joined(separator: "\n")))
+        scroll.documentView = view
+        let window = NSWindow(contentRect: scroll.frame, styleMask: .borderless, backing: .buffered, defer: false)
+        window.contentView = scroll
+        defer { window.contentView = nil }
+        for width: CGFloat in [140, 90, 240] {
+            scroll.setFrameSize(NSSize(width: width, height: 60))
+            view.setFrameSize(NSSize(width: width, height: 1000))
+            for offset: CGFloat in [0, 150, 600, 0] {
+                scroll.contentView.scroll(to: NSPoint(x: 0, y: offset))
+                XCTAssertTrue(view.linkRects().contains { $0.intersection(view.visibleRect).isNull })
+                view.resetCursorRects()
+            }
+        }
+    }
+
+}
+
+
+@MainActor
+private final class CursorRecordingView: NSView {
+    var registeredRects: [NSRect] = []
+
+    override func addCursorRect(_ rect: NSRect, cursor: NSCursor) {
+        registeredRects.append(rect)
+        super.addCursorRect(rect, cursor: cursor)
+    }
 }

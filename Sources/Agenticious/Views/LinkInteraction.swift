@@ -15,7 +15,7 @@ private final class LinkCursorView: NSView {
 
     override func resetCursorRects() {
         super.resetCursorRects()
-        addCursorRect(visibleRect, cursor: .pointingHand)
+        addVisibleLinkCursor(for: bounds)
     }
 }
 
@@ -76,7 +76,7 @@ struct LinkedMarkdownText: NSViewRepresentable {
 final class LinkTextView: NSTextView {
     override func resetCursorRects() {
         super.resetCursorRects()
-        for rect in linkRects() { addCursorRect(rect.intersection(visibleRect), cursor: .pointingHand) }
+        for rect in linkRects() { addVisibleLinkCursor(for: rect) }
     }
 
     override func setFrameSize(_ newSize: NSSize) {
@@ -96,5 +96,15 @@ final class LinkTextView: NSTextView {
             }
         }
         return rects
+    }
+}
+
+extension NSView {
+    func addVisibleLinkCursor(for rect: NSRect) {
+        guard rect.origin.x.isFinite, rect.origin.y.isFinite, rect.width.isFinite, rect.height.isFinite else { return }
+        let clipped = rect.intersection(visibleRect)
+        guard !clipped.isEmpty, clipped.origin.x.isFinite, clipped.origin.y.isFinite,
+              clipped.width.isFinite, clipped.height.isFinite else { return }
+        addCursorRect(clipped, cursor: .pointingHand)
     }
 }
