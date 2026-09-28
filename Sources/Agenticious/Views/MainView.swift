@@ -58,6 +58,7 @@ struct MainView: View {
         if options.showSettings { store.selection = .settings }
         if options.showSkills { store.selection = .skills }
         if options.showProviders { store.selection = .providers }
+        if options.showFinished { store.show(.finished) }
         guard let task = options.task else { return }
 
         let project = options.directory.map { store.addFavorite($0) } ?? .none
@@ -77,25 +78,34 @@ private struct Sidebar: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                Button { store.selection = .overview } label: {
-                    HStack {
-                        Label("All agents", systemImage: "square.grid.2x2")
-                        Spacer()
-                        Text("\(store.sessions.count)").monospacedDigit()
+                HStack(spacing: 6) {
+                    ForEach(AgentList.allCases) { list in
+                        Button { store.show(list) } label: {
+                            HStack(spacing: 6) {
+                                Text(list.title)
+                                Text("\(store.count(in: list))").monospacedDigit().opacity(0.7)
+                            }
+                            .font(.callout.weight(.semibold))
+                            .frame(maxWidth: .infinity).padding(.vertical, 10)
+                            .foregroundStyle(store.agentList == list ? AgenticiousStyle.lime : .secondary)
+                            .background(store.agentList == list ? AgenticiousStyle.lime.opacity(0.1) : .clear, in: RoundedRectangle(cornerRadius: 10))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(store.agentList == list ? .isSelected : [])
                     }
-                    .font(.callout.weight(.semibold)).padding(12)
-                    .foregroundStyle(store.selection == .overview ? AgenticiousStyle.lime : .primary)
-                    .background(store.selection == .overview ? AgenticiousStyle.lime.opacity(0.1) : AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 12))
                 }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(store.selection == .overview ? .isSelected : [])
+                .padding(4).background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 14))
+                if store.visibleSessions.isEmpty {
+                    Text(store.agentList == .queue ? "Queue clear. Summon an agent to get started." : "Completed and exited agents will appear here.")
+                        .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 4)
+                }
                 HStack {
                     Text("WORKSPACES").font(.system(size: 10, weight: .bold, design: .monospaced)).tracking(1)
                     Spacer()
                     Button("Add project folder…", systemImage: "folder.badge.plus", action: addProject)
                         .labelStyle(.iconOnly).buttonStyle(.plain).help("Add project folder")
                 }.foregroundStyle(.secondary).padding(.horizontal, 4)
-                ForEach(store.projectGroups) { group in
+                ForEach(store.visibleProjectGroups) { group in
                     let isCollapsed = collapsed.contains(group.id)
                     VStack(spacing: 8) {
                         ProjectHeader(group: group, isCollapsed: isCollapsed) {
@@ -275,23 +285,33 @@ private struct OverviewView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
-                ControlRoomHero(isEmpty: store.sessions.isEmpty) {
-                    store.composer = Composer(project: store.favorites.first ?? .none)
+                if store.agentList == .queue {
+                    ControlRoomHero(isEmpty: store.visibleSessions.isEmpty) {
+                        store.composer = Composer(project: store.favorites.first ?? .none)
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Finished agents").font(.system(size: 30, weight: .bold, design: .rounded))
+                        Text("Your completed and exited sessions. Open any agent to revisit its work or resume it.")
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 HStack(spacing: 12) {
-                    DashboardMetric(title: "AGENTS", value: store.sessions.count, color: AgenticiousStyle.violet)
-                    DashboardMetric(title: "RUNNING", value: store.sessions.filter(\.isRunning).count, color: AgenticiousStyle.lime)
-                    DashboardMetric(title: "NEEDS YOU", value: store.attentionCount, color: .orange)
+                    DashboardMetric(title: store.agentList == .queue ? "QUEUED" : "FINISHED", value: store.visibleSessions.count, color: AgenticiousStyle.violet)
+                    if store.agentList == .queue {
+                        DashboardMetric(title: "RUNNING", value: store.visibleSessions.filter(\.isRunning).count, color: AgenticiousStyle.lime)
+                        DashboardMetric(title: "NEEDS YOU", value: store.attentionCount, color: .orange)
+                    }
                 }
                 if let error = store.serverError {
                     Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red)
                 }
-                if store.sessions.isEmpty {
-                    Label("Your next big idea deserves a small army. Pick a project and start an agent.", systemImage: "sparkles")
+                if store.visibleSessions.isEmpty {
+                    Label(store.agentList == .queue ? "No agents in your queue. Finished work is saved in the Finished tab." : "No finished agents yet.", systemImage: "sparkles")
                         .foregroundStyle(.secondary)
                         .padding(.vertical, 8)
                 }
-                ForEach(store.projectGroups.filter { !$0.sessions.isEmpty }) { group in
+                ForEach(store.visibleProjectGroups.filter { !$0.sessions.isEmpty }) { group in
                     VStack(alignment: .leading, spacing: 14) {
                         HStack {
                             Label(group.project.name, systemImage: group.project.symbol)

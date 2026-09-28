@@ -11,6 +11,26 @@ enum Selection: Hashable {
     case session(UUID)
 }
 
+enum AgentList: String, CaseIterable, Identifiable {
+    case queue, finished
+
+    var id: Self { self }
+    var title: String { self == .queue ? "Queue" : "Finished" }
+
+    func includes(_ status: SessionStatus) -> Bool {
+        status.isFinished == (self == .finished)
+    }
+
+    @MainActor
+    func groups(from groups: [ProjectGroup]) -> [ProjectGroup] {
+        groups.compactMap { group in
+            let sessions = group.sessions.filter { includes($0.status) }
+            guard !sessions.isEmpty || (self == .queue && (group.isFavorite || group.project == .none)) else { return nil }
+            return ProjectGroup(project: group.project, sessions: sessions, isFavorite: group.isFavorite)
+        }
+    }
+}
+
 struct ProjectGroup: Identifiable {
     let project: Project
     let sessions: [AgentSession]
@@ -34,7 +54,12 @@ final class SessionStore: ObservableObject {
     @Published private(set) var sessions: [AgentSession] = []
     @Published private(set) var favorites: [Project]
     @Published private(set) var serverError: String?
-    @Published var selection: Selection? = .overview
+    @Published var agentList: AgentList = .queue
+    @Published var selection: Selection? = .overview {
+        didSet {
+            if let selectedSession { agentList = selectedSession.status.isFinished ? .finished : .queue }
+        }
+    }
     @Published var composer: Composer?
     @Published var alert: String?
 
@@ -61,6 +86,16 @@ final class SessionStore: ObservableObject {
     // MARK: - Reading
 
     var attentionCount: Int { sessions.filter { $0.status.needsAttention }.count }
+
+    var visibleProjectGroups: [ProjectGroup] { agentList.groups(from: projectGroups) }
+    var visibleSessions: [AgentSession] { sessions.filter { agentList.includes($0.status) } }
+
+    func count(in list: AgentList) -> Int { sessions.filter { list.includes($0.status) }.count }
+
+    func show(_ list: AgentList) {
+        agentList = list
+        selection = .overview
+    }
 
     func session(_ id: UUID) -> AgentSession? { sessions.first { $0.id == id } }
 
