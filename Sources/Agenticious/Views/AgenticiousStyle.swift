@@ -36,10 +36,11 @@ struct ControlRoomHero: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
                 Button(action: createAgent) {
-                    Label("Summon an agent", systemImage: "plus")
+                    Label("Summon an agent", systemImage: "sparkles")
+                        .frame(minWidth: 280)
                 }
-                .buttonStyle(AgenticiousButtonStyle())
-                .padding(.top, 4)
+                .buttonStyle(AgenticiousButtonStyle(isProminent: true))
+                .padding(.top, 12)
             }
             .padding(30)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -93,16 +94,19 @@ struct DashboardMetric: View {
 struct AgenticiousButtonStyle: ButtonStyle {
     var isPrimary = true
     var isCompact = false
+    var isProminent = false
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 13, weight: .semibold))
-            .padding(.horizontal, isCompact ? 10 : 18)
-            .padding(.vertical, isCompact ? 6 : 11)
+            .font(.system(size: isProminent ? 24 : 13, weight: isProminent ? .bold : .semibold,
+                          design: isProminent ? .rounded : .default))
+            .padding(.horizontal, isProminent ? 28 : (isCompact ? 10 : 18))
+            .padding(.vertical, isProminent ? 22 : (isCompact ? 6 : 11))
             .foregroundStyle(isPrimary ? AgenticiousStyle.ink : Color.primary)
             .background(isPrimary ? AgenticiousStyle.lime : AgenticiousStyle.panel, in: Capsule())
             .overlay(Capsule().stroke(isPrimary ? Color.clear : AgenticiousStyle.violet.opacity(0.4)))
+            .shadow(color: AgenticiousStyle.lime.opacity(isProminent && isEnabled ? 0.18 : 0), radius: 16, y: 5)
             .brightness(configuration.isPressed ? -0.08 : 0)
             .opacity(isEnabled ? 1 : 0.4)
             .contentShape(Capsule())
