@@ -32,6 +32,7 @@ struct AgenticiousApp: App {
                 .frame(minWidth: 960, minHeight: 600)
         }
         .defaultSize(width: 1400, height: 880)
+        .windowStyle(.hiddenTitleBar)
         .commands {
             CommandGroup(replacing: .appSettings) {
                 Button("Settings…") { store.selection = .settings }

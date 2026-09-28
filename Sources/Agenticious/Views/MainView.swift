@@ -11,20 +11,12 @@ struct MainView: View {
                 .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 420)
         } detail: {
             detail
+                .safeAreaInset(edge: .top, spacing: 0) { ControlRoomBar(project: defaultProject) }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .background(AgenticiousStyle.ink)
         }
         .tint(AgenticiousStyle.lime)
         .preferredColorScheme(.dark)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) { UsageBar() }
-            ToolbarItem(placement: .primaryAction) { ProviderStatusButton() }
-            ToolbarItem(placement: .primaryAction) {
-                Button("New Agent", systemImage: "plus") { store.composer = Composer(project: defaultProject) }
-                    .keyboardShortcut("n")
-                    .buttonStyle(AgenticiousButtonStyle(isCompact: true))
-            }
-        }
         .sheet(item: $store.composer) { NewTaskSheet(project: $0.project, template: $0.template) }
         .alert(store.alert ?? "", isPresented: Binding(get: { store.alert != nil }, set: { if !$0 { store.alert = nil } })) {
             Button("OK") {}
@@ -59,6 +51,7 @@ struct MainView: View {
         if options.showSkills { store.selection = .skills }
         if options.showProviders { store.selection = .providers }
         if options.showFinished { store.show(.finished) }
+        if let id = options.sessionToShow, store.session(id) != nil { store.selection = .session(id) }
         guard let task = options.task else { return }
 
         let project = options.directory.map { store.addFavorite($0) } ?? .none

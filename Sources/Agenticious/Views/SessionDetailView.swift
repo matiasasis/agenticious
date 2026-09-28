@@ -6,6 +6,7 @@ import SwiftUI
 struct SessionDetailView: View {
     @EnvironmentObject private var store: SessionStore
     @ObservedObject var session: AgentSession
+    @State private var showActivity = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -47,7 +48,20 @@ struct SessionDetailView: View {
 
             Divider()
 
-            if session.terminalView == nil {
+            HStack(spacing: 8) {
+                Button("Activity", systemImage: "text.bubble") { showActivity = true }
+                    .buttonStyle(AgenticiousButtonStyle(isPrimary: showActivity, isCompact: true))
+                Button("Terminal", systemImage: "terminal") { showActivity = false }
+                    .buttonStyle(AgenticiousButtonStyle(isPrimary: !showActivity, isCompact: true))
+                Spacer()
+                if session.status.needsAttention || session.status == .yourTurn {
+                    Button("Reply / approve in terminal", systemImage: "arrow.right") { showActivity = false }
+                        .buttonStyle(AgenticiousButtonStyle(isCompact: true))
+                }
+            }.padding(12).background(AgenticiousStyle.panel)
+            if showActivity {
+                ActivityView(session: session) { showActivity = false }
+            } else if session.terminalView == nil {
                 ContentUnavailableView(
                     "Not running", systemImage: "moon.zzz",
                     description: Text("Resume to reopen \(session.agent.displayName)'s conversation, with everything it already knows.")

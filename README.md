@@ -111,3 +111,11 @@ Claude checks MCP connections; Codex reports configured authentication without c
 Agent details show saved PR links above the step cards. Full HTTPS PR URLs in task text, Claude tool results, progress notes, and completion summaries are captured automatically. Agents use `set_pull_requests` to attach verified links as soon as they identify or create a PR, including every PR in a stack. Bare numbers must first be resolved against the actual repository by the agent. Links are deduplicated and kept across app restarts, including in Finished sessions. Existing sessions can report links in progress notes even without the new MCP tool.
 
 Step cards use equal heights; hover a card to read its complete title and note.
+
+### Activity and terminal
+
+Agent details default to **Activity**, a structured view of provider messages and tool calls. Command/input blocks include copy controls and working-directory context; long inputs and output can be expanded, errors open automatically, and unknown result statuses remain neutral. Markdown emphasis, links, and fenced code blocks render separately. Use **Terminal** or **Respond in terminal** for replies, approvals, interactive prompts, and raw output. Switching tabs keeps the agent process alive.
+
+Activity reads the session's local Claude or Codex JSONL log every two seconds while visible. Claude sessions are matched by conversation ID. Codex uses its reported conversation ID or a unique marker added to new Agenticious prompts, never just the workspace folder. Older Codex sessions without a known ID may need to finish a turn before activity becomes available. Subagent logs and private reasoning records are not displayed. Provider log formats may change; when a log is unavailable, use the terminal.
+
+The view reads up to the latest 4 MiB, shows at most 200 entries, and labels content truncated beyond 32 KiB per field. Activity history comes from the provider's log, so disabling or deleting those logs also removes that history from this view. No additional transcript copy is saved by Agenticious.

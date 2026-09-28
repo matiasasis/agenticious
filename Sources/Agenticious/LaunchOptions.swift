@@ -17,6 +17,7 @@ struct LaunchOptions {
     let showSettings: Bool
     let showSkills: Bool
     let showProviders: Bool
+    let sessionToShow: UUID?
     let showFinished: Bool
 
     static let current = LaunchOptions(arguments: CommandLine.arguments)
@@ -35,6 +36,7 @@ struct LaunchOptions {
         showSettings = arguments.contains("--settings")
         showSkills = arguments.contains("--skills")
         showProviders = arguments.contains("--providers")
+        sessionToShow = value("--session").flatMap(UUID.init(uuidString:))
         showFinished = arguments.contains("--finished")
         newAgentTemplate = arguments.contains("--new-agent") ? value("--new-agent").flatMap { $0.hasPrefix("--") ? nil : $0 } ?? "custom" : nil
     }

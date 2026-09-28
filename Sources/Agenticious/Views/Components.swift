@@ -177,7 +177,7 @@ struct UsageBar: View {
     @EnvironmentObject private var usage: UsageMonitor
 
     var body: some View {
-        HStack(spacing: 18) {
+        HStack(spacing: 10) {
             if let claude = usage.claudeReading {
                 vendor("Claude", claude.limits, source: "Read \(claude.takenAt.formatted(.relative(presentation: .named))) " +
                     "from the status line of a Claude agent started here.")
@@ -201,6 +201,10 @@ struct UsageBar: View {
                 .font(.caption.weight(.semibold))
             ForEach(limits, id: \.windowMinutes) { LimitGauge(limit: $0, source: source) }
         }
+        .fixedSize(horizontal: true, vertical: false)
+        .padding(.horizontal, 10).padding(.vertical, 8)
+        .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(AgenticiousStyle.violet.opacity(0.25)))
     }
 }
 
@@ -213,11 +217,11 @@ private struct LimitGauge: View {
 
         VStack(alignment: .leading, spacing: 2) {
             Text("\(limit.windowLabel) \(Int(percent.rounded()))%")
-                .font(.caption)
-                .monospacedDigit()
+                .font(.system(size: 10))
+                .monospacedDigit().lineLimit(1)
             ProgressView(value: min(percent, 100), total: 100)
-                .tint(percent >= 90 ? .red : percent >= 70 ? .orange : .accentColor)
-                .frame(width: 80)
+                .tint(percent >= 90 ? .red : percent >= 70 ? .orange : AgenticiousStyle.lime)
+                .frame(width: 62)
         }
         .help([resetText, source].compactMap { $0 }.joined(separator: "\n"))
     }
@@ -249,5 +253,34 @@ struct PullRequestLinks: View {
                 }
             }
         }.scrollIndicators(.hidden)
+    }
+}
+
+struct ControlRoomBar: View {
+    @EnvironmentObject private var store: SessionStore
+    let project: Project
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(nsImage: AgenticiousMenuIcon.image).foregroundStyle(AgenticiousStyle.lime)
+                .accessibilityLabel("Agenticious")
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) {
+                    Text("CONTROL ROOM").font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .tracking(1).foregroundStyle(AgenticiousStyle.violet)
+                    Spacer(minLength: 8)
+                    UsageBar()
+                }
+                UsageBar()
+            }
+            Spacer(minLength: 0)
+            ProviderStatusButton().buttonStyle(AgenticiousButtonStyle(isPrimary: false, isCompact: true)).labelStyle(.iconOnly)
+            Button("Summon agent", systemImage: "plus") { store.composer = Composer(project: project) }
+                .labelStyle(.iconOnly).keyboardShortcut("n")
+                .buttonStyle(AgenticiousButtonStyle(isCompact: true)).help("Summon an agent · ⌘N")
+        }
+        .padding(.horizontal, 18).padding(.vertical, 12)
+        .background(AgenticiousStyle.ink)
+        .overlay(alignment: .bottom) { Rectangle().fill(AgenticiousStyle.violet.opacity(0.25)).frame(height: 1) }
     }
 }
