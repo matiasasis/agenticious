@@ -2,7 +2,7 @@ import AppKit
 
 /// Command-line options, so an agent can be started (and the UI inspected) without clicking:
 ///
-///     AgentDeck --task "Fix the flaky spec" --agent codex --dir ~/code/app --snapshot-dir /tmp/shots
+///     Agenticious --task "Fix the flaky spec" --agent codex --dir ~/code/app --snapshot-dir /tmp/shots
 ///
 /// Without `--dir` the agent runs under "No project".
 struct LaunchOptions {
@@ -25,7 +25,7 @@ struct LaunchOptions {
     }
 }
 
-/// Writes a PNG of every visible AgentDeck window every few seconds. It renders the app's own views,
+/// Writes a PNG of every visible Agenticious window every few seconds. It renders the app's own views,
 /// so it needs no Screen Recording permission.
 @MainActor
 final class WindowSnapshotter {

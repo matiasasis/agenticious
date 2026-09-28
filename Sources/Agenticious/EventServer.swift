@@ -1,7 +1,7 @@
 import Foundation
 import Network
 
-/// One signal from a running agent: a Claude Code hook, a Codex `notify`, or a call to the agentdeck MCP tools.
+/// One signal from a running agent: a Claude Code hook, a Codex `notify`, or a call to the agenticious MCP tools.
 struct AgentEvent: Sendable {
     let sessionID: UUID
     let name: String
@@ -14,7 +14,7 @@ final class EventServer: @unchecked Sendable {
     typealias Handler = @Sendable (AgentEvent, @escaping @Sendable (Data?) -> Void) -> Void
 
     private let listener: NWListener
-    private let queue = DispatchQueue(label: "agentdeck.events")
+    private let queue = DispatchQueue(label: "agenticious.events")
     private let onEvent: Handler
 
     init(port: UInt16, onEvent: @escaping Handler) throws {

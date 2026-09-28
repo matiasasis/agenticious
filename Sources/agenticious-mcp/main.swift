@@ -1,11 +1,11 @@
 import Foundation
 
 // Minimal MCP server (JSON-RPC over stdio) that the agent uses to report its plan and ask for the human.
-// Every tool call is forwarded to the AgentDeck app at POST /hook/<session>/mcp.
+// Every tool call is forwarded to the Agenticious app at POST /hook/<session>/mcp.
 
 let environment = ProcessInfo.processInfo.environment
-let sessionID = environment["AGENTDECK_SESSION"] ?? ""
-let port = environment["AGENTDECK_PORT"] ?? "47821"
+let sessionID = environment["AGENTICIOUS_SESSION"] ?? ""
+let port = environment["AGENTICIOUS_PORT"] ?? "47821"
 
 let statusValues = ["pending", "in_progress", "done", "blocked"]
 
@@ -75,7 +75,7 @@ func fail(_ id: Any, code: Int, message: String) {
     send(["jsonrpc": "2.0", "id": id, "error": ["code": code, "message": message]])
 }
 
-/// Blocks until AgentDeck acknowledges, so the dashboard is updated before the agent moves on.
+/// Blocks until Agenticious acknowledges, so the dashboard is updated before the agent moves on.
 func forward(tool: String, arguments: [String: Any]) -> Bool {
     guard let url = URL(string: "http://127.0.0.1:\(port)/hook/\(sessionID)/mcp"),
           let body = try? JSONSerialization.data(withJSONObject: ["tool": tool, "args": arguments]) else { return false }
@@ -100,7 +100,7 @@ func callTool(_ id: Any, _ params: [String: Any]) {
     }
 
     let delivered = forward(tool: name, arguments: params["arguments"] as? [String: Any] ?? [:])
-    let text = delivered ? "Shown on the AgentDeck dashboard." : "AgentDeck isn't reachable. Carry on normally."
+    let text = delivered ? "Shown on the Agenticious dashboard." : "Agenticious isn't reachable. Carry on normally."
     reply(id, result: ["content": [["type": "text", "text": text]]])
 }
 
@@ -115,7 +115,7 @@ while let line = readLine() {
         reply(id, result: [
             "protocolVersion": params["protocolVersion"] as? String ?? "2025-06-18",
             "capabilities": ["tools": [:]],
-            "serverInfo": ["name": "agentdeck", "version": "0.1.0"],
+            "serverInfo": ["name": "agenticious", "version": "0.1.0"],
         ])
     case "tools/list":
         reply(id, result: ["tools": tools])

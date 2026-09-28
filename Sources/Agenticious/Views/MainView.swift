@@ -253,8 +253,8 @@ struct MenuBarContent: View {
             }
         }
         if !store.sessions.isEmpty { Divider() }
-        Button("Open AgentDeck", action: showMainWindow)
-        Button("Quit AgentDeck") { NSApp.terminate(nil) }
+        Button("Open Agenticious", action: showMainWindow)
+        Button("Quit Agenticious") { NSApp.terminate(nil) }
     }
 
     private func showMainWindow() {
