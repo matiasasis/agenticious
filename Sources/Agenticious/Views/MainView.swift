@@ -119,7 +119,7 @@ private struct Sidebar: View {
         .safeAreaInset(edge: .top) {
             HStack(spacing: 10) {
                 if let icon = Bundle.module.url(forResource: "AppIcon", withExtension: "png").flatMap(NSImage.init(contentsOf:)) {
-                    Image(nsImage: icon).resizable().scaledToFit().frame(width: 44, height: 44)
+                    Image(nsImage: icon).resizable().scaledToFit().frame(width: 64, height: 64)
                         .accessibilityHidden(true)
                 }
                 VStack(alignment: .leading, spacing: 3) {
@@ -304,9 +304,7 @@ private struct OverviewView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
                 if store.agentList == .queue {
-                    ControlRoomHero(isEmpty: store.visibleSessions.isEmpty) {
-                        store.composer = Composer(project: store.composerProject)
-                    }
+                    ControlRoomHero(isEmpty: store.visibleSessions.isEmpty)
                 } else {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Finished agents").font(.system(size: 30, weight: .bold, design: .rounded))

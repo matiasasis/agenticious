@@ -20,12 +20,16 @@ struct ActivityView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 16) {
                         if let notice { Text(notice).font(.caption).foregroundStyle(.secondary) }
-                        if entries.isEmpty {
-                            ContentUnavailableView("No activity yet", systemImage: "text.bubble", description: Text("Messages and tool calls appear here when the provider writes them to this session’s log."))
-                        }
                         ForEach(entries) { entry in ActivityCard(entry: entry, isRunning: session.isRunning) }
                         Color.clear.frame(height: 1).id("latest")
                     }.padding(20)
+                }
+                .overlay {
+                    if entries.isEmpty {
+                        ContentUnavailableView("No activity yet", systemImage: "text.bubble", description: Text("Messages and tool calls appear here when the provider writes them to this session’s log."))
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .allowsHitTesting(false)
+                    }
                 }
                 .onChange(of: entries) { _, _ in if followLatest { proxy.scrollTo("latest", anchor: .bottom) } }
             }
