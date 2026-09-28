@@ -51,8 +51,11 @@ struct TaskTemplate: Codable, Identifiable, Equatable {
                      Address review comments on pull request {{input}} and get it merged.
                      Follow the project's review conventions. Implement applicable feedback, test and push fixes,
                      and reply to each review thread. Explain any feedback that cannot be applied.
+                     Resolve merge conflicts with the target branch, preserving the intended changes on both sides.
+                     Test the resolution and push it before checking CI again.
                      Wait for CI on the latest commit before merging with the repository's normal method.
-                     Do not bypass required checks or approvals. Ask the human about conflicts or blockers.
+                     Do not bypass required checks or approvals. Ask the human when a conflict's intended behavior
+                     is unclear or another blocker cannot be resolved.
                      """),
         TaskTemplate(id: "reviewPR", name: "Review PR", summary: "Review a pull request and post actionable feedback.",
                      symbol: "text.magnifyingglass", fieldLabel: "Pull request", fieldPlaceholder: "PR number or URL",
