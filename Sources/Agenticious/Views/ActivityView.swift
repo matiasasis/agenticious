@@ -112,7 +112,7 @@ struct ActivityCard: View {
                 }
                 if let file = entry.file, file.hasPrefix("/") {
                     Link(destination: URL(fileURLWithPath: file)) { Label(file, systemImage: "doc.text") }
-                        .font(.caption).foregroundStyle(AgenticiousStyle.violet)
+                        .font(.caption).foregroundStyle(AgenticiousStyle.violet).linkCursor()
                 }
                 if !entry.output.isEmpty {
                     DisclosureGroup(isExpanded: $expanded) {
@@ -138,8 +138,7 @@ private struct ActivityMarkdown: View {
         VStack(alignment: .leading, spacing: 12) {
             ForEach(Array(text.components(separatedBy: "```").enumerated()), id: \.offset) { index, block in
                 if index.isMultiple(of: 2) {
-                    Text((try? AttributedString(markdown: block, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(block))
-                        .textSelection(.enabled).tint(AgenticiousStyle.violet)
+                    LinkedMarkdownText(text: block)
                 } else {
                     Text(block.components(separatedBy: "\n").dropFirst().joined(separator: "\n"))
                         .font(.system(size: 12, design: .monospaced)).textSelection(.enabled)

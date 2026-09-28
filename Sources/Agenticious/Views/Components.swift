@@ -250,6 +250,7 @@ struct PullRequestLinks: View {
                     }
                     .foregroundStyle(AgenticiousStyle.violet)
                     .help(reference.url.absoluteString)
+                    .linkCursor()
                 }
             }
         }.scrollIndicators(.hidden)
