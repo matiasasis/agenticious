@@ -263,8 +263,6 @@ struct ControlRoomBar: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(nsImage: AgenticiousMenuIcon.image).foregroundStyle(AgenticiousStyle.lime)
-                .accessibilityLabel("Agenticious")
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 12) {
                     Text("CONTROL ROOM").font(.system(size: 10, weight: .bold, design: .monospaced))

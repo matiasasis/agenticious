@@ -122,7 +122,10 @@ private struct Sidebar: View {
         .background(AgenticiousStyle.ink)
         .safeAreaInset(edge: .top) {
             HStack(spacing: 10) {
-                Image("AppIcon", bundle: .module).resizable().frame(width: 44, height: 44)
+                if let icon = Bundle.module.url(forResource: "AppIcon", withExtension: "png").flatMap(NSImage.init(contentsOf:)) {
+                    Image(nsImage: icon).resizable().scaledToFit().frame(width: 44, height: 44)
+                        .accessibilityHidden(true)
+                }
                 VStack(alignment: .leading, spacing: 3) {
                     Text("AGENTICIOUS").font(.system(size: 17, weight: .black, design: .rounded))
                     Text("A LITTLE CHAOS. A LOT DONE.")
