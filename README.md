@@ -119,3 +119,7 @@ Agent details default to **Activity**, a structured view of provider messages an
 Activity reads the session's local Claude or Codex JSONL log every two seconds while visible. Claude sessions are matched by conversation ID. Codex uses its reported conversation ID or a unique marker added to new Agenticious prompts, never just the workspace folder. Older Codex sessions without a known ID may need to finish a turn before activity becomes available. Subagent logs and private reasoning records are not displayed. Provider log formats may change; when a log is unavailable, use the terminal.
 
 The view reads up to the latest 4 MiB, shows at most 200 entries, and labels content truncated beyond 32 KiB per field. Activity history comes from the provider's log, so disabling or deleting those logs also removes that history from this view. No additional transcript copy is saved by Agenticious.
+
+The summon sheet remembers the last task preset and workspace, plus provider, model, and effort (model and effort separately per provider). Opening a workspace's **+** button still selects that workspace explicitly. Removed favorites are not restored as the default workspace. The larger sheet adapts to the available display size and keeps model selection beside the compact provider choices.
+
+Provider icons are bundled from the installed official Claude desktop and ChatGPT/Codex applications, respectively (`TrayIconTemplate@3x.png` and `icon-codex-light.png`); their trademarks belong to Anthropic and OpenAI.

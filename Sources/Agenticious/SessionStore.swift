@@ -43,7 +43,7 @@ struct ProjectGroup: Identifiable {
 struct Composer: Identifiable {
     let id = UUID()
     let project: Project
-    var template = TaskTemplate.custom
+    var template: TaskTemplate?
 }
 
 @MainActor
@@ -84,6 +84,15 @@ final class SessionStore: ObservableObject {
     }
 
     // MARK: - Reading
+
+    var composerProject: Project {
+        if let selectedSession { return selectedSession.project }
+        if let path = UserDefaults.standard.string(forKey: "lastWorkspace") {
+            if path.isEmpty { return .none }
+            if let favorite = favorites.first(where: { $0.path == path }) { return favorite }
+        }
+        return favorites.first ?? .none
+    }
 
     var attentionCount: Int { sessions.filter { $0.status.needsAttention }.count }
 

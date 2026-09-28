@@ -41,7 +41,7 @@ struct MainView: View {
 
     /// New agents default to the project of whatever you're looking at.
     private var defaultProject: Project {
-        store.selectedSession?.project ?? store.favorites.first ?? .none
+        store.composerProject
     }
 
     private func launchFromCommandLine() {
@@ -280,7 +280,7 @@ private struct OverviewView: View {
             VStack(alignment: .leading, spacing: 26) {
                 if store.agentList == .queue {
                     ControlRoomHero(isEmpty: store.visibleSessions.isEmpty) {
-                        store.composer = Composer(project: store.favorites.first ?? .none)
+                        store.composer = Composer(project: store.composerProject)
                     }
                 } else {
                     VStack(alignment: .leading, spacing: 8) {
