@@ -81,14 +81,9 @@ enum TaskTemplate: String, CaseIterable, Identifiable {
             """
         case .reviewPR:
             return """
-            Review PR \(value).
-
-            Read the description and the full diff (`gh pr view`, `gh pr diff`), and read the changed code in context. \
-            Look for bugs, missing tests, security problems and anything that doesn't fit the repo's conventions.
-            Don't push commits or post anything on GitHub. Finish with the review as your reply: a verdict, then findings \
-            ordered by severity, each with file:line and a suggested fix.
-
-            \(skills)
+            Review PR \(value) with the perfect-pr-comment skill: post the inline suggestions, and approve if the review \
+            is complete with no HIGH or CRITICAL findings. You're authorized to post the review on GitHub and to add \
+            the skill's Slack reactions to the review request in coders. If the skill isn't available, call need_human.
             """
         case .fixCI:
             let target = value.isEmpty ? "the current branch" : value
