@@ -105,6 +105,19 @@ struct TaskTemplate: Codable, Identifiable, Equatable {
                      if the human explicitly requests a historical review. Review stacked PRs in dependency order,
                      comparing each PR against its own target branch so shared changes are not reported repeatedly.
 
+                     Signal review work as soon as it starts, before reading the full diff or posting findings.
+                     For a Slack source, resolve the parent thread even if the input targets a reply, and immediately
+                     add :eyes: to the parent when starting work on that thread. Read all replies and pages, retain
+                     each PR's source message identifiers, and add :eyes: to each message referencing a PR when
+                     starting that PR's review. Do not mark all queued PR messages in advance. A message containing
+                     multiple PRs gets :eyes: when review of its first PR starts; this signals work started, not completion.
+                     For each PR, add the eyes reaction to its GitHub description when starting its review, including
+                     when the input is a direct PR number or URL. Use the reaction name eyes in Slack and GitHub APIs.
+                     Preserve existing reactions and skip adding your own if already present. Read back each reaction
+                     to verify it was saved. If a reaction fails or access is unavailable, report the affected message
+                     or PR link separately and continue any review work that remains accessible. Do not claim the
+                     reaction succeeded without verification. Do not post new Slack messages or remove other reactions.
+
                      For each open PR, follow the project's review conventions. Read the description, linked context,
                      existing review threads, and the full current diff. Check correctness, maintainability, test coverage,
                      and CI results. Verify findings against the latest head before posting and avoid duplicating existing feedback.
