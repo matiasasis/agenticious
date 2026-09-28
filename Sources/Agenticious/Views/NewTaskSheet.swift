@@ -461,13 +461,15 @@ private struct ProviderIcon: View {
 
     private var image: NSImage {
         let name = agent == .claude ? "ClaudeIcon" : "CodexIcon"
-        return Bundle.module.url(forResource: name, withExtension: "png").flatMap(NSImage.init(contentsOf:)) ?? NSImage()
+        return Bundle.module.url(forResource: name, withExtension: agent == .claude ? "png" : "svg")
+            .flatMap(NSImage.init(contentsOf:)) ?? NSImage()
     }
 
     var body: some View {
         Image(nsImage: image)
-            .renderingMode(agent == .claude ? .template : .original)
+            .renderingMode(.template)
             .resizable().scaledToFit().frame(width: 24, height: 24)
+            .foregroundStyle(Color.primary)
             .accessibilityHidden(true)
     }
 }

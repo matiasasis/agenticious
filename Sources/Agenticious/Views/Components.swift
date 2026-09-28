@@ -275,8 +275,9 @@ struct ControlRoomBar: View {
             Spacer(minLength: 0)
             ProviderStatusButton().buttonStyle(AgenticiousButtonStyle(isPrimary: false, isCompact: true)).labelStyle(.iconOnly)
             Button("Summon agent", systemImage: "plus") { store.composer = Composer(project: project) }
-                .labelStyle(.iconOnly).keyboardShortcut("n")
-                .buttonStyle(AgenticiousButtonStyle(isCompact: true)).help("Summon an agent · ⌘N")
+                .labelStyle(.titleAndIcon).keyboardShortcut("n")
+                .buttonStyle(AgenticiousButtonStyle()).fixedSize()
+                .help("Summon an agent · ⌘N")
         }
         .padding(.horizontal, 18).padding(.vertical, 12)
         .background(AgenticiousStyle.ink)

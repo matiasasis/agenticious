@@ -73,13 +73,47 @@ struct TaskTemplate: Codable, Identifiable, Equatable {
                      Ask the human when intended behavior is unclear or a blocker cannot be resolved; continue independent PRs.
                      Track every PR through completion and report its clickable URL, final state, and any blockers.
                      Only report the whole task complete after verifying that every PR in scope is merged.
+
+                     When the source is a Slack message, resolve its parent thread even if the URL targets a reply.
+                     Read the parent and every reply, including all pages and PR links in attachments. Keep each
+                     PR's source message identifiers, including duplicate references. After verifying a PR is merged
+                     on GitHub, including already-merged PRs, add :merged: to every reply referencing it. If a reply
+                     lists multiple PRs, add the reaction only when all PRs in that message are verified merged.
+                     Reread the complete thread and reconcile newly posted PRs before marking the parent message.
+                     Add :merged: to the parent only when at least one PR was found and every PR in the thread is
+                     verified merged. Never mark a message complete while any PR in its scope is open, blocked,
+                     closed without merging, or has an unknown state. Preserve existing reactions and skip your
+                     reaction if already present. Use the Slack reaction name merged and read back each update
+                     to verify it succeeded. Report inaccessible messages, missing emoji, or failed reactions with
+                     the affected message links separately from merge results. Do not substitute another emoji or
+                     post a new Slack message. If the source cannot be read completely, do not mark the thread complete.
                      """),
-        TaskTemplate(id: "reviewPR", name: "Review PR", summary: "Review a pull request and post actionable feedback.",
-                     symbol: "text.magnifyingglass", fieldLabel: "Pull request", fieldPlaceholder: "PR number or URL",
-                     titlePattern: "Review PR {{input}}", prompt: """
-                     Review pull request {{input}} following the project's conventions.
-                     Check correctness, maintainability, and test coverage. Post actionable review comments
-                     with suggestions where useful. Do not modify the author's branch.
+        TaskTemplate(id: "reviewPR", name: "Review PR", summary: "Review one or multiple PRs and post actionable feedback on each.",
+                     symbol: "text.magnifyingglass", fieldLabel: "Pull request(s)",
+                     fieldPlaceholder: "PR numbers, URLs, or a link containing multiple PRs",
+                     titlePattern: "Review PRs: {{input}}", prompt: """
+                     Review every pull request identified by this input:
+                     {{input}}
+
+                     Accept a single PR, a list of PR numbers or URLs, or a source link containing PR references.
+                     For a source link, read its complete content and all comments/replies, including paginated results.
+                     Collect every PR explicitly linked there; deduplicate by repository and PR number, and list the
+                     resulting scope before reviewing. Do not expand scope to unrelated linked discussions.
+                     Resolve bare PR numbers against the selected project. If the repository or scope is ambiguous,
+                     or the source cannot be read completely, ask the human instead of guessing or silently omitting PRs.
+                     Check each PR's current state. Report closed or already-merged PRs separately; only review them
+                     if the human explicitly requests a historical review. Review stacked PRs in dependency order,
+                     comparing each PR against its own target branch so shared changes are not reported repeatedly.
+
+                     For each open PR, follow the project's review conventions. Read the description, linked context,
+                     existing review threads, and the full current diff. Check correctness, maintainability, test coverage,
+                     and CI results. Verify findings against the latest head before posting and avoid duplicating existing feedback.
+                     Post actionable comments or code suggestions on the relevant PR, using COMMENT by default.
+                     Do not submit Request Changes. Submit an approval only when the human explicitly requests approval.
+                     Do not implement fixes, commit, push, or merge the author's branch as part of this review.
+                     If a PR cannot be reviewed, record the blocker and continue with independent PRs.
+                     Finish with a per-PR report containing clickable PR and posted-review links, findings, and any blockers.
+                     Do not claim the whole batch was reviewed while any PR in scope remains unreviewed or blocked.
                      """),
         TaskTemplate(id: "fixCI", name: "Fix CI", summary: "Investigate failing checks, fix the cause, and get CI green.",
                      symbol: "wrench.and.screwdriver", fieldLabel: "Pull request or branch",

@@ -128,4 +128,4 @@ The view reads up to the latest 4 MiB, shows at most 200 entries, and labels con
 
 The summon sheet remembers the last task preset and workspace, plus provider, model, and effort (model and effort separately per provider). Opening a workspace's **+** button still selects that workspace explicitly. Removed favorites are not restored as the default workspace. The larger sheet adapts to the available display size and keeps model selection beside the compact provider choices.
 
-Provider icons are bundled from the installed official Claude desktop and ChatGPT/Codex applications, respectively (`TrayIconTemplate@3x.png` and `icon-codex-light.png`); their trademarks belong to Anthropic and OpenAI.
+Provider icons use monochrome template rendering. The Claude mark comes from the official Claude desktop app (`TrayIconTemplate@3x.png`); the OpenAI mark used for Codex comes from the official ChatGPT app (`webview/assets/openai-logo-regular-ceb75a1754fa.svg` in `app.asar`). Their trademarks belong to Anthropic and OpenAI.
