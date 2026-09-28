@@ -45,7 +45,7 @@ struct NewTaskSheet: View {
 
             if isGitProject {
                 Toggle("Run in its own git worktree", isOn: $useWorktree)
-                    .help("Creates \(Worktrees.folder)/<task> on a new agentdeck/<task> branch from the current HEAD, so agents in the same repo don't edit the same files.")
+                    .help("Creates \(Worktrees.folder)/<task> on a new agenticious/<task> branch from the current HEAD, so agents in the same repo don't edit the same files.")
             }
 
             if let launchError {

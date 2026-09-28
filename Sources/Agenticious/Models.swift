@@ -89,7 +89,7 @@ struct Chunk: Identifiable, Equatable {
 enum PlanSource {
     case none
     case todoList   // mirrored from Claude's own TodoWrite tool
-    case agent      // declared explicitly through the agentdeck MCP tools; wins over todoList
+    case agent      // declared explicitly through the agenticious MCP tools; wins over todoList
 }
 
 @MainActor

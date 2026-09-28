@@ -2,13 +2,28 @@ import AppKit
 import SwiftUI
 
 @main
-struct AgentDeckApp: App {
+struct AgenticiousApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var store = SessionStore()
     @StateObject private var usage = UsageMonitor()
 
+    init() {
+        Self.importSettingsFromAgentDeck()
+    }
+
+    /// The app was called AgentDeck, and a bare executable's defaults domain is its name, so settings saved
+    /// before the rename live in AgentDeck.plist. Copy them over once so favorites survive.
+    private static func importSettingsFromAgentDeck() {
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: "importedAgentDeckSettings"), let old = UserDefaults(suiteName: "AgentDeck") else { return }
+        for key in ["favoriteProjects", "lastAgent", "useWorktree"] where defaults.object(forKey: key) == nil {
+            if let value = old.object(forKey: key) { defaults.set(value, forKey: key) }
+        }
+        defaults.set(true, forKey: "importedAgentDeckSettings")
+    }
+
     var body: some Scene {
-        Window("AgentDeck", id: "main") {
+        Window("Agenticious", id: "main") {
             MainView()
                 .environmentObject(store)
                 .environmentObject(usage)

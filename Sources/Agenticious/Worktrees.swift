@@ -30,7 +30,7 @@ enum Worktrees {
         guard let root = repositoryRoot(of: projectPath) else { throw WorktreeError.git("\(projectPath) isn't a git repository.") }
 
         let slug = slug(for: task)
-        let worktree = Worktree(repositoryRoot: root, path: "\(root)/\(folder)/\(slug)", branch: "agentdeck/\(slug)")
+        let worktree = Worktree(repositoryRoot: root, path: "\(root)/\(folder)/\(slug)", branch: "agenticious/\(slug)")
 
         try excludeLocally(in: root)
         try git(["worktree", "add", "-b", worktree.branch, worktree.path, "HEAD"], in: root)

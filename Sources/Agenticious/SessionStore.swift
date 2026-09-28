@@ -40,7 +40,7 @@ final class SessionStore: ObservableObject {
     private var commandLineTaskPending = true
 
     init() {
-        port = ProcessInfo.processInfo.environment["AGENTDECK_PORT"].flatMap(UInt16.init) ?? Self.defaultPort
+        port = ProcessInfo.processInfo.environment["AGENTICIOUS_PORT"].flatMap(UInt16.init) ?? Self.defaultPort
         favorites = (UserDefaults.standard.stringArray(forKey: Self.favoritesKey) ?? []).map(Project.init(path:))
         startServer()
         snapshotter = LaunchOptions.current.snapshotDirectory.map(WindowSnapshotter.init)
@@ -152,7 +152,7 @@ final class SessionStore: ObservableObject {
         if let path = project.path { return URL(fileURLWithPath: path) }
 
         let scratch = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("AgentDeck/scratch")
+            .appendingPathComponent("Agenticious/scratch")
         try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
         return scratch
     }
