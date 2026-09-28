@@ -11,7 +11,7 @@ enum TaskTemplate: String, CaseIterable, Identifiable {
         switch self {
         case .custom: "Custom"
         case .implementTicket: "Implement ticket"
-        case .reviewComments: "Review comments"
+        case .reviewComments: "Review comments / Merge"
         case .reviewPR: "Review PR"
         case .fixCI: "Fix CI"
         }
@@ -41,7 +41,7 @@ enum TaskTemplate: String, CaseIterable, Identifiable {
         switch self {
         case .custom: value
         case .implementTicket: "Implement \(value)"
-        case .reviewComments: "Address review comments on PR \(value)"
+        case .reviewComments: "Address comments and merge PR \(value)"
         case .reviewPR: "Review PR \(value)"
         case .fixCI: value.isEmpty ? "Fix CI" : "Fix CI on \(value)"
         }
@@ -69,15 +69,17 @@ enum TaskTemplate: String, CaseIterable, Identifiable {
             """
         case .reviewComments:
             return """
-            Address the open review comments on PR \(value).
+            Get PR \(value) merged, handling any review comments on the way with the perfect-pr-address-comments skill.
 
             1. Check out the PR's branch (`gh pr checkout`). If git says it's checked out in another worktree, call need_human.
-            2. Read every unresolved review thread.
-            3. For each one, decide whether it applies. Implement the ones that do.
-            4. Run the relevant tests and linters, then commit and push.
-            5. Reply on every thread: what you changed, or why you didn't. Resolve the threads you fixed.
+            2. If there are unresolved review threads, work through them as perfect-pr-address-comments says: implement \
+            the ones that apply, push, reply on every thread and resolve the ones you fixed. With none, go straight to step 3.
+            3. Wait for CI on the latest commit (`gh pr checks --watch`). Fix failures the PR caused; if one looks flaky or \
+            unrelated, call need_human.
+            4. Merge with the method the repo uses (see how recent PRs were merged). Never use --admin or skip required \
+            checks or approvals. If GitHub blocks the merge (conflicts, a required review), call need_human with the reason.
 
-            \(skills)
+            If the skill isn't available, call need_human.
             """
         case .reviewPR:
             return """
