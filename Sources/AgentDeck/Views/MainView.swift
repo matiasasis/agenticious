@@ -21,6 +21,9 @@ struct MainView: View {
             }
         }
         .sheet(item: $store.composer) { NewTaskSheet(project: $0.project) }
+        .alert(store.alert ?? "", isPresented: Binding(get: { store.alert != nil }, set: { if !$0 { store.alert = nil } })) {
+            Button("OK", role: .cancel) {}
+        }
         .onAppear(perform: launchFromCommandLine)
     }
 
@@ -120,6 +123,7 @@ private struct SessionRow: View {
                     .lineLimit(2)
             }
             ChunkStrip(chunks: session.chunks, style: .compact)
+            if let worktree = session.worktree { BranchLabel(worktree: worktree, isRemoved: session.worktreeRemoved) }
             if case let .needsYou(reason) = session.status {
                 Text(reason)
                     .font(.caption)
@@ -137,6 +141,11 @@ struct SessionMenu: View {
 
     var body: some View {
         Button("Stop agent") { store.stop(session) }
+        if session.worktree != nil && !session.worktreeRemoved {
+            Button("Delete worktree") { store.deleteWorktree(of: session) }
+                .disabled(!session.hasExited)
+                .help("Stop the agent first; git refuses if there are uncommitted changes.")
+        }
         Button("Remove", role: .destructive) { store.remove(session) }
     }
 }
@@ -209,6 +218,8 @@ struct SessionCard: View {
                     .foregroundStyle(.orange)
                     .lineLimit(2)
             }
+
+            if let worktree = session.worktree { BranchLabel(worktree: worktree, isRemoved: session.worktreeRemoved) }
 
             HStack {
                 Text(session.startedAt, style: .relative)

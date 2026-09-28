@@ -22,6 +22,7 @@ struct SessionDetailView: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
+                    if let worktree = session.worktree { BranchLabel(worktree: worktree, isRemoved: session.worktreeRemoved) }
                     Label(session.project.path ?? "No project", systemImage: session.project.symbol)
                         .font(.caption)
                         .foregroundStyle(.secondary)

@@ -31,6 +31,7 @@ final class SessionStore: ObservableObject {
     @Published private(set) var serverError: String?
     @Published var selection: Selection? = .overview
     @Published var composer: Composer?
+    @Published var alert: String?
 
     let port: UInt16
     private var server: EventServer?
@@ -93,8 +94,10 @@ final class SessionStore: ObservableObject {
     // MARK: - Sessions
 
     @discardableResult
-    func launch(task: String, agent: AgentKind, project: Project) throws -> AgentSession {
-        let session = AgentSession(task: task, agent: agent, project: project, directory: try directory(for: project))
+    func launch(task: String, agent: AgentKind, project: Project, isolated: Bool = false) throws -> AgentSession {
+        let worktree = try isolated ? project.path.map { try Worktrees.create(in: $0, for: task) } : nil
+        let directory = try worktree.map { directory(inside: $0, for: project) } ?? directory(for: project)
+        let session = AgentSession(task: task, agent: agent, project: project, directory: directory, worktree: worktree)
         let spec = try AgentLauncher(port: port).spec(for: session)
 
         attachTerminal(to: session, running: spec)
@@ -122,6 +125,26 @@ final class SessionStore: ObservableObject {
         subscriptions[session.id] = nil
         sessions.removeAll { $0.id == session.id }
         updateBadge()
+    }
+
+    /// Removes the agent's worktree folder (git refuses if it has uncommitted changes). The branch stays.
+    func deleteWorktree(of session: AgentSession) {
+        guard let worktree = session.worktree else { return }
+
+        do {
+            try Worktrees.remove(worktree)
+            session.worktreeRemoved = true
+        } catch {
+            alert = "Couldn't delete the worktree: \(error.localizedDescription)"
+        }
+    }
+
+    /// A project that is a subfolder of its repo keeps that subfolder inside the worktree.
+    private func directory(inside worktree: Worktree, for project: Project) -> URL {
+        let projectPath = URL(fileURLWithPath: project.path ?? worktree.repositoryRoot).resolvingSymlinksInPath().path
+        let root = URL(fileURLWithPath: worktree.repositoryRoot).resolvingSymlinksInPath().path
+        let relative = projectPath.hasPrefix(root) ? String(projectPath.dropFirst(root.count)) : ""
+        return URL(fileURLWithPath: worktree.path + relative)
     }
 
     /// "No project" agents share one scratch folder, so Claude asks to trust it only once.

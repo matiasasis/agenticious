@@ -48,9 +48,18 @@ Note: those Codex overrides replace your own `notify` setting for sessions start
 | `Sources/AgentDeck/UsageMonitor.swift` | Local-log usage readout |
 | `Sources/agentdeck-mcp/main.swift` | Stdio MCP server the agents call |
 
+## Worktrees
+
+For a git project, the New Agent sheet can run the agent in its own worktree, so parallel agents don't edit the
+same checkout. AgentDeck creates `<repo>/.claude/worktrees/<task-slug>` on a new `agentdeck/<task-slug>` branch
+from the current `HEAD`. It adds that folder to `.git/info/exclude` (local only, nothing committed), so it stays
+out of `git status`. Because the folder sits inside the repo, Claude doesn't ask to trust each new worktree.
+
+**Delete worktree** (right-click the agent) is enabled once the agent has exited. Git refuses if the worktree has
+uncommitted changes, and the branch is always kept.
+
 ## Next steps
 
-- A git worktree per task (checkbox in the New Agent sheet)
 - Persist sessions across app restarts (`claude --resume`, `codex resume`)
 - System notifications (needs a proper `.app` bundle)
 - Codex approval prompts don't trigger a hook yet, so they only show up if the agent calls `need_human`
