@@ -277,7 +277,7 @@ final class SessionStore: ObservableObject {
         session.terminalView = terminal
         session.terminalBridge = bridge
         session.isRunning = true
-        notifications.playSound("Tink")
+        if terminal.process.running { notifications.playSummonSound() }
     }
 
     /// Re-publish every session change so lists re-sort when an agent flips to "needs you", and save it.

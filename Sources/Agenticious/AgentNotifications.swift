@@ -46,6 +46,8 @@ final class AgentNotifications: NSObject, ObservableObject, UNUserNotificationCe
     @Published var requestedSession: UUID?
     private let defaults: UserDefaults
     private let center: UNUserNotificationCenter?
+    private let summonSound = Bundle.module.url(forResource: "Summon", withExtension: "wav")
+        .flatMap { NSSound(contentsOf: $0, byReference: false) }
 
     var available: Bool { center != nil }
 
@@ -90,6 +92,12 @@ final class AgentNotifications: NSObject, ObservableObject, UNUserNotificationCe
             do { try await center.add(request) }
             catch { self.error = error.localizedDescription }
         }
+    }
+
+    func playSummonSound() {
+        guard soundsEnabled else { return }
+        summonSound?.volume = 0.5
+        summonSound?.play()
     }
 
     func playSound(_ name: String) {
