@@ -114,6 +114,7 @@ final class AgentSession: ObservableObject, Identifiable {
     let model: ModelChoice?
     let effort: String?
 
+    @Published var isMarkedFinished = false
     @Published var status: SessionStatus = .starting
     @Published var chunks: [Chunk] = []
     @Published private(set) var pullRequests: [PullRequestReference] = []

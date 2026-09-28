@@ -17,14 +17,14 @@ enum AgentList: String, CaseIterable, Identifiable {
     var id: Self { self }
     var title: String { self == .queue ? "Queue" : "Finished" }
 
-    func includes(_ status: SessionStatus) -> Bool {
-        status.isFinished == (self == .finished)
+    func includes(isMarkedFinished: Bool) -> Bool {
+        isMarkedFinished == (self == .finished)
     }
 
     @MainActor
     func groups(from groups: [ProjectGroup]) -> [ProjectGroup] {
         groups.compactMap { group in
-            let sessions = group.sessions.filter { includes($0.status) }
+            let sessions = group.sessions.filter { includes(isMarkedFinished: $0.isMarkedFinished) }
             guard !sessions.isEmpty || (self == .queue && (group.isFavorite || group.project == .none)) else { return nil }
             return ProjectGroup(project: group.project, sessions: sessions, isFavorite: group.isFavorite)
         }
@@ -57,7 +57,7 @@ final class SessionStore: ObservableObject {
     @Published var agentList: AgentList = .queue
     @Published var selection: Selection? = .overview {
         didSet {
-            if let selectedSession { agentList = selectedSession.status.isFinished ? .finished : .queue }
+            if let selectedSession { agentList = selectedSession.isMarkedFinished ? .finished : .queue }
         }
     }
     @Published var composer: Composer?
@@ -97,9 +97,16 @@ final class SessionStore: ObservableObject {
     var attentionCount: Int { sessions.filter { $0.status.needsAttention }.count }
 
     var visibleProjectGroups: [ProjectGroup] { agentList.groups(from: projectGroups) }
-    var visibleSessions: [AgentSession] { sessions.filter { agentList.includes($0.status) } }
+    var visibleSessions: [AgentSession] { sessions.filter { agentList.includes(isMarkedFinished: $0.isMarkedFinished) } }
 
-    func count(in list: AgentList) -> Int { sessions.filter { list.includes($0.status) }.count }
+    func count(in list: AgentList) -> Int { sessions.filter { list.includes(isMarkedFinished: $0.isMarkedFinished) }.count }
+
+    func markFinished(_ session: AgentSession, finished: Bool) {
+        session.isMarkedFinished = finished
+        save(session)
+        if finished { show(.queue) }
+        else { selection = .session(session.id) }
+    }
 
     func show(_ list: AgentList) {
         agentList = list
@@ -181,6 +188,7 @@ final class SessionStore: ObservableObject {
             let spec = try AgentLauncher(port: port).spec(for: session, resuming: true)
             attachTerminal(to: session, running: spec)
             session.status = .yourTurn
+            session.isMarkedFinished = false
             selection = .session(session.id)
         } catch {
             alert = "Couldn't resume the agent: \(error.localizedDescription)"

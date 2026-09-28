@@ -96,7 +96,7 @@ For UI inspection, `--settings`, `--skills`, and `--new-agent [preset-id]` can b
 
 ### Navigation and menu bar
 
-The sidebar defaults to **Queue**, grouped by workspace. Done and exited sessions automatically move to **Finished**, where their details and resume actions remain accessible. Waiting, interrupted, and input-needed sessions stay in Queue. Resuming a finished session returns it to Queue. Each card shows its provider, status, task, and completed steps; select a card to return to its terminal, or right-click for session actions. Use the folder button beside **Workspaces** to add a project.
+The sidebar defaults to **Queue**, grouped by workspace. Tasks stay in **Queue** regardless of their status. Use **Mark as finished** at the bottom of an agent view to move it to **Finished** without deleting history or stopping its process. **Move to Queue** reverses that choice; resuming a finished session also returns it to Queue. Existing completed tasks return to Queue when upgrading to this manual behavior. Each card shows its provider, status, task, and completed steps; select a card to return to its terminal, or right-click for session actions. Use the folder button beside **Workspaces** to add a project.
 
 **Customize** keeps task presets, skills, and preferences together while the agent sidebar stays visible. Preferences can hide sidebar branch names and set the default worktree behavior for new agents. The macOS menu bar uses a monochrome Agenticious face, with a count only when agents need your attention.
 

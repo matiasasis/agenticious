@@ -69,6 +69,18 @@ struct SessionDetailView: View {
             } else {
                 TerminalContainer(session: session)
             }
+            HStack {
+                Text(session.isMarkedFinished ? "Saved in Finished. You can bring it back anytime." : "Keep this task in Queue until you’re ready to put it away.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Button(session.isMarkedFinished ? "Move to Queue" : "Mark as finished",
+                       systemImage: session.isMarkedFinished ? "arrow.uturn.backward" : "checkmark.circle") {
+                    store.markFinished(session, finished: !session.isMarkedFinished)
+                }
+                .buttonStyle(AgenticiousButtonStyle())
+                .help("Changes the task’s list without stopping its process or deleting its history.")
+            }
+            .padding(14).background(AgenticiousStyle.panel)
         }
     }
 

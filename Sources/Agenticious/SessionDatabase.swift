@@ -58,6 +58,10 @@ struct SessionDatabase {
             try database.execute("ALTER TABLE sessions ADD COLUMN pull_requests TEXT NOT NULL DEFAULT '[]'")
             database.schemaVersion = 2
         }
+        if database.schemaVersion < 3 {
+            try database.execute("ALTER TABLE sessions ADD COLUMN is_marked_finished INTEGER NOT NULL DEFAULT 0")
+            database.schemaVersion = 3
+        }
     }
 
     // MARK: - Writing
@@ -71,15 +75,16 @@ struct SessionDatabase {
                 INSERT OR REPLACE INTO sessions (
                     id, task, prompt, agent, project_path, directory, started_at, last_activity,
                     worktree_root, worktree_path, worktree_branch, worktree_removed,
-                    model_id, model_name, effort, status, status_detail, plan_source, conversation_id, pull_requests
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    model_id, model_name, effort, status, status_detail, plan_source, conversation_id, pull_requests, is_marked_finished
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 session.id.uuidString, session.task, session.prompt, session.agent.rawValue, session.project.path,
                 session.directory.path, session.startedAt.timeIntervalSince1970, session.lastActivity.timeIntervalSince1970,
                 session.worktree?.repositoryRoot, session.worktree?.path, session.worktree?.branch, session.worktreeRemoved,
                 session.model?.id, session.model?.name, session.effort, status, detail,
                 Self.encode(session.planSource), session.conversationID,
-                String(decoding: try JSONEncoder().encode(session.pullRequests.map { $0.url.absoluteString }), as: UTF8.self)
+                String(decoding: try JSONEncoder().encode(session.pullRequests.map { $0.url.absoluteString }), as: UTF8.self),
+                session.isMarkedFinished
             )
             try database.execute("DELETE FROM chunks WHERE session_id = ?", session.id.uuidString)
             for chunk in session.chunks {
@@ -122,6 +127,7 @@ struct SessionDatabase {
             )
             let status = Self.decode(row.string("status"), detail: row.string("status_detail"))
             session.status = status.isFinished ? status : .interrupted
+            session.isMarkedFinished = row.bool("is_marked_finished")
             session.lastActivity = Date(timeIntervalSince1970: row.double("last_activity") ?? 0)
             session.worktreeRemoved = row.bool("worktree_removed")
             session.planSource = Self.decodePlanSource(row.string("plan_source"))

@@ -89,7 +89,7 @@ private struct Sidebar: View {
                 }
                 .padding(4).background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 14))
                 if store.visibleSessions.isEmpty {
-                    Text(store.agentList == .queue ? "Queue clear. Summon an agent to get started." : "Completed and exited agents will appear here.")
+                    Text(store.agentList == .queue ? "Queue clear. Summon an agent to get started." : "Agents you mark as finished will appear here.")
                         .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 4)
                 }
                 HStack {
@@ -285,7 +285,7 @@ private struct OverviewView: View {
                 } else {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Finished agents").font(.system(size: 30, weight: .bold, design: .rounded))
-                        Text("Your completed and exited sessions. Open any agent to revisit its work or resume it.")
+                        Text("Agents you marked as finished. Open any agent to revisit its work or move it back to Queue.")
                             .foregroundStyle(.secondary)
                     }
                 }
