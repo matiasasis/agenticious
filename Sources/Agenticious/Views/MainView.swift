@@ -220,20 +220,22 @@ private struct SessionRow: View {
             }
             .buttonStyle(.plain)
             .accessibilityAddTraits(isSelected ? .isSelected : [])
-            HStack {
-                Spacer(minLength: 0)
-                Button {
-                    store.markFinished(session, finished: !session.isMarkedFinished)
-                } label: {
-                    Label(session.isMarkedFinished ? "Move to Queue" : "Mark as finished",
-                          systemImage: session.isMarkedFinished ? "arrow.uturn.backward" : "checkmark.circle")
-                        .font(.system(size: 10, weight: .semibold))
-                        .padding(.horizontal, 8).padding(.vertical, 5)
-                        .foregroundStyle(AgenticiousStyle.lime)
-                        .background(AgenticiousStyle.lime.opacity(0.1), in: Capsule())
+            if session.isMarkedFinished || session.canMarkFinished {
+                HStack {
+                    Spacer(minLength: 0)
+                    Button {
+                        store.markFinished(session, finished: !session.isMarkedFinished)
+                    } label: {
+                        Label(session.isMarkedFinished ? "Move to Queue" : "Mark as finished",
+                              systemImage: session.isMarkedFinished ? "arrow.uturn.backward" : "checkmark.circle")
+                            .font(.system(size: 10, weight: .semibold))
+                            .padding(.horizontal, 8).padding(.vertical, 5)
+                            .foregroundStyle(AgenticiousStyle.lime)
+                            .background(AgenticiousStyle.lime.opacity(0.1), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Changes the task’s list without stopping its process or deleting its history.")
                 }
-                .buttonStyle(.plain)
-                .help("Changes the task’s list without stopping its process or deleting its history.")
             }
         }
         .padding(12)

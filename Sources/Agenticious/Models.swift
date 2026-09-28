@@ -156,6 +156,11 @@ final class AgentSession: ObservableObject, Identifiable {
         for reference in additions where !pullRequests.contains(reference) { pullRequests.append(reference) }
     }
 
+    var canMarkFinished: Bool {
+        if case .done = status { return !isMarkedFinished }
+        return false
+    }
+
     var completedChunks: Int { chunks.filter { $0.status == .done }.count }
 
     var allChunksDone: Bool { !chunks.isEmpty && completedChunks == chunks.count }
