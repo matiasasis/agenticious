@@ -36,6 +36,8 @@ enum SessionStatus: Equatable {
     case yourTurn
     case done(String?)
     case exited(Int32?)
+    /// Agenticious quit while the agent was still going. Resuming reopens its conversation.
+    case interrupted
 
     var label: String {
         switch self {
@@ -45,6 +47,7 @@ enum SessionStatus: Equatable {
         case .yourTurn: "Your turn"
         case .done: "Done"
         case .exited: "Exited"
+        case .interrupted: "Interrupted"
         }
     }
 
@@ -66,8 +69,9 @@ enum SessionStatus: Equatable {
         case .needsYou: 0
         case .yourTurn: 1
         case .working, .starting: 2
-        case .done: 3
-        case .exited: 4
+        case .interrupted: 3
+        case .done: 4
+        case .exited: 5
         }
     }
 }
@@ -94,14 +98,14 @@ enum PlanSource {
 
 @MainActor
 final class AgentSession: ObservableObject, Identifiable {
-    let id = UUID()
+    let id: UUID
     let task: String
     /// What the agent is told. Usually the task itself; a template sends full instructions under a short title.
     let prompt: String
     let agent: AgentKind
     let project: Project
     let directory: URL
-    let startedAt = Date()
+    let startedAt: Date
     /// Set when the agent runs in its own git worktree instead of the project checkout.
     let worktree: Worktree?
     /// Nil leaves the CLI's own default in place.
@@ -112,15 +116,20 @@ final class AgentSession: ObservableObject, Identifiable {
     @Published var chunks: [Chunk] = []
     @Published var lastActivity = Date()
     @Published var worktreeRemoved = false
+    @Published var isRunning = false
 
     var planSource: PlanSource = .none
+    /// The CLI's own session id (Claude's session id, Codex's thread id), which is what `--resume` takes.
+    var conversationID: String?
     var terminalView: LocalProcessTerminalView?
     var terminalBridge: TerminalBridge?
 
     init(
-        task: String, prompt: String? = nil, agent: AgentKind, project: Project, directory: URL,
-        worktree: Worktree? = nil, model: ModelChoice? = nil, effort: String? = nil
+        id: UUID = UUID(), task: String, prompt: String? = nil, agent: AgentKind, project: Project, directory: URL,
+        startedAt: Date = Date(), worktree: Worktree? = nil, model: ModelChoice? = nil, effort: String? = nil
     ) {
+        self.id = id
+        self.startedAt = startedAt
         self.task = task
         self.prompt = prompt ?? task
         self.agent = agent
@@ -141,9 +150,9 @@ final class AgentSession: ObservableObject, Identifiable {
 
     var allChunksDone: Bool { !chunks.isEmpty && completedChunks == chunks.count }
 
-    var hasExited: Bool {
-        if case .exited = status { return true }
-        return false
+    /// Resuming reopens the conversation in the folder it ran in, so a deleted worktree can't come back.
+    var canResume: Bool {
+        !isRunning && !worktreeRemoved && FileManager.default.fileExists(atPath: directory.path)
     }
 
     var hasOpenChunks: Bool { chunks.contains { $0.status != .done } }

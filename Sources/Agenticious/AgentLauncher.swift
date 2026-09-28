@@ -12,8 +12,11 @@ struct LaunchSpec {
 struct AgentLauncher {
     let port: UInt16
 
-    func spec(for session: AgentSession) throws -> LaunchSpec {
+    /// With `resuming`, the agent reopens its earlier conversation (`session.conversationID`) instead of getting the task.
+    @MainActor
+    func spec(for session: AgentSession, resuming: Bool = false) throws -> LaunchSpec {
         var variables = baseEnvironment(for: session)
+        variables["AD_CONVERSATION"] = session.conversationID
         let command: String
 
         switch session.agent {
@@ -23,15 +26,19 @@ struct AgentLauncher {
             variables["AD_MCP"] = files.mcp
             variables["AD_SYSPROMPT"] = ChunkingPrompt.text
             variables["AD_PROMPT"] = session.prompt
+            // A fixed session id makes the conversation resumable even if the app quits before Claude reports anything.
+            let conversation = resuming ? #" --resume "$AD_CONVERSATION""# : #" --session-id "$AD_CONVERSATION" -- "$AD_PROMPT""#
             command = #"exec claude --settings "$AD_SETTINGS" --mcp-config "$AD_MCP" --append-system-prompt "$AD_SYSPROMPT""#
-                + modelFlags(for: session, into: &variables) + #" -- "$AD_PROMPT""#
+                + modelFlags(for: session, into: &variables) + conversation
         case .codex:
             variables["AD_MCP_CMD"] = #"mcp_servers.agenticious.command="\#(tomlEscaped(mcpBinary))""#
             variables["AD_MCP_ENV"] = #"mcp_servers.agenticious.env={AGENTICIOUS_SESSION="\#(session.id.uuidString)",AGENTICIOUS_PORT="\#(port)"}"#
             variables["AD_NOTIFY"] = #"notify=['/bin/sh','-c','curl -s -m 2 -X POST --data-binary "$1" \#(hookURL(session, "codex-notify")) >/dev/null 2>&1','sh']"#
             variables["AD_PROMPT"] = ChunkingPrompt.inlined(with: session.prompt)
-            command = #"exec codex -c "$AD_MCP_CMD" -c "$AD_MCP_ENV" -c "$AD_NOTIFY""#
-                + modelFlags(for: session, into: &variables) + #" -- "$AD_PROMPT""#
+            // Codex reports its thread id only when a turn completes. Without one, `codex resume` shows its picker for this folder.
+            let conversation = !resuming ? #" -- "$AD_PROMPT""# : session.conversationID == nil ? "" : #" -- "$AD_CONVERSATION""#
+            command = "exec codex" + (resuming ? " resume" : "") + #" -c "$AD_MCP_CMD" -c "$AD_MCP_ENV" -c "$AD_NOTIFY""#
+                + modelFlags(for: session, into: &variables) + conversation
         }
 
         // A login + interactive shell picks up the user's PATH (nodenv, ~/.local/bin, …), which a GUI app doesn't inherit.
