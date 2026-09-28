@@ -9,6 +9,11 @@ import Foundation
 @MainActor
 enum EventInterpreter {
     static func apply(_ name: String, _ payload: [String: Any], to session: AgentSession) {
+        // Claude's hooks carry its session id (a new one after /clear); Codex's notify carries its thread id.
+        if let conversation = payload["session_id"] as? String ?? payload["thread-id"] as? String {
+            session.conversationID = conversation
+        }
+
         switch name {
         case "UserPromptSubmit":
             session.status = .working

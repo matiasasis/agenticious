@@ -65,6 +65,7 @@ extension SessionStatus {
         case .yourTurn: .purple
         case .done: .green
         case .exited: .secondary
+        case .interrupted: .brown
         }
     }
 }
@@ -74,10 +75,12 @@ struct ChunkStrip: View {
 
     let chunks: [Chunk]
     let style: Style
+    /// An agent that isn't running won't post a plan, so don't say we're waiting for one.
+    var isRunning = true
 
     var body: some View {
         if chunks.isEmpty {
-            Text("Waiting for the agent's plan…")
+            Text(isRunning ? "Waiting for the agent's plan…" : "No plan")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         } else if style == .compact {

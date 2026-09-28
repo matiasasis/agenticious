@@ -160,7 +160,7 @@ private struct SessionRow: View {
                     .font(.title3.weight(.medium))
                     .lineLimit(2)
             }
-            ChunkStrip(chunks: session.chunks, style: .compact)
+            ChunkStrip(chunks: session.chunks, style: .compact, isRunning: session.isRunning)
             if let worktree = session.worktree { BranchLabel(worktree: worktree, isRemoved: session.worktreeRemoved) }
             if case let .needsYou(reason) = session.status {
                 Text(reason)
@@ -178,10 +178,15 @@ struct SessionMenu: View {
     let session: AgentSession
 
     var body: some View {
-        Button("Stop agent") { store.stop(session) }
+        if session.isRunning {
+            Button("Stop agent") { store.stop(session) }
+        } else {
+            Button("Resume") { store.resume(session) }
+                .disabled(!session.canResume)
+        }
         if session.worktree != nil && !session.worktreeRemoved {
             Button("Delete worktree") { store.deleteWorktree(of: session) }
-                .disabled(!session.hasExited)
+                .disabled(session.isRunning)
                 .help("Stop the agent first; git refuses if there are uncommitted changes.")
         }
         Button("Remove", role: .destructive) { store.remove(session) }
@@ -247,7 +252,7 @@ struct SessionCard: View {
                 .lineLimit(3)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            ChunkStrip(chunks: session.chunks, style: .compact)
+            ChunkStrip(chunks: session.chunks, style: .compact, isRunning: session.isRunning)
             ChunkList(chunks: session.chunks, limit: 5)
 
             if case let .needsYou(reason) = session.status {

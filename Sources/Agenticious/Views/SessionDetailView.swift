@@ -4,6 +4,7 @@ import SwiftUI
 
 /// The selected agent, embedded in the main window: big title, step boxes, why it needs you, and its live terminal.
 struct SessionDetailView: View {
+    @EnvironmentObject private var store: SessionStore
     @ObservedObject var session: AgentSession
 
     var body: some View {
@@ -22,6 +23,11 @@ struct SessionDetailView: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
+                    if !session.isRunning {
+                        Button("Resume", systemImage: "play.fill") { store.resume(session) }
+                            .disabled(!session.canResume)
+                            .help("Reopen this agent's conversation where it left off.")
+                    }
                     if let worktree = session.worktree { BranchLabel(worktree: worktree, isRemoved: session.worktreeRemoved) }
                     Label(session.project.path ?? "No project", systemImage: session.project.symbol)
                         .font(.caption)
@@ -30,14 +36,21 @@ struct SessionDetailView: View {
                         .truncationMode(.head)
                 }
 
-                ChunkStrip(chunks: session.chunks, style: .expanded)
+                ChunkStrip(chunks: session.chunks, style: .expanded, isRunning: session.isRunning)
                 statusBanner
             }
             .padding()
 
             Divider()
 
-            TerminalContainer(session: session)
+            if session.terminalView == nil {
+                ContentUnavailableView(
+                    "Not running", systemImage: "moon.zzz",
+                    description: Text("Resume to reopen \(session.agent.displayName)'s conversation, with everything it already knows.")
+                )
+            } else {
+                TerminalContainer(session: session)
+            }
         }
     }
 
@@ -54,6 +67,9 @@ struct SessionDetailView: View {
         case let .exited(code):
             Banner(title: "Exited", text: "The agent process ended (code \(code.map(String.init) ?? "?")).",
                    systemImage: "stop.circle", color: .secondary)
+        case .interrupted:
+            Banner(title: "Interrupted", text: "Agenticious closed while this agent was running. Resume to pick up where it left off.",
+                   systemImage: "pause.circle", color: .brown)
         default:
             EmptyView()
         }
@@ -92,6 +108,8 @@ struct TerminalContainer: NSViewRepresentable {
     func updateNSView(_ container: NSView, context: Context) {
         guard let terminal = session.terminalView, terminal.superview !== container else { return }
 
+        // Resuming swaps in a new terminal; drop the one whose process ended.
+        container.subviews.forEach { $0.removeFromSuperview() }
         terminal.frame = container.bounds
         terminal.autoresizingMask = [.width, .height]
         container.addSubview(terminal)

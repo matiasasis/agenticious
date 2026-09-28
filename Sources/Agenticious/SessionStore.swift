@@ -37,13 +37,16 @@ final class SessionStore: ObservableObject {
     let port: UInt16
     let usage = UsageMonitor()
     private var server: EventServer?
+    private var database: SessionDatabase?
     private var subscriptions: [UUID: AnyCancellable] = [:]
+    private var unsaved: Set<UUID> = []
     private var snapshotter: WindowSnapshotter?
     private var commandLineOptionsPending = true
 
     init() {
         port = ProcessInfo.processInfo.environment["AGENTICIOUS_PORT"].flatMap(UInt16.init) ?? Self.defaultPort
         favorites = (UserDefaults.standard.stringArray(forKey: Self.favoritesKey) ?? []).map(Project.init(path:))
+        openDatabase()
         startServer()
         snapshotter = LaunchOptions.current.snapshotDirectory.map(WindowSnapshotter.init)
     }
@@ -104,13 +107,33 @@ final class SessionStore: ObservableObject {
         let session = AgentSession(
             task: task, prompt: prompt, agent: agent, project: project, directory: directory, worktree: worktree, model: model, effort: effort
         )
+        if agent == .claude { session.conversationID = session.id.uuidString.lowercased() }
         let spec = try AgentLauncher(port: port).spec(for: session)
 
         attachTerminal(to: session, running: spec)
+        sessions.insert(session, at: 0)
         track(session)
+        save(session)
         selection = .session(session.id)
 
         return session
+    }
+
+    /// Starts the agent again on its earlier conversation, in the same folder, still reporting to this session.
+    func resume(_ session: AgentSession) {
+        guard session.canResume else {
+            alert = "Can't resume: \(session.worktreeRemoved ? "its worktree was deleted" : "\(session.directory.path) no longer exists")."
+            return
+        }
+
+        do {
+            let spec = try AgentLauncher(port: port).spec(for: session, resuming: true)
+            attachTerminal(to: session, running: spec)
+            session.status = .yourTurn
+            selection = .session(session.id)
+        } catch {
+            alert = "Couldn't resume the agent: \(error.localizedDescription)"
+        }
     }
 
     /// The command-line options, handed out once so reopening the window doesn't launch the `--task` again.
@@ -130,6 +153,12 @@ final class SessionStore: ObservableObject {
         if selection == .session(session.id) { selection = .overview }
         subscriptions[session.id] = nil
         sessions.removeAll { $0.id == session.id }
+        unsaved.remove(session.id)
+        do {
+            try database?.delete(session.id)
+        } catch {
+            alert = "Couldn't delete the agent from the database: \(error.localizedDescription)"
+        }
         updateBadge()
     }
 
@@ -167,6 +196,7 @@ final class SessionStore: ObservableObject {
         let terminal = LocalProcessTerminalView(frame: NSRect(x: 0, y: 0, width: 900, height: 500))
         let bridge = TerminalBridge { [weak self, weak session] exitCode in
             guard let session else { return }
+            session.isRunning = false
             if case .done = session.status {} else { session.status = .exited(exitCode) }
             self?.updateBadge()
         }
@@ -176,12 +206,47 @@ final class SessionStore: ObservableObject {
 
         session.terminalView = terminal
         session.terminalBridge = bridge
+        session.isRunning = true
     }
 
-    /// Re-publish every session change so lists re-sort when an agent flips to "needs you".
+    /// Re-publish every session change so lists re-sort when an agent flips to "needs you", and save it.
     private func track(_ session: AgentSession) {
-        subscriptions[session.id] = session.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }
-        sessions.insert(session, at: 0)
+        subscriptions[session.id] = session.objectWillChange.sink { [weak self, id = session.id] _ in
+            self?.objectWillChange.send()
+            self?.saveSoon(id)
+        }
+    }
+
+    // MARK: - Database
+
+    private func openDatabase() {
+        do {
+            let database = try SessionDatabase()
+            sessions = try database.load()
+            sessions.forEach(track)
+            self.database = database
+        } catch {
+            alert = "Agents won't be saved: couldn't open the database (\(error.localizedDescription))."
+        }
+    }
+
+    /// `objectWillChange` fires before the new value is stored, so save on the next turn of the run loop,
+    /// once per session however many properties changed.
+    private func saveSoon(_ id: UUID) {
+        guard unsaved.insert(id).inserted else { return }
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self, unsaved.remove(id) != nil, let session = session(id) else { return }
+            save(session)
+        }
+    }
+
+    private func save(_ session: AgentSession) {
+        do {
+            try database?.save(session)
+        } catch {
+            alert = "Couldn't save the agent: \(error.localizedDescription)"
+        }
     }
 
     // MARK: - Events
