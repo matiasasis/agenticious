@@ -37,7 +37,7 @@ struct ControlRoomHero: View {
                     .foregroundStyle(.secondary)
                 Button(action: createAgent) {
                     Label("Summon an agent", systemImage: "sparkles")
-                        .frame(minWidth: 280)
+                        .frame(minWidth: 280, maxWidth: .infinity)
                 }
                 .buttonStyle(AgenticiousButtonStyle(isProminent: true))
                 .padding(.top, 12)
@@ -99,10 +99,10 @@ struct AgenticiousButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: isProminent ? 24 : 13, weight: isProminent ? .bold : .semibold,
+            .font(.system(size: isProminent ? 28 : 13, weight: isProminent ? .bold : .semibold,
                           design: isProminent ? .rounded : .default))
             .padding(.horizontal, isProminent ? 28 : (isCompact ? 10 : 18))
-            .padding(.vertical, isProminent ? 22 : (isCompact ? 6 : 11))
+            .padding(.vertical, isProminent ? 28 : (isCompact ? 6 : 11))
             .foregroundStyle(isPrimary ? AgenticiousStyle.ink : Color.primary)
             .background(isPrimary ? AgenticiousStyle.lime : AgenticiousStyle.panel, in: Capsule())
             .overlay(Capsule().stroke(isPrimary ? Color.clear : AgenticiousStyle.violet.opacity(0.4)))

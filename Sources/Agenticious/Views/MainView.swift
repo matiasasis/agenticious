@@ -107,12 +107,8 @@ private struct Sidebar: View {
                         }
                         if !isCollapsed {
                             ForEach(group.sessions) { session in
-                                Button { store.selection = .session(session.id) } label: {
-                                    SessionRow(session: session, isSelected: store.selection == .session(session.id))
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityAddTraits(store.selection == .session(session.id) ? .isSelected : [])
-                                .contextMenu { SessionMenu(session: session) }
+                                SessionRow(session: session, isSelected: store.selection == .session(session.id))
+                                    .contextMenu { SessionMenu(session: session) }
                             }
                         }
                     }
@@ -194,11 +190,10 @@ private struct ProjectHeader: View {
 
             Spacer()
 
-            Button("New agent here", systemImage: "plus") { store.composer = Composer(project: group.project) }
-                .labelStyle(.iconOnly)
-                .font(.title3.weight(.semibold))
-                .contentShape(Rectangle())
-                .buttonStyle(AgenticiousButtonStyle(isPrimary: false, isCompact: true))
+            Button("Summon agent", systemImage: "plus") { store.composer = Composer(project: group.project) }
+                .fixedSize()
+                .buttonStyle(AgenticiousButtonStyle(isCompact: true))
+                .help("Summon an agent in \(group.project.name)")
         }
         .padding(.horizontal, 2)
         .contextMenu {
@@ -212,12 +207,44 @@ private struct ProjectHeader: View {
 }
 
 private struct SessionRow: View {
+    @EnvironmentObject private var store: SessionStore
     @ObservedObject var session: AgentSession
     let isSelected: Bool
     @AppStorage("sidebarShowBranches") private var showBranches = true
     @State private var isHovered = false
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Button { store.selection = .session(session.id) } label: {
+                details.contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(isSelected ? .isSelected : [])
+            HStack {
+                Spacer(minLength: 0)
+                Button {
+                    store.markFinished(session, finished: !session.isMarkedFinished)
+                } label: {
+                    Label(session.isMarkedFinished ? "Move to Queue" : "Mark as finished",
+                          systemImage: session.isMarkedFinished ? "arrow.uturn.backward" : "checkmark.circle")
+                        .font(.system(size: 10, weight: .semibold))
+                        .padding(.horizontal, 8).padding(.vertical, 5)
+                        .foregroundStyle(AgenticiousStyle.lime)
+                        .background(AgenticiousStyle.lime.opacity(0.1), in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .help("Changes the task’s list without stopping its process or deleting its history.")
+            }
+        }
+        .padding(12)
+        .background(isSelected ? AgenticiousStyle.violet.opacity(0.14) : AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(isSelected ? AgenticiousStyle.violet : AgenticiousStyle.violet.opacity(isHovered ? 0.4 : 0.12)))
+        .contentShape(RoundedRectangle(cornerRadius: 12))
+        .onHover { isHovered = $0 }
+        .help(session.task)
+    }
+
+    private var details: some View {
         VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 6) {
                 StatusDot(status: session.status)
@@ -243,12 +270,6 @@ private struct SessionRow: View {
                 Text(reason).font(.caption).foregroundStyle(.orange).lineLimit(2)
             }
         }
-        .padding(12)
-        .background(isSelected ? AgenticiousStyle.violet.opacity(0.14) : AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(isSelected ? AgenticiousStyle.violet : AgenticiousStyle.violet.opacity(isHovered ? 0.4 : 0.12)))
-        .contentShape(RoundedRectangle(cornerRadius: 12))
-        .onHover { isHovered = $0 }
-        .help(session.task)
     }
 }
 
