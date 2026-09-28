@@ -21,11 +21,13 @@ struct MainView: View {
             ToolbarItem(placement: .primaryAction) {
                 Button("New Agent", systemImage: "plus") { store.composer = Composer(project: defaultProject) }
                     .keyboardShortcut("n")
+                    .buttonStyle(AgenticiousButtonStyle(isCompact: true))
             }
         }
         .sheet(item: $store.composer) { NewTaskSheet(project: $0.project, template: $0.template) }
         .alert(store.alert ?? "", isPresented: Binding(get: { store.alert != nil }, set: { if !$0 { store.alert = nil } })) {
-            Button("OK", role: .cancel) {}
+            Button("OK") {}
+                .tint(AgenticiousStyle.lime)
         }
         .onAppear(perform: launchFromCommandLine)
     }
@@ -105,7 +107,7 @@ private struct Sidebar: View {
         }
         .safeAreaInset(edge: .bottom) {
             Button("Add project folder…", systemImage: "folder.badge.plus", action: addProject)
-                .buttonStyle(.borderless)
+                .buttonStyle(AgenticiousButtonStyle(isCompact: true))
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -152,9 +154,8 @@ private struct ProjectHeader: View {
             Button("New agent here", systemImage: "plus") { store.composer = Composer(project: group.project) }
                 .labelStyle(.iconOnly)
                 .font(.title3.weight(.semibold))
-                .frame(width: 28, height: 28)
                 .contentShape(Rectangle())
-                .buttonStyle(.borderless)
+                .buttonStyle(AgenticiousButtonStyle(isCompact: true))
         }
         .padding(.top, 10)
         .contextMenu {

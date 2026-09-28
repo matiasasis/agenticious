@@ -37,13 +37,8 @@ struct ControlRoomHero: View {
                     .foregroundStyle(.secondary)
                 Button(action: createAgent) {
                     Label("Summon an agent", systemImage: "plus")
-                        .font(.headline)
-                        .foregroundStyle(AgenticiousStyle.ink)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 11)
-                        .background(AgenticiousStyle.lime, in: Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(AgenticiousButtonStyle())
                 .padding(.top, 4)
             }
             .padding(30)
@@ -92,5 +87,24 @@ struct DashboardMetric: View {
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(color.opacity(0.2)))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(value) \(title.lowercased())")
+    }
+}
+
+struct AgenticiousButtonStyle: ButtonStyle {
+    var isPrimary = true
+    var isCompact = false
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 13, weight: .semibold))
+            .padding(.horizontal, isCompact ? 10 : 18)
+            .padding(.vertical, isCompact ? 6 : 11)
+            .foregroundStyle(isPrimary ? AgenticiousStyle.ink : Color.primary)
+            .background(isPrimary ? AgenticiousStyle.lime : AgenticiousStyle.panel, in: Capsule())
+            .overlay(Capsule().stroke(isPrimary ? Color.clear : AgenticiousStyle.violet.opacity(0.4)))
+            .brightness(configuration.isPressed ? -0.08 : 0)
+            .opacity(isEnabled ? 1 : 0.4)
+            .contentShape(Capsule())
     }
 }

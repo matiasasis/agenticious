@@ -17,6 +17,36 @@ enum TaskTemplate: String, CaseIterable, Identifiable {
         }
     }
 
+    var shortName: String {
+        switch self {
+        case .custom: "Custom task"
+        case .implementTicket: "Implement"
+        case .reviewComments: "Resolve & merge"
+        case .reviewPR: "Review PR"
+        case .fixCI: "Fix CI"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .custom: "sparkles"
+        case .implementTicket: "hammer"
+        case .reviewComments: "arrow.triangle.merge"
+        case .reviewPR: "text.magnifyingglass"
+        case .fixCI: "wrench.and.screwdriver"
+        }
+    }
+
+    var summary: String {
+        switch self {
+        case .custom: "Give your agent a mission in your own words."
+        case .implementTicket: "Turn a ticket into tested code and a draft pull request."
+        case .reviewComments: "Address review feedback, wait for CI, then merge the pull request."
+        case .reviewPR: "Review a pull request, post suggestions, and approve when it passes review."
+        case .fixCI: "Investigate failing checks, fix the cause, and get CI green."
+        }
+    }
+
     var fieldLabel: String {
         switch self {
         case .custom: ""

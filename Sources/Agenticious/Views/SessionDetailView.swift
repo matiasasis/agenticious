@@ -25,6 +25,7 @@ struct SessionDetailView: View {
                     Spacer()
                     if !session.isRunning {
                         Button("Resume", systemImage: "play.fill") { store.resume(session) }
+                            .buttonStyle(AgenticiousButtonStyle())
                             .disabled(!session.canResume)
                             .help("Reopen this agent's conversation where it left off.")
                     }
