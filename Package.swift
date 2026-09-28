@@ -10,7 +10,8 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "Agenticious",
-            dependencies: [.product(name: "SwiftTerm", package: "SwiftTerm")]
+            dependencies: [.product(name: "SwiftTerm", package: "SwiftTerm")],
+            resources: [.copy("Resources/AppIcon.png")]
         ),
         .executableTarget(name: "agenticious-mcp"),
     ]
