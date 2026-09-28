@@ -1,11 +1,12 @@
 #!/bin/sh
-# Build and launch AgentDeck. Uses Xcode's toolchain directly with an explicit SDK, so it still works
+# Build and launch Agenticious. Uses Xcode's toolchain directly with an explicit SDK, so it still works
 # when `xcodebuild` / the Command Line Tools are in a broken half-updated state.
 set -e
 cd "$(dirname "$0")/.."
 
 XCODE=/Applications/Xcode.app/Contents/Developer
 if [ -x "$XCODE/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-build" ]; then
+  export DEVELOPER_DIR="${DEVELOPER_DIR:-$XCODE}"
   export SDKROOT="${SDKROOT:-$XCODE/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk}"
   SWIFT_BUILD="$XCODE/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-build"
 else
@@ -13,6 +14,6 @@ else
 fi
 
 # Build per product: building everything also compiles an unused swift-argument-parser plugin that fails on newer toolchains.
-$SWIFT_BUILD --product agentdeck-mcp "$@"
-$SWIFT_BUILD --product AgentDeck "$@"
-exec .build/debug/AgentDeck
+$SWIFT_BUILD --product agenticious-mcp "$@"
+$SWIFT_BUILD --product Agenticious "$@"
+exec .build/debug/Agenticious

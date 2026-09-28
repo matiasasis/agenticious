@@ -40,10 +40,10 @@ enum EventInterpreter {
 
         switch session.planSource {
         case .none:
-            return "AgentDeck: you haven't posted a plan. Call set_plan with the steps you took (1-2 is fine for a quick " +
+            return "Agenticious: you haven't posted a plan. Call set_plan with the steps you took (1-2 is fine for a quick " +
                 "question), mark each finished one done with update_chunk. " + closing
         case .agent where session.hasOpenChunks:
-            return "AgentDeck: your plan still has chunks that aren't marked done. Call update_chunk for each chunk " +
+            return "Agenticious: your plan still has chunks that aren't marked done. Call update_chunk for each chunk " +
                 "you finished. " + closing
         default:
             return nil
@@ -55,7 +55,7 @@ enum EventInterpreter {
     private static func toolFinished(_ payload: [String: Any], in session: AgentSession) {
         let tool = payload["tool_name"] as? String ?? ""
         // Our own MCP calls already set the status; a trailing PostToolUse must not undo a need_human.
-        guard !tool.hasPrefix("mcp__agentdeck__") else { return }
+        guard !tool.hasPrefix("mcp__agenticious__") else { return }
 
         session.status = .working
         if tool == "TodoWrite" { mirrorTodoList(payload, in: session) }
@@ -100,7 +100,7 @@ enum EventInterpreter {
         session.status = session.allChunksDone ? .done(nil) : .yourTurn
     }
 
-    // MARK: - agentdeck MCP tools
+    // MARK: - agenticious MCP tools
 
     private static func agentReported(_ payload: [String: Any], in session: AgentSession) {
         let arguments = payload["args"] as? [String: Any] ?? [:]

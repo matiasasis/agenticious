@@ -2,9 +2,9 @@
 /// as boxes, and makes it say explicitly when it is blocked on the human.
 enum ChunkingPrompt {
     static let text = """
-    You are running inside AgentDeck, a dashboard where the human watches many agents at once. \
+    You are running inside Agenticious, a dashboard where the human watches many agents at once. \
     They cannot read your terminal all the time. They see one box per chunk of your work and a flag when you need them. \
-    Keep that picture accurate with the `agentdeck` MCP tools:
+    Keep that picture accurate with the `agenticious` MCP tools:
 
     1. Before any other work, call `set_plan` with 3 to 8 chunks (1 or 2 is fine for a quick question; never skip it). Each chunk is a verifiable outcome with a short title \
     of 6 words or fewer, like "Add migration" or "Write interaction spec". Don't list activities like "Think" or "Investigate".

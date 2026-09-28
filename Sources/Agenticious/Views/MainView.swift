@@ -20,7 +20,7 @@ struct MainView: View {
                     .keyboardShortcut("n")
             }
         }
-        .sheet(item: $store.composer) { NewTaskSheet(project: $0.project) }
+        .sheet(item: $store.composer) { NewTaskSheet(project: $0.project, template: $0.template) }
         .alert(store.alert ?? "", isPresented: Binding(get: { store.alert != nil }, set: { if !$0 { store.alert = nil } })) {
             Button("OK", role: .cancel) {}
         }
@@ -43,11 +43,15 @@ struct MainView: View {
     }
 
     private func launchFromCommandLine() {
-        guard let task = store.takeCommandLineTask() else { return }
+        guard let options = store.takeCommandLineOptions() else { return }
+        if let template = options.newAgentTemplate { store.composer = Composer(project: defaultProject, template: template) }
+        guard let task = options.task else { return }
 
-        let options = LaunchOptions.current
         let project = options.directory.map { store.addFavorite($0) } ?? .none
-        _ = try? store.launch(task: task, agent: options.agent, project: project)
+        let model = options.model.map { id in
+            ModelCatalog.models(for: options.agent).first { $0.id == id } ?? ModelChoice(id: id, name: id, efforts: [], defaultEffort: nil)
+        }
+        _ = try? store.launch(task: task, agent: options.agent, model: model, effort: options.effort, project: project)
     }
 }
 
@@ -55,6 +59,7 @@ struct MainView: View {
 
 private struct Sidebar: View {
     @EnvironmentObject private var store: SessionStore
+    @State private var collapsed: Set<Project.ID> = []
 
     var body: some View {
         List(selection: $store.selection) {
@@ -62,15 +67,20 @@ private struct Sidebar: View {
                 .badge(store.attentionCount)
                 .tag(Selection.overview)
 
+            // Plain rows rather than Sections: a sidebar Section's collapse arrow appears on hover and shoves the + aside.
             ForEach(store.projectGroups) { group in
-                Section {
+                let isCollapsed = collapsed.contains(group.id)
+
+                ProjectHeader(group: group, isCollapsed: isCollapsed) {
+                    if isCollapsed { collapsed.remove(group.id) } else { collapsed.insert(group.id) }
+                }
+
+                if !isCollapsed {
                     ForEach(group.sessions) { session in
                         SessionRow(session: session)
                             .tag(Selection.session(session.id))
                             .contextMenu { SessionMenu(session: session) }
                     }
-                } header: {
-                    ProjectHeader(group: group)
                 }
             }
         }
@@ -91,16 +101,44 @@ private struct Sidebar: View {
 private struct ProjectHeader: View {
     @EnvironmentObject private var store: SessionStore
     let group: ProjectGroup
+    let isCollapsed: Bool
+    let toggle: () -> Void
 
     var body: some View {
-        HStack {
-            Label(group.project.name, systemImage: group.project.symbol)
-                .help(group.project.path ?? "Ideas and questions that don't need a codebase")
+        HStack(spacing: 6) {
+            Button { if !group.sessions.isEmpty { toggle() } } label: {
+                HStack(spacing: 6) {
+                    // Always laid out, even with nothing to fold, so every project name lines up.
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(isCollapsed ? 0 : 90))
+                        .frame(width: 12)
+                        .opacity(group.sessions.isEmpty ? 0 : 1)
+                    Label(group.project.name, systemImage: group.project.symbol)
+                        .font(.title2.weight(.semibold))
+                        .lineLimit(1)
+                    if isCollapsed && !group.sessions.isEmpty {
+                        Text("\(group.sessions.count)")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(group.project.path ?? "Ideas and questions that don't need a codebase")
+
             Spacer()
+
             Button("New agent here", systemImage: "plus") { store.composer = Composer(project: group.project) }
                 .labelStyle(.iconOnly)
+                .font(.title3.weight(.semibold))
+                .frame(width: 28, height: 28)
+                .contentShape(Rectangle())
                 .buttonStyle(.borderless)
         }
+        .padding(.top, 10)
         .contextMenu {
             if group.isFavorite {
                 Button("Remove from favorites") { store.removeFavorite(group.project) }
@@ -119,7 +157,7 @@ private struct SessionRow: View {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 StatusDot(status: session.status)
                 Text(session.task)
-                    .font(.callout.weight(.medium))
+                    .font(.title3.weight(.medium))
                     .lineLimit(2)
             }
             ChunkStrip(chunks: session.chunks, style: .compact)
@@ -199,7 +237,7 @@ struct SessionCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                AgentBadge(agent: session.agent)
+                AgentBadge(agent: session.agent, detail: session.modelSummary)
                 Spacer()
                 StatusPill(status: session.status)
             }
@@ -253,8 +291,8 @@ struct MenuBarContent: View {
             }
         }
         if !store.sessions.isEmpty { Divider() }
-        Button("Open AgentDeck", action: showMainWindow)
-        Button("Quit AgentDeck") { NSApp.terminate(nil) }
+        Button("Open Agenticious", action: showMainWindow)
+        Button("Quit Agenticious") { NSApp.terminate(nil) }
     }
 
     private func showMainWindow() {

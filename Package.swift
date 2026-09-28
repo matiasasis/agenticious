@@ -2,16 +2,16 @@
 import PackageDescription
 
 let package = Package(
-    name: "AgentDeck",
+    name: "Agenticious",
     platforms: [.macOS(.v14)],
     dependencies: [
         .package(url: "https://github.com/migueldeicaza/SwiftTerm", .upToNextMinor(from: "1.11.2")),
     ],
     targets: [
         .executableTarget(
-            name: "AgentDeck",
+            name: "Agenticious",
             dependencies: [.product(name: "SwiftTerm", package: "SwiftTerm")]
         ),
-        .executableTarget(name: "agentdeck-mcp"),
+        .executableTarget(name: "agenticious-mcp"),
     ]
 )

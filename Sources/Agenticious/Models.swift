@@ -89,19 +89,24 @@ struct Chunk: Identifiable, Equatable {
 enum PlanSource {
     case none
     case todoList   // mirrored from Claude's own TodoWrite tool
-    case agent      // declared explicitly through the agentdeck MCP tools; wins over todoList
+    case agent      // declared explicitly through the agenticious MCP tools; wins over todoList
 }
 
 @MainActor
 final class AgentSession: ObservableObject, Identifiable {
     let id = UUID()
     let task: String
+    /// What the agent is told. Usually the task itself; a template sends full instructions under a short title.
+    let prompt: String
     let agent: AgentKind
     let project: Project
     let directory: URL
     let startedAt = Date()
     /// Set when the agent runs in its own git worktree instead of the project checkout.
     let worktree: Worktree?
+    /// Nil leaves the CLI's own default in place.
+    let model: ModelChoice?
+    let effort: String?
 
     @Published var status: SessionStatus = .starting
     @Published var chunks: [Chunk] = []
@@ -112,12 +117,24 @@ final class AgentSession: ObservableObject, Identifiable {
     var terminalView: LocalProcessTerminalView?
     var terminalBridge: TerminalBridge?
 
-    init(task: String, agent: AgentKind, project: Project, directory: URL, worktree: Worktree? = nil) {
+    init(
+        task: String, prompt: String? = nil, agent: AgentKind, project: Project, directory: URL,
+        worktree: Worktree? = nil, model: ModelChoice? = nil, effort: String? = nil
+    ) {
         self.task = task
+        self.prompt = prompt ?? task
         self.agent = agent
         self.project = project
         self.directory = directory
         self.worktree = worktree
+        self.model = model
+        self.effort = effort
+    }
+
+    /// "Opus · High", or nil when both are left at the CLI default.
+    var modelSummary: String? {
+        let parts = [model?.name, effort.map(ModelCatalog.effortName)].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
     var completedChunks: Int { chunks.filter { $0.status == .done }.count }
