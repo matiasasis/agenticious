@@ -276,6 +276,7 @@ final class SessionStore: ObservableObject {
         session.lastActivity = Date()
 
         if event.name == "Stop", let reply = EventInterpreter.stopHookReply(payload, for: session) {
+            session.status = .working
             return try? JSONSerialization.data(withJSONObject: reply)
         }
 

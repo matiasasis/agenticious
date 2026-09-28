@@ -29,7 +29,7 @@ agent ──agenticious MCP───┘
 |---|---|---|
 | Chunk plan | `agenticious` MCP tools (`set_plan`, `update_chunk`); falls back to mirroring its TodoWrite list | `agenticious` MCP tools |
 | Needs you | `Notification` hook (permission / idle), `need_human` tool | `need_human` tool |
-| Turn finished | `Stop` hook | `notify` (agent-turn-complete) |
+| Turn finished | `Stop` hook; background tasks or scheduled wakeups show as Waiting | `notify` (agent-turn-complete) |
 | Plan limits | `statusLine` command (`rate_limits`) | session logs |
 | Done | `finish` tool | `finish` tool |
 

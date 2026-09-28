@@ -61,6 +61,7 @@ extension SessionStatus {
         switch self {
         case .starting: .gray
         case .working: AgenticiousStyle.lime
+        case .waiting: .teal
         case .needsYou: .orange
         case .yourTurn: AgenticiousStyle.violet
         case .done: .green

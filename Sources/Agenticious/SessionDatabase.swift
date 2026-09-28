@@ -153,6 +153,7 @@ struct SessionDatabase {
         switch status {
         case .starting: ("starting", nil)
         case .working: ("working", nil)
+        case .waiting: ("waiting", nil)
         case let .needsYou(reason): ("needs_you", reason)
         case .yourTurn: ("your_turn", nil)
         case let .done(summary): ("done", summary)
@@ -168,6 +169,7 @@ struct SessionDatabase {
         case "needs_you": .needsYou(detail ?? "")
         case "your_turn": .yourTurn
         case "working": .working
+        case "waiting": .waiting
         case "starting": .starting
         default: .interrupted
         }

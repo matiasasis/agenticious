@@ -97,6 +97,7 @@ struct AgentLauncher {
         [
             "hooks": [
                 "UserPromptSubmit": [hookEntry(session, "UserPromptSubmit")],
+                "PreToolUse": [hookEntry(session, "PreToolUse", matcher: "*")],
                 "PostToolUse": [hookEntry(session, "PostToolUse", matcher: "*")],
                 "Notification": [hookEntry(session, "Notification")],
                 "Stop": [hookEntry(session, "Stop", passReplyToClaude: true)],

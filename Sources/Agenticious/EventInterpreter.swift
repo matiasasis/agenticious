@@ -1,11 +1,6 @@
 import Foundation
 
-/// Turns raw agent events into dashboard state: status, the "needs you" reason, and the chunk boxes.
-///
-/// What counts as "needs you" (orange, sound, dock badge):
-/// - Claude shows a permission prompt (`Notification` hook of type `permission_prompt`)
-/// - the agent calls the `need_human` tool
-/// A turn that simply ended (`Stop`, Claude's idle reminder, Codex's turn-complete) is only "your turn".
+/// A stopped response may still be waiting for background work to wake the agent.
 @MainActor
 enum EventInterpreter {
     static func apply(_ name: String, _ payload: [String: Any], to session: AgentSession) {
@@ -17,11 +12,15 @@ enum EventInterpreter {
         switch name {
         case "UserPromptSubmit":
             session.status = .working
+        case "PreToolUse":
+            toolStarted(payload, in: session)
         case "PostToolUse":
             toolFinished(payload, in: session)
         case "Notification":
             notified(payload, session: session)
-        case "Stop", "codex-notify":
+        case "Stop":
+            turnFinished(session, hasBackgroundWork: hasBackgroundWork(payload))
+        case "codex-notify":
             turnFinished(session)
         case "mcp":
             agentReported(payload, in: session)
@@ -34,7 +33,8 @@ enum EventInterpreter {
     /// send it back once to report, so the step boxes don't stay empty or grey after it has answered.
     static func stopHookReply(_ payload: [String: Any], for session: AgentSession) -> [String: Any]? {
         let alreadyNudged = payload["stop_hook_active"] as? Bool ?? false
-        guard !alreadyNudged, !session.status.isFinished, let reason = stopNudge(for: session) else { return nil }
+        guard !alreadyNudged, !session.status.isFinished, !session.status.needsAttention,
+              !hasBackgroundWork(payload), let reason = stopNudge(for: session) else { return nil }
 
         return ["decision": "block", "reason": reason]
     }
@@ -57,6 +57,17 @@ enum EventInterpreter {
 
     // MARK: - Hook events
 
+    private static func hasBackgroundWork(_ payload: [String: Any]) -> Bool {
+        let tasks = payload["background_tasks"] as? [[String: Any]] ?? []
+        let wakeups = payload["session_crons"] as? [[String: Any]] ?? []
+        return !tasks.isEmpty || !wakeups.isEmpty
+    }
+
+    private static func toolStarted(_ payload: [String: Any], in session: AgentSession) {
+        guard let tool = payload["tool_name"] as? String, !tool.hasPrefix("mcp__agenticious__") else { return }
+        session.status = .working
+    }
+
     private static func toolFinished(_ payload: [String: Any], in session: AgentSession) {
         let tool = payload["tool_name"] as? String ?? ""
         // Our own MCP calls already set the status; a trailing PostToolUse must not undo a need_human.
@@ -70,7 +81,9 @@ enum EventInterpreter {
         let message = payload["message"] as? String ?? "Needs your input"
 
         if isIdleReminder(payload, message: message) {
-            if !session.status.needsAttention && !session.status.isFinished { session.status = .yourTurn }
+            if !session.status.needsAttention && !session.status.isFinished && session.status != .waiting {
+                session.status = .yourTurn
+            }
         } else {
             session.status = .needsYou(message)
         }
@@ -99,10 +112,14 @@ enum EventInterpreter {
         }
     }
 
-    private static func turnFinished(_ session: AgentSession) {
+    private static func turnFinished(_ session: AgentSession, hasBackgroundWork: Bool = false) {
         guard !session.status.isFinished, !session.status.needsAttention else { return }
 
-        session.status = session.allChunksDone ? .done(nil) : .yourTurn
+        if hasBackgroundWork {
+            session.status = .waiting
+        } else {
+            session.status = session.allChunksDone ? .done(nil) : .yourTurn
+        }
     }
 
     // MARK: - agenticious MCP tools

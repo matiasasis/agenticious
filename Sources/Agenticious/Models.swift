@@ -30,6 +30,7 @@ struct Project: Identifiable, Hashable {
 enum SessionStatus: Equatable {
     case starting
     case working
+    case waiting
     /// Blocked on the human: a permission prompt, or the agent explicitly called `need_human`.
     case needsYou(String)
     /// The agent finished its turn and is idle, waiting for the next message. Nothing is blocked.
@@ -43,6 +44,7 @@ enum SessionStatus: Equatable {
         switch self {
         case .starting: "Starting"
         case .working: "Working"
+        case .waiting: "Waiting"
         case .needsYou: "Needs you"
         case .yourTurn: "Your turn"
         case .done: "Done"
@@ -68,7 +70,7 @@ enum SessionStatus: Equatable {
         switch self {
         case .needsYou: 0
         case .yourTurn: 1
-        case .working, .starting: 2
+        case .working, .starting, .waiting: 2
         case .interrupted: 3
         case .done: 4
         case .exited: 5

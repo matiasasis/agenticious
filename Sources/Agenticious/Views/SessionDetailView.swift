@@ -61,6 +61,9 @@ struct SessionDetailView: View {
         switch session.status {
         case let .needsYou(reason):
             Banner(title: "Needs you", text: reason, systemImage: "hand.raised.fill", color: .orange)
+        case .waiting:
+            Banner(title: "Waiting", text: "\(session.agent.displayName) has background work or a scheduled wakeup. No input needed.",
+                   systemImage: "clock", color: .teal)
         case .yourTurn:
             Banner(title: "Your turn", text: "\(session.agent.displayName) replied and is waiting for your next message.",
                    systemImage: "text.bubble", color: .purple)
