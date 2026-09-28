@@ -9,6 +9,13 @@ enum EventInterpreter {
             session.conversationID = conversation
         }
 
+        if name == "PostToolUse", let response = payload["tool_response"] {
+            if let text = response as? String { session.recordPullRequests(in: text) }
+            else if JSONSerialization.isValidJSONObject(response),
+                    let data = try? JSONSerialization.data(withJSONObject: response, options: .withoutEscapingSlashes) {
+                session.recordPullRequests(in: String(decoding: data, as: UTF8.self))
+            }
+        }
         switch name {
         case "UserPromptSubmit":
             session.status = .working
@@ -128,6 +135,8 @@ enum EventInterpreter {
         let arguments = payload["args"] as? [String: Any] ?? [:]
 
         switch payload["tool"] as? String {
+        case "set_pull_requests":
+            session.recordPullRequests(in: (arguments["urls"] as? [String] ?? []).joined(separator: "\n"))
         case "set_plan": setPlan(arguments, in: session)
         case "update_chunk": updateChunk(arguments, in: session)
         case "need_human": session.status = .needsYou(arguments["reason"] as? String ?? "Needs your input")
@@ -154,6 +163,7 @@ enum EventInterpreter {
 
         session.chunks[position].status = ChunkStatus(rawValue: arguments["status"] as? String ?? "") ?? .inProgress
         session.chunks[position].note = arguments["note"] as? String
+        session.recordPullRequests(in: arguments["note"] as? String ?? "")
         if !session.status.needsAttention { session.status = .working }
     }
 
@@ -161,6 +171,7 @@ enum EventInterpreter {
         for index in session.chunks.indices where session.chunks[index].status != .done {
             session.chunks[index].status = .done
         }
+        session.recordPullRequests(in: arguments["summary"] as? String ?? "")
         session.status = .done(arguments["summary"] as? String)
     }
 }

@@ -116,6 +116,7 @@ final class AgentSession: ObservableObject, Identifiable {
 
     @Published var status: SessionStatus = .starting
     @Published var chunks: [Chunk] = []
+    @Published private(set) var pullRequests: [PullRequestReference] = []
     @Published var lastActivity = Date()
     @Published var worktreeRemoved = false
     @Published var isRunning = false
@@ -140,12 +141,18 @@ final class AgentSession: ObservableObject, Identifiable {
         self.worktree = worktree
         self.model = model
         self.effort = effort
+        recordPullRequests(in: task + "\n" + self.prompt)
     }
 
     /// "Opus · High", or nil when both are left at the CLI default.
     var modelSummary: String? {
         let parts = [model?.name, effort.map(ModelCatalog.effortName)].compactMap { $0 }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    func recordPullRequests(in text: String) {
+        let additions = PullRequestReference.extract(from: text).filter { !pullRequests.contains($0) }
+        for reference in additions where !pullRequests.contains(reference) { pullRequests.append(reference) }
     }
 
     var completedChunks: Int { chunks.filter { $0.status == .done }.count }

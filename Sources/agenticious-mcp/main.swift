@@ -11,6 +11,15 @@ let statusValues = ["pending", "in_progress", "done", "blocked"]
 
 let tools: [[String: Any]] = [
     [
+        "name": "set_pull_requests",
+        "description": "Attach the verified full HTTPS URLs of pull requests this task implements, creates, reviews, fixes, or merges. Call as soon as the PR is identified or created. Adds links without removing earlier ones.",
+        "inputSchema": [
+            "type": "object",
+            "properties": ["urls": ["type": "array", "items": ["type": "string"], "minItems": 1]],
+            "required": ["urls"],
+        ],
+    ],
+    [
         "name": "set_plan",
         "description": "Show the human your plan as 3-8 chunks. Call it before starting work, and again whenever the plan changes.",
         "inputSchema": [

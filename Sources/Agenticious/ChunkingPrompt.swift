@@ -15,6 +15,12 @@ enum ChunkingPrompt {
     4. If the plan changes, call `set_plan` again. Keep the titles of chunks you already finished.
     5. When the whole task is finished, call `finish` with a two-sentence summary of what changed.
 
+    6. Whenever the task involves a pull request (implementation, creation, review, CI, comments, or merging), \
+    identify its full repository URL and call `set_pull_requests` with its verified HTTPS URL as soon as you know it. \
+    Resolve PR numbers against the actual repository using the provider CLI; do not guess the repository or invent a link. \
+    For new implementation work, call it immediately after creating the PR. Report every PR in a stack. \
+    If this tool is unavailable in an older session, include the full URL in an `update_chunk` note or `finish` summary.
+
     These calls are cheap and don't replace your normal work or your normal replies.
     """
 

@@ -105,3 +105,9 @@ The sidebar defaults to **Queue**, grouped by workspace. Done and exited session
 Open the connection-status button beside the usage meters, then **Manage providers**, to check Claude Code and Codex account access and MCP status in your home folder or a selected project. The toolbar warning icon opens a compact provider summary. Checks run at launch and on refresh; changing the folder runs a fresh check. Authentication and connection failures include recovery instructions.
 
 Claude checks MCP connections; Codex reports configured authentication without claiming the server is reachable. Session-only MCP overrides and worktree configuration can differ from these folder checks. Raw command output, server URLs, and credentials are not shown. Run the displayed provider commands in that folder for full details, then refresh after fixing an issue.
+
+### Pull request links
+
+Agent details show saved PR links above the step cards. Full HTTPS PR URLs in task text, Claude tool results, progress notes, and completion summaries are captured automatically. Agents use `set_pull_requests` to attach verified links as soon as they identify or create a PR, including every PR in a stack. Bare numbers must first be resolved against the actual repository by the agent. Links are deduplicated and kept across app restarts, including in Finished sessions. Existing sessions can report links in progress notes even without the new MCP tool.
+
+Step cards use equal heights; hover a card to read its complete title and note.

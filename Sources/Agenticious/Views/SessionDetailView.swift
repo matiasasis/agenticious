@@ -37,6 +37,8 @@ struct SessionDetailView: View {
                         .truncationMode(.head)
                 }
 
+                if !session.pullRequests.isEmpty { PullRequestLinks(references: session.pullRequests) }
+
                 ChunkStrip(chunks: session.chunks, style: .expanded, isRunning: session.isRunning)
                 statusBanner
             }

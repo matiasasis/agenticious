@@ -146,9 +146,10 @@ private struct ChunkBox: View {
             }
         }
         .padding(10)
-        .frame(maxWidth: .infinity, minHeight: 64, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: 108, maxHeight: 108, alignment: .topLeading)
         .background(chunk.status.color.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(chunk.status.color.opacity(0.5)))
+        .help([chunk.title, chunk.note].compactMap { $0 }.joined(separator: "\n"))
     }
 }
 
@@ -227,5 +228,26 @@ private struct LimitGauge: View {
 
         let relative = resetsAt.formatted(.relative(presentation: .named))
         return "Resets \(relative) (\(resetsAt.formatted(date: .abbreviated, time: .shortened)))."
+    }
+}
+
+struct PullRequestLinks: View {
+    let references: [PullRequestReference]
+
+    var body: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 8) {
+                ForEach(references) { reference in
+                    Link(destination: reference.url) {
+                        Label(reference.label, systemImage: "arrow.triangle.pull")
+                            .font(.caption.weight(.semibold))
+                            .padding(.horizontal, 10).padding(.vertical, 6)
+                            .background(AgenticiousStyle.violet.opacity(0.12), in: Capsule())
+                    }
+                    .foregroundStyle(AgenticiousStyle.violet)
+                    .help(reference.url.absoluteString)
+                }
+            }
+        }.scrollIndicators(.hidden)
     }
 }
