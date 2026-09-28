@@ -73,6 +73,20 @@ struct TaskTemplate: Codable, Identifiable, Equatable {
                      Ask the human when intended behavior is unclear or a blocker cannot be resolved; continue independent PRs.
                      Track every PR through completion and report its clickable URL, final state, and any blockers.
                      Only report the whole task complete after verifying that every PR in scope is merged.
+
+                     When the source is a Slack message, resolve its parent thread even if the URL targets a reply.
+                     Read the parent and every reply, including all pages and PR links in attachments. Keep each
+                     PR's source message identifiers, including duplicate references. After verifying a PR is merged
+                     on GitHub, including already-merged PRs, add :merged: to every reply referencing it. If a reply
+                     lists multiple PRs, add the reaction only when all PRs in that message are verified merged.
+                     Reread the complete thread and reconcile newly posted PRs before marking the parent message.
+                     Add :merged: to the parent only when at least one PR was found and every PR in the thread is
+                     verified merged. Never mark a message complete while any PR in its scope is open, blocked,
+                     closed without merging, or has an unknown state. Preserve existing reactions and skip your
+                     reaction if already present. Use the Slack reaction name merged and read back each update
+                     to verify it succeeded. Report inaccessible messages, missing emoji, or failed reactions with
+                     the affected message links separately from merge results. Do not substitute another emoji or
+                     post a new Slack message. If the source cannot be read completely, do not mark the thread complete.
                      """),
         TaskTemplate(id: "reviewPR", name: "Review PR", summary: "Review one or multiple PRs and post actionable feedback on each.",
                      symbol: "text.magnifyingglass", fieldLabel: "Pull request(s)",
