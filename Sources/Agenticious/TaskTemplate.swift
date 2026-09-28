@@ -121,8 +121,17 @@ struct TaskTemplate: Codable, Identifiable, Equatable {
                      For each open PR, follow the project's review conventions. Read the description, linked context,
                      existing review threads, and the full current diff. Check correctness, maintainability, test coverage,
                      and CI results. Verify findings against the latest head before posting and avoid duplicating existing feedback.
-                     Post actionable comments or code suggestions on the relevant PR, using COMMENT by default.
-                     Do not submit Request Changes. Submit an approval only when the human explicitly requests approval.
+                     Post actionable comments or code suggestions on the relevant PR. The intended final outcome for
+                     each reviewable PR is an APPROVE review, not a comment-only review. This preset authorizes approval
+                     without asking for separate confirmation. Use COMMENT for interim findings; never submit Request Changes.
+                     Before approving, recheck the latest head, relevant CI results, and any fixes to reported issues.
+                     Submit APPROVE once no unresolved blocking findings remain, including when the initial review is clean.
+                     If fixes are needed, report the findings and re-review when fixes are available; do not approve known
+                     blocking issues or wait indefinitely for the author. If approval is not possible, including self-review,
+                     missing permissions, unresolved blockers, or a changed head that has not been reviewed, report the
+                     specific blocker and leave that PR pending. Do not claim the review is complete without approval.
+                     Avoid duplicate approvals when your existing approval already covers the current head. Verify the
+                     submitted approval and include its clickable review link in the final per-PR report.
                      Do not implement fixes, commit, push, or merge the author's branch as part of this review.
                      If a PR cannot be reviewed, record the blocker and continue with independent PRs.
                      Finish with a per-PR report containing clickable PR and posted-review links, findings, and any blockers.
