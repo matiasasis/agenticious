@@ -6,7 +6,8 @@ A native macOS dashboard for running many coding agents (Claude Code and Codex) 
 - **Chunk boxes**: every agent is told to split its task into 3–8 chunks and to report progress on each.
 - **"Needs you" floats to the top** with the reason. You also get a dock badge, a sound and a menu-bar counter.
 - **The real terminal** is one click away. Each agent runs in an embedded terminal (SwiftTerm) that keeps running when you close its window.
-- **Usage**: Codex rate-limit percentages read from its session logs, and an estimate of today's Claude tokens.
+- **Usage**: session and weekly limits for both. Codex's come from its session logs. Claude's come from the status line
+  of agents started here (until one has replied, you see an estimate of today's tokens instead).
 
 ## Run
 
@@ -29,13 +30,15 @@ agent ──agenticious MCP───┘
 | Chunk plan | `agenticious` MCP tools (`set_plan`, `update_chunk`); falls back to mirroring its TodoWrite list | `agenticious` MCP tools |
 | Needs you | `Notification` hook (permission / idle), `need_human` tool | `need_human` tool |
 | Turn finished | `Stop` hook | `notify` (agent-turn-complete) |
+| Plan limits | `statusLine` command (`rate_limits`) | session logs |
 | Done | `finish` tool | `finish` tool |
 
 The built-in "skill" is `Sources/Agenticious/ChunkingPrompt.swift`. Claude gets it through `--append-system-prompt`. Codex gets it prepended to the task.
 
 Nothing in your global config changes. Per-session Claude settings and MCP config are written to
 `~/Library/Application Support/Agenticious/sessions/<id>/` and passed with `--settings` / `--mcp-config`. Codex uses `-c` overrides.
-Note: those Codex overrides replace your own `notify` setting for sessions started from Agenticious.
+Note: those Codex overrides replace your own `notify` setting for sessions started from Agenticious, and the Claude
+settings replace your own `statusLine` there (it shows the model and both limits instead).
 
 ## Layout
 
@@ -45,7 +48,7 @@ Note: those Codex overrides replace your own `notify` setting for sessions start
 | `Sources/Agenticious/EventServer.swift` | Loopback HTTP listener |
 | `Sources/Agenticious/EventInterpreter.swift` | Event → status / chunks |
 | `Sources/Agenticious/SessionStore.swift` | Running sessions, terminal processes, dock badge |
-| `Sources/Agenticious/UsageMonitor.swift` | Local-log usage readout |
+| `Sources/Agenticious/UsageMonitor.swift` | Codex and Claude plan limits |
 | `Sources/agenticious-mcp/main.swift` | Stdio MCP server the agents call |
 
 ## Worktrees

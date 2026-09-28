@@ -15,7 +15,7 @@ struct SessionDetailView: View {
                     .lineLimit(4)
 
                 HStack(spacing: 12) {
-                    AgentBadge(agent: session.agent)
+                    AgentBadge(agent: session.agent, detail: session.modelSummary)
                     StatusPill(status: session.status)
                     if !session.chunks.isEmpty {
                         Text("\(session.completedChunks)/\(session.chunks.count) steps")

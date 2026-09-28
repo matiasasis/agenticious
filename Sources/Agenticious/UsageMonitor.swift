@@ -1,21 +1,46 @@
 import Foundation
 
-struct CodexLimit: Equatable {
+struct UsageLimit: Codable, Equatable {
     let usedPercent: Double
     let windowMinutes: Int
     let resetsAt: Date?
+
+    var hasReset: Bool { resetsAt.map { $0 < Date() } ?? false }
+
+    /// A reading from before the window reset is stale: the window has started over.
+    var currentPercent: Double { hasReset ? 0 : usedPercent }
+
+    var windowLabel: String {
+        switch windowMinutes {
+        case 10080: "Week"
+        case 300: "Session"
+        case 0: "Limit"
+        default: windowMinutes % 60 == 0 ? "\(windowMinutes / 60)h" : "\(windowMinutes)m"
+        }
+    }
 }
 
-/// Best-effort usage readout. Neither vendor exposes a quota API, so this reads what the CLIs log locally:
-/// Codex writes its real rate-limit percentages into session logs; for Claude we can only sum today's tokens.
+struct ClaudeReading: Codable, Equatable {
+    let limits: [UsageLimit]
+    let takenAt: Date
+}
+
+/// Best-effort usage readout. Neither vendor exposes a quota API, so this reads what the CLIs hand out locally:
+/// Codex writes its rate-limit percentages into session logs, and Claude Code passes its session and weekly
+/// usage to the status line of agents started here. Until one has run, Claude falls back to today's token count.
 @MainActor
 final class UsageMonitor: ObservableObject {
-    @Published private(set) var codexLimits: [CodexLimit] = []
+    private static let claudeReadingKey = "claudeRateLimits"
+
+    @Published private(set) var codexLimits: [UsageLimit] = []
+    @Published private(set) var claudeReading: ClaudeReading?
     @Published private(set) var claudeTokensToday: Int?
 
     private var timer: Timer?
 
     init() {
+        claudeReading = UserDefaults.standard.data(forKey: Self.claudeReadingKey)
+            .flatMap { try? JSONDecoder().decode(ClaudeReading.self, from: $0) }
         refresh()
         timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.refresh() }
@@ -32,6 +57,18 @@ final class UsageMonitor: ObservableObject {
             }
         }
     }
+
+    /// `rate_limits` from Claude Code's status line input: `five_hour` and `seven_day`, each `used_percentage` + `resets_at`.
+    func recordClaudeRateLimits(_ rateLimits: [String: Any]) {
+        let limits = [("five_hour", 300), ("seven_day", 10080)].compactMap { key, minutes in
+            UsageReader.limit(rateLimits[key], usedKey: "used_percentage", windowMinutes: minutes)
+        }
+        guard !limits.isEmpty else { return }
+
+        let reading = ClaudeReading(limits: limits, takenAt: Date())
+        claudeReading = reading
+        UserDefaults.standard.set(try? JSONEncoder().encode(reading), forKey: Self.claudeReadingKey)
+    }
 }
 
 enum UsageReader {
@@ -39,25 +76,36 @@ enum UsageReader {
 
     // MARK: - Codex
 
-    static func codexLimits() -> [CodexLimit] {
-        guard let log = newestFile(in: home.appendingPathComponent(".codex/sessions"), modifiedAfter: .distantPast),
-              let content = try? String(contentsOf: log, encoding: .utf8) else { return [] }
+    /// The newest log can predate its first rate-limit line (a session that just started), so look a few back.
+    static func codexLimits() -> [UsageLimit] {
+        let logs = allFiles(in: home.appendingPathComponent(".codex/sessions"), modifiedAfter: .distantPast)
+            .sorted { modified($0) > modified($1) }
+            .prefix(5)
+        return logs.lazy.compactMap(codexLimits(in:)).first ?? []
+    }
+
+    private static func codexLimits(in log: URL) -> [UsageLimit]? {
+        guard let content = try? String(contentsOf: log, encoding: .utf8) else { return nil }
 
         for line in content.split(separator: "\n").reversed() where line.contains("\"rate_limits\":{") {
             guard let object = parse(line),
                   let payload = object["payload"] as? [String: Any],
                   let limits = payload["rate_limits"] as? [String: Any] else { continue }
 
-            return ["primary", "secondary"].compactMap { codexLimit(limits[$0]) }
+            return ["primary", "secondary"]
+                .compactMap { limit(limits[$0], usedKey: "used_percent") }
+                .sorted { $0.windowMinutes < $1.windowMinutes }
         }
-        return []
+        return nil
     }
 
-    private static func codexLimit(_ raw: Any?) -> CodexLimit? {
-        guard let window = raw as? [String: Any], let used = window["used_percent"] as? Double else { return nil }
+    /// Both CLIs report `resets_at` in epoch seconds. Codex includes `window_minutes`; Claude's windows are fixed.
+    static func limit(_ raw: Any?, usedKey: String, windowMinutes: Int? = nil) -> UsageLimit? {
+        guard let window = raw as? [String: Any], let used = window[usedKey] as? Double else { return nil }
 
         let resets = (window["resets_at"] as? Double).map { Date(timeIntervalSince1970: $0) }
-        return CodexLimit(usedPercent: used, windowMinutes: window["window_minutes"] as? Int ?? 0, resetsAt: resets)
+        let minutes = windowMinutes ?? window["window_minutes"] as? Int ?? 0
+        return UsageLimit(usedPercent: used, windowMinutes: minutes, resetsAt: resets)
     }
 
     // MARK: - Claude
@@ -93,10 +141,6 @@ enum UsageReader {
 
     private static func parse(_ line: Substring) -> [String: Any]? {
         (try? JSONSerialization.jsonObject(with: Data(line.utf8))) as? [String: Any]
-    }
-
-    private static func newestFile(in directory: URL, modifiedAfter date: Date) -> URL? {
-        allFiles(in: directory, modifiedAfter: date).max { modified($0) < modified($1) }
     }
 
     private static func allFiles(in directory: URL, modifiedAfter date: Date) -> [URL] {

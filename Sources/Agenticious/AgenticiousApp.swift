@@ -5,7 +5,6 @@ import SwiftUI
 struct AgenticiousApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var store = SessionStore()
-    @StateObject private var usage = UsageMonitor()
 
     init() {
         Self.importSettingsFromAgentDeck()
@@ -26,7 +25,7 @@ struct AgenticiousApp: App {
         Window("Agenticious", id: "main") {
             MainView()
                 .environmentObject(store)
-                .environmentObject(usage)
+                .environmentObject(store.usage)
                 .frame(minWidth: 960, minHeight: 600)
         }
         .defaultSize(width: 1400, height: 880)

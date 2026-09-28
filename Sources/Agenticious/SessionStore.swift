@@ -19,6 +19,7 @@ struct ProjectGroup: Identifiable {
 struct Composer: Identifiable {
     let id = UUID()
     let project: Project
+    var template = TaskTemplate.custom
 }
 
 @MainActor
@@ -34,10 +35,11 @@ final class SessionStore: ObservableObject {
     @Published var alert: String?
 
     let port: UInt16
+    let usage = UsageMonitor()
     private var server: EventServer?
     private var subscriptions: [UUID: AnyCancellable] = [:]
     private var snapshotter: WindowSnapshotter?
-    private var commandLineTaskPending = true
+    private var commandLineOptionsPending = true
 
     init() {
         port = ProcessInfo.processInfo.environment["AGENTICIOUS_PORT"].flatMap(UInt16.init) ?? Self.defaultPort
@@ -94,10 +96,14 @@ final class SessionStore: ObservableObject {
     // MARK: - Sessions
 
     @discardableResult
-    func launch(task: String, agent: AgentKind, project: Project, isolated: Bool = false) throws -> AgentSession {
+    func launch(
+        task: String, prompt: String? = nil, agent: AgentKind, model: ModelChoice? = nil, effort: String? = nil, project: Project, isolated: Bool = false
+    ) throws -> AgentSession {
         let worktree = try isolated ? project.path.map { try Worktrees.create(in: $0, for: task) } : nil
         let directory = try worktree.map { directory(inside: $0, for: project) } ?? directory(for: project)
-        let session = AgentSession(task: task, agent: agent, project: project, directory: directory, worktree: worktree)
+        let session = AgentSession(
+            task: task, prompt: prompt, agent: agent, project: project, directory: directory, worktree: worktree, model: model, effort: effort
+        )
         let spec = try AgentLauncher(port: port).spec(for: session)
 
         attachTerminal(to: session, running: spec)
@@ -107,12 +113,12 @@ final class SessionStore: ObservableObject {
         return session
     }
 
-    /// The `--task` from the command line, handed out once so reopening the window doesn't relaunch it.
-    func takeCommandLineTask() -> String? {
-        guard commandLineTaskPending else { return nil }
+    /// The command-line options, handed out once so reopening the window doesn't launch the `--task` again.
+    func takeCommandLineOptions() -> LaunchOptions? {
+        guard commandLineOptionsPending else { return nil }
 
-        commandLineTaskPending = false
-        return LaunchOptions.current.task
+        commandLineOptionsPending = false
+        return LaunchOptions.current
     }
 
     func stop(_ session: AgentSession) {
@@ -196,6 +202,8 @@ final class SessionStore: ObservableObject {
         guard let session = session(event.sessionID) else { return nil }
 
         let payload = (try? JSONSerialization.jsonObject(with: event.body)) as? [String: Any] ?? [:]
+        if event.name == "StatusLine" { return statusLine(payload) }
+
         session.lastActivity = Date()
 
         if event.name == "Stop", let reply = EventInterpreter.stopHookReply(payload, for: session) {
@@ -207,6 +215,15 @@ final class SessionStore: ObservableObject {
         if !neededAttention && session.status.needsAttention { NSSound(named: "Glass")?.play() }
         updateBadge()
         return nil
+    }
+
+    /// Claude redraws its status line after every message, so this doubles as the feed for the toolbar's Claude limits.
+    private func statusLine(_ payload: [String: Any]) -> Data {
+        if let rateLimits = payload["rate_limits"] as? [String: Any] { usage.recordClaudeRateLimits(rateLimits) }
+
+        let model = (payload["model"] as? [String: Any])?["display_name"] as? String
+        let limits = (usage.claudeReading?.limits ?? []).map { "\($0.windowLabel) \(Int($0.currentPercent.rounded()))%" }
+        return Data(([model].compactMap { $0 } + limits).joined(separator: " · ").utf8)
     }
 
     private func updateBadge() {

@@ -2,9 +2,10 @@ import SwiftUI
 
 struct AgentBadge: View {
     let agent: AgentKind
+    var detail: String?
 
     var body: some View {
-        Text(agent.displayName)
+        Text([agent.displayName, detail].compactMap { $0 }.joined(separator: " · "))
             .font(.caption.weight(.semibold))
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
@@ -171,33 +172,56 @@ struct UsageBar: View {
     @EnvironmentObject private var usage: UsageMonitor
 
     var body: some View {
-        HStack(spacing: 14) {
-            ForEach(Array(usage.codexLimits.enumerated()), id: \.offset) { _, limit in
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Codex \(windowLabel(limit.windowMinutes)): \(Int(limit.usedPercent))%")
-                        .font(.caption)
-                    ProgressView(value: min(limit.usedPercent, 100), total: 100)
-                        .tint(limit.usedPercent >= 90 ? .red : .accentColor)
-                        .frame(width: 110)
-                }
-                .help(limit.resetsAt.map { "Resets \($0.formatted(date: .abbreviated, time: .shortened))" } ?? "")
-            }
-
-            if let tokens = usage.claudeTokensToday {
+        HStack(spacing: 18) {
+            if let claude = usage.claudeReading {
+                vendor("Claude", claude.limits, source: "Read \(claude.takenAt.formatted(.relative(presentation: .named))) " +
+                    "from the status line of a Claude agent started here.")
+            } else if let tokens = usage.claudeTokensToday {
                 Text("Claude today: \(tokens.formatted(.number.notation(.compactName))) tok")
                     .font(.caption)
-                    .help("Input + output + cache-write tokens since midnight, read from ~/.claude/projects. An estimate, not your plan quota.")
+                    .help("Input + output + cache-write tokens since midnight, read from ~/.claude/projects. " +
+                        "Your session and weekly limits show up here once a Claude agent started from Agenticious replies.")
+            }
+
+            if !usage.codexLimits.isEmpty {
+                vendor("Codex", usage.codexLimits, source: "Read from Codex's latest session log.")
             }
         }
         .foregroundStyle(.secondary)
     }
 
-    private func windowLabel(_ minutes: Int) -> String {
-        switch minutes {
-        case 10080: "week"
-        case 300: "5h"
-        case 0: "limit"
-        default: minutes % 60 == 0 ? "\(minutes / 60)h" : "\(minutes)m"
+    private func vendor(_ name: String, _ limits: [UsageLimit], source: String) -> some View {
+        HStack(spacing: 8) {
+            Text(name)
+                .font(.caption.weight(.semibold))
+            ForEach(limits, id: \.windowMinutes) { LimitGauge(limit: $0, source: source) }
         }
+    }
+}
+
+private struct LimitGauge: View {
+    let limit: UsageLimit
+    let source: String
+
+    var body: some View {
+        let percent = limit.currentPercent
+
+        VStack(alignment: .leading, spacing: 2) {
+            Text("\(limit.windowLabel) \(Int(percent.rounded()))%")
+                .font(.caption)
+                .monospacedDigit()
+            ProgressView(value: min(percent, 100), total: 100)
+                .tint(percent >= 90 ? .red : percent >= 70 ? .orange : .accentColor)
+                .frame(width: 80)
+        }
+        .help([resetText, source].compactMap { $0 }.joined(separator: "\n"))
+    }
+
+    private var resetText: String? {
+        guard let resetsAt = limit.resetsAt else { return nil }
+        if limit.hasReset { return "Reset \(resetsAt.formatted(.relative(presentation: .named))), so it's back to 0%." }
+
+        let relative = resetsAt.formatted(.relative(presentation: .named))
+        return "Resets \(relative) (\(resetsAt.formatted(date: .abbreviated, time: .shortened)))."
     }
 }

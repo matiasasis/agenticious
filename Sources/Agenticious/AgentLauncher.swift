@@ -22,14 +22,16 @@ struct AgentLauncher {
             variables["AD_SETTINGS"] = files.settings
             variables["AD_MCP"] = files.mcp
             variables["AD_SYSPROMPT"] = ChunkingPrompt.text
-            variables["AD_PROMPT"] = session.task
-            command = #"exec claude --settings "$AD_SETTINGS" --mcp-config "$AD_MCP" --append-system-prompt "$AD_SYSPROMPT" -- "$AD_PROMPT""#
+            variables["AD_PROMPT"] = session.prompt
+            command = #"exec claude --settings "$AD_SETTINGS" --mcp-config "$AD_MCP" --append-system-prompt "$AD_SYSPROMPT""#
+                + modelFlags(for: session, into: &variables) + #" -- "$AD_PROMPT""#
         case .codex:
             variables["AD_MCP_CMD"] = #"mcp_servers.agenticious.command="\#(tomlEscaped(mcpBinary))""#
             variables["AD_MCP_ENV"] = #"mcp_servers.agenticious.env={AGENTICIOUS_SESSION="\#(session.id.uuidString)",AGENTICIOUS_PORT="\#(port)"}"#
             variables["AD_NOTIFY"] = #"notify=['/bin/sh','-c','curl -s -m 2 -X POST --data-binary "$1" \#(hookURL(session, "codex-notify")) >/dev/null 2>&1','sh']"#
-            variables["AD_PROMPT"] = ChunkingPrompt.inlined(with: session.task)
-            command = #"exec codex -c "$AD_MCP_CMD" -c "$AD_MCP_ENV" -c "$AD_NOTIFY" -- "$AD_PROMPT""#
+            variables["AD_PROMPT"] = ChunkingPrompt.inlined(with: session.prompt)
+            command = #"exec codex -c "$AD_MCP_CMD" -c "$AD_MCP_ENV" -c "$AD_NOTIFY""#
+                + modelFlags(for: session, into: &variables) + #" -- "$AD_PROMPT""#
         }
 
         // A login + interactive shell picks up the user's PATH (nodenv, ~/.local/bin, …), which a GUI app doesn't inherit.
@@ -40,6 +42,20 @@ struct AgentLauncher {
             environment: variables.map { "\($0.key)=\($0.value)" },
             directory: session.directory.path
         )
+    }
+
+    /// Claude takes `--model` / `--effort`; Codex takes `-m` and the `model_reasoning_effort` config key.
+    private func modelFlags(for session: AgentSession, into variables: inout [String: String]) -> String {
+        var flags = ""
+        if let model = session.model {
+            variables["AD_MODEL"] = model.id
+            flags += session.agent == .claude ? #" --model "$AD_MODEL""# : #" -m "$AD_MODEL""#
+        }
+        if let effort = session.effort {
+            variables["AD_EFFORT"] = session.agent == .claude ? effort : #"model_reasoning_effort="\#(tomlEscaped(effort))""#
+            flags += session.agent == .claude ? #" --effort "$AD_EFFORT""# : #" -c "$AD_EFFORT""#
+        }
+        return flags
     }
 
     // MARK: - Environment
@@ -80,6 +96,8 @@ struct AgentLauncher {
             ],
             // Reporting progress must never cost the human a permission prompt.
             "permissions": ["allow": ["mcp__agenticious"]],
+            // Claude Code hands the status line its plan limits; the app records them and answers with the line to show.
+            "statusLine": ["type": "command", "command": "curl -s -m 2 -X POST --data-binary @- '\(hookURL(session, "StatusLine"))' 2>/dev/null || true"],
         ]
     }
 
