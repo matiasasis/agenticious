@@ -26,9 +26,17 @@ struct AgenticiousApp: App {
             MainView()
                 .environmentObject(store)
                 .environmentObject(store.usage)
+                .environmentObject(store.presets)
+                .environmentObject(store.skillLocations)
                 .frame(minWidth: 960, minHeight: 600)
         }
         .defaultSize(width: 1400, height: 880)
+        .commands {
+            CommandGroup(replacing: .appSettings) {
+                Button("Settings…") { store.selection = .settings }
+                    .keyboardShortcut(",")
+            }
+        }
 
         MenuBarExtra {
             MenuBarContent()

@@ -4,6 +4,8 @@ import SwiftTerm
 
 enum Selection: Hashable {
     case overview
+    case settings
+    case skills
     case session(UUID)
 }
 
@@ -36,6 +38,8 @@ final class SessionStore: ObservableObject {
 
     let port: UInt16
     let usage = UsageMonitor()
+    let presets = TaskPresetStore()
+    let skillLocations = SkillLocations()
     private var server: EventServer?
     private var database: SessionDatabase?
     private var subscriptions: [UUID: AnyCancellable] = [:]

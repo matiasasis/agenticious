@@ -2,6 +2,7 @@ import SwiftUI
 
 struct NewTaskSheet: View {
     @EnvironmentObject private var store: SessionStore
+    @EnvironmentObject private var presets: TaskPresetStore
     @Environment(\.dismiss) private var dismiss
 
     @AppStorage("lastAgent") private var agent: AgentKind = .claude
@@ -12,6 +13,8 @@ struct NewTaskSheet: View {
     @AppStorage("useWorktree") private var useWorktree = true
     @State private var project: Project
     @State private var template: TaskTemplate
+    @State private var loadedPreset = false
+    @State private var skillPaths: [String] = []
     @State private var task = ""
     @State private var templateValue = ""
     @State private var notes = ""
@@ -27,13 +30,14 @@ struct NewTaskSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            TaskTemplatePicker(selection: $template)
+            TaskTemplatePicker(selection: $template, templates: presets.presets)
                 .padding(.horizontal, 24)
                 .padding(.vertical, 16)
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
                     missionFields
                     configurationFields
+                    SkillSelectionField(paths: $skillPaths, project: project)
                     if let launchError {
                         Label(launchError, systemImage: "exclamationmark.triangle.fill")
                             .foregroundStyle(.red).font(.callout)
@@ -48,6 +52,13 @@ struct NewTaskSheet: View {
         .background(AgenticiousStyle.ink)
         .tint(AgenticiousStyle.lime)
         .preferredColorScheme(.dark)
+        .onAppear {
+            guard !loadedPreset else { return }
+            loadedPreset = true
+            template = presets.preset(id: template.id)
+            skillPaths = template.skillPaths
+        }
+        .onChange(of: template.id) { _, _ in skillPaths = template.skillPaths }
     }
 
     private var header: some View {
@@ -60,7 +71,7 @@ struct NewTaskSheet: View {
             VStack(alignment: .leading, spacing: 5) {
                 Text("Summon an agent")
                     .font(.system(size: 26, weight: .bold, design: .rounded))
-                Text("Choose a skill. Give it a mission. Let the magic happen.")
+                Text("Choose a task. Add your skills. Let the magic happen.")
                     .font(.callout).foregroundStyle(.secondary)
             }
             Spacer()
@@ -71,7 +82,7 @@ struct NewTaskSheet: View {
 
     @ViewBuilder
     private var missionFields: some View {
-        if template == .custom {
+        if template.isCustom {
             VStack(alignment: .leading, spacing: 8) {
                 Text("The mission").font(.headline)
                 editor($task, minHeight: 140)
@@ -168,21 +179,10 @@ struct NewTaskSheet: View {
     private var trimmedValue: String { templateValue.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     private var canStart: Bool {
-        switch template {
-        case .custom: !task.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        default: !template.isFieldRequired || !trimmedValue.isEmpty
-        }
+        !template.isFieldRequired || !taskInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    /// The agent's title, and what it's told when that differs (templates expand into full instructions).
-    private var titleAndPrompt: (title: String, prompt: String?) {
-        let trimmedTask = task.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard template != .custom else { return (trimmedTask, nil) }
-
-        let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
-        let instructions = template.instructions(for: trimmedValue)
-        return (template.title(for: trimmedValue), trimmedNotes.isEmpty ? instructions : "\(instructions)\n\nNotes from the human:\n\(trimmedNotes)")
-    }
+    private var taskInput: String { template.isCustom ? task : templateValue }
 
     /// Favorites, "No project", and the preset project in case it isn't a favorite.
     private var projectChoices: [Project] {
@@ -227,10 +227,10 @@ struct NewTaskSheet: View {
 
     private func start() {
         do {
-            let (title, prompt) = titleAndPrompt
+            let prompt = try TaskPrompt(template: template, input: taskInput, notes: notes, skillPaths: skillPaths)
             try store.launch(
-                task: title,
-                prompt: prompt,
+                task: prompt.title,
+                prompt: prompt.instructions,
                 agent: agent,
                 model: selectedModel.isDefault ? nil : selectedModel,
                 effort: selectedEffort.isEmpty ? nil : selectedEffort,
@@ -246,40 +246,44 @@ struct NewTaskSheet: View {
 
 private struct TaskTemplatePicker: View {
     @Binding var selection: TaskTemplate
+    let templates: [TaskTemplate]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Choose a skill").font(.headline)
-            HStack(spacing: 8) {
-                ForEach(TaskTemplate.allCases) { template in
-                    Button { selection = template } label: {
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                Image(systemName: template.symbol).font(.title3)
-                                Spacer()
-                                Image(systemName: "checkmark.circle.fill")
-                                    .opacity(selection == template ? 1 : 0)
+            Text("Choose a task").font(.headline)
+            ScrollView(.horizontal) {
+                HStack(spacing: 8) {
+                    ForEach(templates) { template in
+                        Button { selection = template } label: {
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack {
+                                    Image(systemName: template.symbol).font(.title3)
+                                    Spacer()
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .opacity(selection == template ? 1 : 0)
+                                }
+                                Text(template.shortName)
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .lineLimit(1)
                             }
-                            Text(template.shortName)
-                                .font(.system(size: 12, weight: .semibold))
-                                .lineLimit(1)
+                            .padding(12)
+                            .frame(width: 136, alignment: .leading)
+                            .foregroundStyle(selection == template ? AgenticiousStyle.lime : .primary)
+                            .background(selection == template ? AgenticiousStyle.lime.opacity(0.1) : AgenticiousStyle.panel,
+                                        in: RoundedRectangle(cornerRadius: 12))
+                            .overlay(RoundedRectangle(cornerRadius: 12)
+                                .stroke(selection == template ? AgenticiousStyle.lime : AgenticiousStyle.violet.opacity(0.25)))
+                            .contentShape(RoundedRectangle(cornerRadius: 12))
                         }
-                        .padding(12)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .foregroundStyle(selection == template ? AgenticiousStyle.lime : .primary)
-                        .background(selection == template ? AgenticiousStyle.lime.opacity(0.1) : AgenticiousStyle.panel,
-                                    in: RoundedRectangle(cornerRadius: 12))
-                        .overlay(RoundedRectangle(cornerRadius: 12)
-                            .stroke(selection == template ? AgenticiousStyle.lime : AgenticiousStyle.violet.opacity(0.25)))
-                        .contentShape(RoundedRectangle(cornerRadius: 12))
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(template.name)
+                        .accessibilityValue(selection == template ? "Selected" : "Not selected")
+                        .accessibilityAddTraits(selection == template ? .isSelected : [])
+                        .help(template.summary)
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(template.name)
-                    .accessibilityValue(selection == template ? "Selected" : "Not selected")
-                    .accessibilityAddTraits(selection == template ? .isSelected : [])
-                    .help(template.summary)
                 }
             }
+            .scrollIndicators(.hidden)
             Text(selection.summary)
                 .font(.callout).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

@@ -34,7 +34,11 @@ struct MainView: View {
 
     @ViewBuilder
     private var detail: some View {
-        if let session = store.selectedSession {
+        if store.selection == .settings {
+            TaskSettingsView()
+        } else if store.selection == .skills {
+            SkillLibraryView()
+        } else if let session = store.selectedSession {
             SessionDetailView(session: session)
                 .id(session.id)
         } else {
@@ -49,7 +53,9 @@ struct MainView: View {
 
     private func launchFromCommandLine() {
         guard let options = store.takeCommandLineOptions() else { return }
-        if let template = options.newAgentTemplate { store.composer = Composer(project: defaultProject, template: template) }
+        if let template = options.newAgentTemplate { store.composer = Composer(project: defaultProject, template: store.presets.preset(id: template)) }
+        if options.showSettings { store.selection = .settings }
+        if options.showSkills { store.selection = .skills }
         guard let task = options.task else { return }
 
         let project = options.directory.map { store.addFavorite($0) } ?? .none
@@ -71,6 +77,8 @@ private struct Sidebar: View {
             Label("All agents", systemImage: "square.grid.2x2")
                 .badge(store.attentionCount)
                 .tag(Selection.overview)
+            Label("Skills", systemImage: "books.vertical").tag(Selection.skills)
+            Label("Settings", systemImage: "slider.horizontal.3").tag(Selection.settings)
 
             // Plain rows rather than Sections: a sidebar Section's collapse arrow appears on hover and shoves the + aside.
             ForEach(store.projectGroups) { group in

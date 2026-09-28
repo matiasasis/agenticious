@@ -1,135 +1,74 @@
 import Foundation
 
-/// Canned tasks for the New Agent sheet. Each asks for one value and expands into a short title (the agent's big
-/// title) and the full instructions the agent gets.
-enum TaskTemplate: String, CaseIterable, Identifiable {
-    case custom, implementTicket, reviewComments, reviewPR, fixCI
+struct TaskTemplate: Codable, Identifiable, Equatable {
+    var id = UUID().uuidString
+    var name: String
+    var summary = ""
+    var symbol = "sparkles"
+    var fieldLabel = "Task input"
+    var fieldPlaceholder = "What should the agent work on?"
+    var isFieldRequired = true
+    var titlePattern = "{{input}}"
+    var prompt = "{{input}}"
+    var skillPaths: [String] = []
 
-    var id: String { rawValue }
-
-    var name: String {
-        switch self {
-        case .custom: "Custom"
-        case .implementTicket: "Implement ticket"
-        case .reviewComments: "Review comments / Merge"
-        case .reviewPR: "Review PR"
-        case .fixCI: "Fix CI"
-        }
+    var isCustom: Bool { id == "custom" }
+    var shortName: String { name }
+    var validationMessage: String? {
+        if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "Give this preset a name." }
+        if prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "Add a prompt for the agent." }
+        if titlePattern.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "Add a task title." }
+        return nil
     }
-
-    var shortName: String {
-        switch self {
-        case .custom: "Custom task"
-        case .implementTicket: "Implement"
-        case .reviewComments: "Resolve & merge"
-        case .reviewPR: "Review PR"
-        case .fixCI: "Fix CI"
-        }
-    }
-
-    var symbol: String {
-        switch self {
-        case .custom: "sparkles"
-        case .implementTicket: "hammer"
-        case .reviewComments: "arrow.triangle.merge"
-        case .reviewPR: "text.magnifyingglass"
-        case .fixCI: "wrench.and.screwdriver"
-        }
-    }
-
-    var summary: String {
-        switch self {
-        case .custom: "Give your agent a mission in your own words."
-        case .implementTicket: "Turn a ticket into tested code and a draft pull request."
-        case .reviewComments: "Address review feedback, wait for CI, then merge the pull request."
-        case .reviewPR: "Review a pull request, post suggestions, and approve when it passes review."
-        case .fixCI: "Investigate failing checks, fix the cause, and get CI green."
-        }
-    }
-
-    var fieldLabel: String {
-        switch self {
-        case .custom: ""
-        case .implementTicket: "Ticket"
-        case .reviewComments, .reviewPR: "Pull request"
-        case .fixCI: "Pull request or branch"
-        }
-    }
-
-    var fieldPlaceholder: String {
-        switch self {
-        case .custom: ""
-        case .implementTicket: "PROJ-123 or the ticket URL"
-        case .reviewComments, .reviewPR: "1234 or the PR URL"
-        case .fixCI: "Leave empty for the current branch"
-        }
-    }
-
-    var isFieldRequired: Bool { self != .fixCI }
 
     func title(for value: String) -> String {
-        switch self {
-        case .custom: value
-        case .implementTicket: "Implement \(value)"
-        case .reviewComments: "Address comments and merge PR \(value)"
-        case .reviewPR: "Review PR \(value)"
-        case .fixCI: value.isEmpty ? "Fix CI" : "Fix CI on \(value)"
-        }
+        let title = titlePattern.replacingOccurrences(of: "{{input}}", with: value).trimmingCharacters(in: .whitespacesAndNewlines)
+        return title.isEmpty ? name : title
     }
 
-    func instructions(for value: String) -> String {
-        let skills = "If you have a skill for this kind of task, use it."
-
-        switch self {
-        case .custom:
-            return value
-        case .implementTicket:
-            return """
-            Implement ticket \(value).
-
-            1. Read the ticket, its comments and linked issues with whatever tracker tools you have (for example the \
-            Jira/Atlassian MCP). If you can't read it, call need_human.
-            2. Explore the code it touches and plan the change.
-            3. Implement it following the repo's conventions, with tests.
-            4. Run the relevant tests and linters until they pass.
-            5. Commit on a feature branch (the current one if it isn't the default branch), push, and open a draft PR \
-            that links the ticket.
-
-            \(skills)
-            """
-        case .reviewComments:
-            return """
-            Get PR \(value) merged, handling any review comments on the way with the perfect-pr-address-comments skill.
-
-            1. Check out the PR's branch (`gh pr checkout`). If git says it's checked out in another worktree, call need_human.
-            2. If there are unresolved review threads, work through them as perfect-pr-address-comments says: implement \
-            the ones that apply, push, reply on every thread and resolve the ones you fixed. With none, go straight to step 3.
-            3. Wait for CI on the latest commit (`gh pr checks --watch`). Fix failures the PR caused; if one looks flaky or \
-            unrelated, call need_human.
-            4. Merge with the method the repo uses (see how recent PRs were merged). Never use --admin or skip required \
-            checks or approvals. If GitHub blocks the merge (conflicts, a required review), call need_human with the reason.
-
-            If the skill isn't available, call need_human.
-            """
-        case .reviewPR:
-            return """
-            Review PR \(value) with the perfect-pr-comment skill: post the inline suggestions, and approve if the review \
-            is complete with no HIGH or CRITICAL findings. You're authorized to post the review on GitHub and to add \
-            the skill's Slack reactions to the review request in coders. If the skill isn't available, call need_human.
-            """
-        case .fixCI:
-            let target = value.isEmpty ? "the current branch" : value
-            return """
-            Fix the failing CI checks on \(target).
-
-            1. Find the failing checks and read their logs (`gh pr checks`, `gh run view --log-failed`).
-            2. Reproduce each failure locally where you can.
-            3. Fix the root cause. Don't skip, disable or loosen tests to get green. If a failure looks flaky or unrelated \
-            to the change, call need_human.
-            4. Run the failing checks locally, commit and push, then watch the new CI run until it's green.
-
-            \(skills)
-            """
-        }
+    func instructions(for value: String, notes: String = "") -> String {
+        var result = prompt.replacingOccurrences(of: "{{input}}", with: value)
+        if !prompt.contains("{{input}}"), !value.isEmpty { result += "\n\nTask input:\n\(value)" }
+        if !notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { result += "\n\nNotes from the human:\n\(notes)" }
+        return result
     }
+
+    static let custom = TaskTemplate(id: "custom", name: "Custom task", summary: "Give your agent a mission in your own words.")
+    static let defaults: [TaskTemplate] = [
+        custom,
+        TaskTemplate(id: "implementTicket", name: "Implement", summary: "Turn a ticket into tested code and a draft pull request.",
+                     symbol: "hammer", fieldLabel: "Ticket", fieldPlaceholder: "Ticket ID or URL",
+                     titlePattern: "Implement {{input}}", prompt: """
+                     Implement ticket {{input}}.
+                     Read the ticket and its linked context, explore the project, and plan the change.
+                     Follow the project's conventions, implement the change, and run relevant tests.
+                     Commit on a feature branch, push, and open a draft pull request linked to the ticket.
+                     If the ticket or a required tool is unavailable, ask the human for help.
+                     """),
+        TaskTemplate(id: "reviewComments", name: "Resolve & merge", summary: "Address review feedback, wait for CI, then merge the pull request.",
+                     symbol: "arrow.triangle.merge", fieldLabel: "Pull request", fieldPlaceholder: "PR number or URL",
+                     titlePattern: "Address comments and merge PR {{input}}", prompt: """
+                     Address review comments on pull request {{input}} and get it merged.
+                     Follow the project's review conventions. Implement applicable feedback, test and push fixes,
+                     and reply to each review thread. Explain any feedback that cannot be applied.
+                     Wait for CI on the latest commit before merging with the repository's normal method.
+                     Do not bypass required checks or approvals. Ask the human about conflicts or blockers.
+                     """),
+        TaskTemplate(id: "reviewPR", name: "Review PR", summary: "Review a pull request and post actionable feedback.",
+                     symbol: "text.magnifyingglass", fieldLabel: "Pull request", fieldPlaceholder: "PR number or URL",
+                     titlePattern: "Review PR {{input}}", prompt: """
+                     Review pull request {{input}} following the project's conventions.
+                     Check correctness, maintainability, and test coverage. Post actionable review comments
+                     with suggestions where useful. Do not modify the author's branch.
+                     """),
+        TaskTemplate(id: "fixCI", name: "Fix CI", summary: "Investigate failing checks, fix the cause, and get CI green.",
+                     symbol: "wrench.and.screwdriver", fieldLabel: "Pull request or branch",
+                     fieldPlaceholder: "Leave empty for the current branch", isFieldRequired: false,
+                     titlePattern: "Fix CI {{input}}", prompt: """
+                     Fix failing CI for {{input}} (use the current branch if no target is supplied).
+                     Read the failing logs, reproduce the failures where possible, and fix the root cause.
+                     Do not skip or weaken tests to get green. Ask the human about unrelated failures.
+                     Run relevant checks, commit and push the fix, and watch CI until it passes.
+                     """)
+    ]
 }

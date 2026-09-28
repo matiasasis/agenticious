@@ -14,5 +14,6 @@ let package = Package(
             resources: [.copy("Resources/AppIcon.png"), .copy("Resources/Mascot.png")]
         ),
         .executableTarget(name: "agenticious-mcp"),
+        .testTarget(name: "AgenticiousTests", dependencies: ["Agenticious"]),
     ]
 )

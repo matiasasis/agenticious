@@ -61,6 +61,33 @@ out of `git status`. Because the folder sits inside the repo, Claude doesn't ask
 **Delete worktree** (right-click the agent) is enabled once the agent has exited. Git refuses if the worktree has
 uncommitted changes, and the branch is always kept.
 
+## Task presets and skills
+
+Open **Settings** in the sidebar (or press `⌘,`) to create, edit, or delete task presets. Each preset has a name,
+description, input hint, title, prompt, and optional skills. Use `{{input}}` in the title or prompt for the task's
+input. Notes and selected skill references are appended automatically. The Custom task is editable and always
+remains available. Changes affect new tasks; existing conversations keep their original prompts.
+
+Presets are saved per user in `~/Library/Application Support/Agenticious/task-presets.json`. A damaged saved
+file is preserved and reported instead of silently overwritten. The included presets are generic starting points,
+so customize their prompts and skill choices for your workflow.
+
+**Skills** browses `SKILL.md` files from personal `.agents/skills`, `.codex/skills` (respecting `CODEX_HOME`),
+`.claude/skills`, `/etc/codex/skills`, project skill folders up to the repository root, and Codex/Claude plugin
+caches. Add other locations with **Search folders**. Symlinked folders are followed and identical files are
+shown once. Cached plugins are labeled as such: a cached skill does not mean its plugin or tools are enabled.
+
+Select a skill to inspect its instructions or reveal its file. Create personal or project skills for Codex or
+Claude Code, and edit personal/project skill files in the app. Plugin-cache and system skills are read-only.
+Edits preserve the complete Markdown file and reject a save if another editor changed it in the meantime.
+
+Use **Choose skills** in a task or preset to attach skills. Agenticious asks the agent to read the selected
+absolute paths and resolve supporting resources from their skill folders. Missing or unreadable selected files
+prevent launch with an error; attaching a skill does not install its tools or enable its plugin.
+
+For UI inspection, `--settings`, `--skills`, and `--new-agent [preset-id]` can be combined with
+`--snapshot-dir /tmp/agenticious-shots`. Run configuration and skill tests with `swift test`.
+
 ## Next steps
 
 - Persist sessions across app restarts (`claude --resume`, `codex resume`)
