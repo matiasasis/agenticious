@@ -125,7 +125,7 @@ enum DiagnosticCommand {
         var hasWarning: Bool { (output + error).localizedCaseInsensitiveContains("warning:") }
     }
 
-    static func run(_ command: String, directory: String) -> Result {
+    static func run(_ command: String, directory: String, timeout: TimeInterval = 35) -> Result {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
@@ -139,13 +139,14 @@ enum DiagnosticCommand {
             defer { try? output.close(); try? error.close() }
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/bin/zsh")
-            process.arguments = ["-lic", "exec " + command]
+            // Background checks inherit the app’s terminal; job control would stop them with SIGTTOU.
+            process.arguments = ["-l", "-i", "+m", "-c", "exec " + command]
             process.currentDirectoryURL = URL(fileURLWithPath: directory)
             process.standardInput = FileHandle.nullDevice
             process.standardOutput = output
             process.standardError = error
             try process.run()
-            let deadline = Date().addingTimeInterval(35)
+            let deadline = Date().addingTimeInterval(timeout)
             while process.isRunning && Date() < deadline { Thread.sleep(forTimeInterval: 0.1) }
             guard !process.isRunning else {
                 process.terminate()

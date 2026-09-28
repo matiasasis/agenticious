@@ -2,6 +2,30 @@ import XCTest
 @testable import Agenticious
 
 final class ProviderDiagnosticsTests: XCTestCase {
+    func testBackgroundCommandsComplete() async {
+        await withTaskGroup(of: DiagnosticCommand.Result.self) { group in
+            for _ in 0..<4 {
+                group.addTask {
+                    DiagnosticCommand.run("/usr/bin/printf ready", directory: "/tmp", timeout: 5)
+                }
+            }
+            for await result in group {
+                XCTAssertNil(result.failure)
+                XCTAssertEqual(result.exitCode, 0)
+                XCTAssertEqual(result.output, "ready")
+            }
+        }
+    }
+
+    func testCommandFailureAndTimeout() {
+        let failed = DiagnosticCommand.run("/usr/bin/false", directory: "/tmp", timeout: 5)
+        XCTAssertNil(failed.failure)
+        XCTAssertEqual(failed.exitCode, 1)
+
+        let timedOut = DiagnosticCommand.run("/bin/sleep 10", directory: "/tmp", timeout: 1)
+        XCTAssertNotNil(timedOut.failure)
+    }
+
     func testClaudeAuthentication() {
         XCTAssertFalse(ProviderProbe.authentication(.claude, result: .init(output: "{\"loggedIn\":true}")).needsAttention)
         XCTAssertTrue(ProviderProbe.authentication(.claude, result: .init(output: "{\"loggedIn\":false}", exitCode: 1)).needsAttention)
