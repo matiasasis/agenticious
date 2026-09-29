@@ -48,7 +48,9 @@ struct SessionDetailView: View {
                         .truncationMode(.head)
                 }
 
-                if !session.pullRequests.isEmpty { PullRequestLinks(references: session.pullRequests) }
+                if !session.pullRequests.isEmpty {
+                    PullRequestLinks(references: session.pullRequests).id(session.id)
+                }
 
                 ChunkStrip(chunks: session.chunks, style: .expanded, isRunning: session.isRunning)
                 if let task = session.backgroundTask {
