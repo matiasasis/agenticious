@@ -102,11 +102,11 @@ For UI inspection, `--settings`, `--skills`, and `--new-agent [preset-id]` can b
 
 ### Navigation and menu bar
 
-The sidebar defaults to **Queue**, grouped by workspace. Tasks stay in **Queue** regardless of their status. Use **Mark as finished** at the bottom of an agent view to move it to **Finished** without deleting history or stopping its process. **Move to Queue** reverses that choice; resuming a finished session also returns it to Queue. Existing completed tasks return to Queue when upgrading to this manual behavior. Each card shows its provider, status, task, and completed steps; select a card to return to its terminal, or right-click for session actions. Use the folder button beside **Workspaces** to add a project.
+The sidebar defaults to **Queue**, grouped by workspace. Tasks stay in **Queue** regardless of their status. Use **Mark as finished** at the bottom of an agent view to move it to **Finished** without deleting history or stopping its process. **Move to Queue** reverses that choice; resuming a finished session also returns it to Queue. Existing completed tasks return to Queue when upgrading to this manual behavior. Each card uses its status color for its background tint and border, with a stronger border for the selected sidebar card. Each card shows its provider, status, task, and completed steps; select a card to return to its terminal, or right-click for session actions. Use the folder button beside **Workspaces** to add a project.
 
 **Customize** keeps task presets, skills, and preferences together while the agent sidebar stays visible. Preferences can hide sidebar branch names and set the default worktree behavior for new agents. The macOS menu bar uses a monochrome Agenticious face, with a count only when agents need your attention.
 
-Interrupted and exited agents can also be marked as finished, even with incomplete steps. Their status, progress, and conversation are preserved so they can be resumed later. For an agent that is still running, use **Stop agent** in its details or right-click menu, then **Mark as finished** once it exits.
+Interrupted and exited agents have a separate **Close** button that puts them in Finished, even with incomplete steps. Their status, progress, and conversation are preserved so they can be resumed later. For an agent that is still running, use **Stop agent** in its details or right-click menu, then **Close** once it exits.
 
 ### Provider diagnostics
 

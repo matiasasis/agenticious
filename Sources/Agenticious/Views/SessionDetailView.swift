@@ -27,7 +27,7 @@ struct SessionDetailView: View {
                     if session.isRunning {
                         Button("Stop agent", systemImage: "stop.fill") { store.stop(session) }
                             .buttonStyle(AgenticiousButtonStyle())
-                            .help("Stop the process. Once it exits, you can mark this task as finished or resume it later.")
+                            .help("Stop the process. Once it exits, you can close this task or resume it later.")
                     } else {
                         Button("Resume", systemImage: "play.fill") { store.resume(session) }
                             .buttonStyle(AgenticiousButtonStyle())
@@ -78,12 +78,11 @@ struct SessionDetailView: View {
                     Text(session.isMarkedFinished ? "Saved in Finished. You can bring it back anytime." : "Keep this task in Queue until you’re ready to put it away.")
                         .font(.caption).foregroundStyle(.secondary)
                     Spacer()
-                    Button(session.isMarkedFinished ? "Move to Queue" : "Mark as finished",
-                           systemImage: session.isMarkedFinished ? "arrow.uturn.backward" : "checkmark.circle") {
+                    Button(session.archiveActionTitle, systemImage: session.archiveActionSymbol) {
                         store.markFinished(session, finished: !session.isMarkedFinished)
                     }
                     .buttonStyle(AgenticiousButtonStyle())
-                    .help("Changes the task’s list without stopping its process or deleting its history.")
+                    .help("Move between Queue and Finished without deleting history or changing unfinished steps.")
                 }
                 .padding(14).background(AgenticiousStyle.panel)
             }
@@ -107,7 +106,9 @@ struct SessionDetailView: View {
             Banner(title: "Exited", text: "The agent process ended (code \(code.map(String.init) ?? "?")).",
                    systemImage: "stop.circle", color: .secondary)
         case .interrupted:
-            Banner(title: "Interrupted", text: "Agenticious closed while this agent was running. Resume to continue, or mark as finished to put it away.",
+            Banner(title: "Interrupted", text: session.isMarkedFinished
+                   ? "This agent was interrupted. Resume to continue where it left off."
+                   : "Agenticious closed while this agent was running. Resume to continue, or Close to put it away.",
                    systemImage: "pause.circle", color: .brown)
         default:
             EmptyView()

@@ -226,21 +226,22 @@ private struct SessionRow: View {
                     Button {
                         store.markFinished(session, finished: !session.isMarkedFinished)
                     } label: {
-                        Label(session.isMarkedFinished ? "Move to Queue" : "Mark as finished",
-                              systemImage: session.isMarkedFinished ? "arrow.uturn.backward" : "checkmark.circle")
+                        Label(session.archiveActionTitle, systemImage: session.archiveActionSymbol)
                             .font(.system(size: 10, weight: .semibold))
                             .padding(.horizontal, 8).padding(.vertical, 5)
                             .foregroundStyle(AgenticiousStyle.lime)
                             .background(AgenticiousStyle.lime.opacity(0.1), in: Capsule())
                     }
                     .buttonStyle(.plain)
-                    .help("Changes the task’s list without stopping its process or deleting its history.")
+                    .help("Move between Queue and Finished without deleting history or changing unfinished steps.")
                 }
             }
         }
         .padding(12)
-        .background(isSelected ? AgenticiousStyle.violet.opacity(0.14) : AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(isSelected ? AgenticiousStyle.violet : AgenticiousStyle.violet.opacity(isHovered ? 0.4 : 0.12)))
+        .background(session.status.color.opacity(isSelected ? 0.22 : 0.1), in: RoundedRectangle(cornerRadius: 12))
+        .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12)
+            .stroke(session.status.color.opacity(isSelected ? 1 : isHovered ? 0.8 : 0.45), lineWidth: isSelected ? 2 : 1))
         .contentShape(RoundedRectangle(cornerRadius: 12))
         .onHover { isHovered = $0 }
         .help(session.task)
@@ -400,12 +401,13 @@ struct SessionCard: View {
             .foregroundStyle(.secondary)
         }
         .padding(20)
+        .background(session.status.color.opacity(isHovered ? 0.16 : 0.1), in: RoundedRectangle(cornerRadius: 18))
         .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 18))
         .overlay(
             RoundedRectangle(cornerRadius: 18)
-                .stroke(session.status.needsAttention ? Color.orange : AgenticiousStyle.violet.opacity(isHovered ? 0.8 : 0.25), lineWidth: 1)
+                .stroke(session.status.color.opacity(isHovered ? 0.8 : 0.45), lineWidth: 1)
         )
-        .shadow(color: AgenticiousStyle.violet.opacity(isHovered ? 0.14 : 0), radius: 16)
+        .shadow(color: session.status.color.opacity(isHovered ? 0.14 : 0), radius: 16)
         .contentShape(RoundedRectangle(cornerRadius: 18))
         .onHover { isHovered = $0 }
     }
