@@ -2,6 +2,58 @@ import XCTest
 @testable import Agenticious
 
 final class ProviderDiagnosticsTests: XCTestCase {
+    func testDisconnectUsesProviderAndSelectedDirectory() {
+        for (agent, executable) in [(AgentKind.claude, "claude"), (.codex, "codex")] {
+            let error = ProviderProbe.disconnect("docs", from: agent, directory: "/tmp/project") { command, directory in
+                XCTAssertEqual(command, "\(executable) mcp remove -- 'docs'")
+                XCTAssertEqual(directory, "/tmp/project")
+                return .init()
+            }
+            XCTAssertNil(error)
+        }
+    }
+
+    func testDisconnectQuotesServerNameAsOneLiteralArgument() {
+        let name = "-docs' $(printf injected); `printf injected`"
+        let error = ProviderProbe.disconnect(name, from: .codex, directory: "/tmp") { command, directory in
+            let arguments = String(command.dropFirst("codex mcp remove -- ".count))
+            let result = DiagnosticCommand.run("/usr/bin/printf '%s' " + arguments, directory: directory)
+            XCTAssertEqual(result.output, name)
+            return result
+        }
+        XCTAssertNil(error)
+    }
+
+    func testDisconnectErrorsDoNotExposeCLIOutput() {
+        for result in [DiagnosticCommand.Result(error: "secret", exitCode: 1),
+                       .init(failure: "secret")] {
+            let error = ProviderProbe.disconnect("docs", from: .claude, directory: "/tmp") { _, _ in result }
+            XCTAssertNotNil(error)
+            XCTAssertFalse(error?.contains("secret") ?? true)
+        }
+    }
+
+    func testClaudeAccountConnectorsUseExternalManagement() {
+        let output = "claude.ai Slack: ✔ Connected\nlocal: ✔ Connected"
+        let checks = ProviderProbe.servers(.claude, result: .init(output: output))
+        XCTAssertTrue(checks[0].isClaudeAIConnector)
+        XCTAssertFalse(checks[1].isClaudeAIConnector)
+        let codex = ProviderProbe.servers(.codex, result: .init(output: "[{\"name\":\"claude.ai Slack\"}]"))
+        XCTAssertFalse(codex[0].isClaudeAIConnector)
+    }
+
+    func testOnlyServerChecksOfferDisconnect() {
+        let codex = ProviderProbe.servers(.codex, result: .init(output: "[{\"name\":\"docs\"}]"))
+        let claude = ProviderProbe.servers(.claude, result: .init(output: "docs: ✔ Connected"))
+        XCTAssertEqual(codex.first?.serverName, "docs")
+        XCTAssertEqual(claude.first?.serverName, "docs")
+        for agent in AgentKind.allCases {
+            XCTAssertNil(ProviderProbe.authentication(agent, result: .init()).serverName)
+            XCTAssertNil(ProviderProbe.servers(agent, result: .init(exitCode: 1)).first?.serverName)
+        }
+        XCTAssertNil(ProviderProbe.servers(.codex, result: .init(output: "[]")).first?.serverName)
+    }
+
     func testBackgroundCommandsComplete() async {
         await withTaskGroup(of: DiagnosticCommand.Result.self) { group in
             for _ in 0..<4 {
