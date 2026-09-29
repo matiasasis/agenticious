@@ -27,6 +27,8 @@ struct NewTaskSheet: View {
     @State private var templateValue = ""
     @State private var notes = ""
     @State private var launchError: String?
+    @State private var images: [PastedImage] = []
+    @State private var pasteMonitor: Any?
     @State private var catalog: [AgentKind: [ModelChoice]]
 
     init(project: Project, template: TaskTemplate? = nil) {
@@ -45,6 +47,7 @@ struct NewTaskSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     missionFields
+                    imageAttachments
                     configurationFields
                     SkillSelectionField(paths: $skillPaths, project: project)
                     if let launchError {
@@ -63,6 +66,13 @@ struct NewTaskSheet: View {
         .tint(AgenticiousStyle.lime)
         .preferredColorScheme(.dark)
         .defaultFocus($missionFocused, true)
+        .dropDestination(for: URL.self) { urls, _ in
+            let dropped = urls.compactMap(PastedImage.init(file:))
+            images += dropped
+            return !dropped.isEmpty
+        }
+        .onAppear(perform: watchForPastedImages)
+        .onDisappear { pasteMonitor.map(NSEvent.removeMonitor) }
         .onAppear {
             guard !loadedPreset else { return }
             loadedPreset = true
@@ -129,6 +139,36 @@ struct NewTaskSheet: View {
                 editor($notes, minHeight: 90)
                     .accessibilityLabel("Notes (optional)")
             }
+        }
+    }
+
+    private var imageAttachments: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if !images.isEmpty {
+                ScrollView(.horizontal) {
+                    HStack(spacing: 10) {
+                        ForEach(images) { image in
+                            Image(nsImage: image.preview)
+                                .resizable().scaledToFill()
+                                .frame(width: 88, height: 88)
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(AgenticiousStyle.violet.opacity(0.3)))
+                                .overlay(alignment: .topTrailing) {
+                                    Button("Remove image", systemImage: "xmark.circle.fill") {
+                                        images.removeAll { $0.id == image.id }
+                                    }
+                                    .labelStyle(.iconOnly).buttonStyle(.plain)
+                                    .font(.title3).foregroundStyle(.white, .black.opacity(0.7))
+                                    .padding(4)
+                                }
+                                .accessibilityLabel("Attached image")
+                        }
+                    }.padding(1)
+                }.scrollIndicators(.hidden)
+            }
+            Label(images.isEmpty ? "Paste (⌘V) or drop images to show the agent." : "\(images.count) image\(images.count == 1 ? "" : "s") attached.",
+                  systemImage: "photo.on.rectangle.angled")
+                .font(.caption).foregroundStyle(.secondary)
         }
     }
 
@@ -369,6 +409,19 @@ struct NewTaskSheet: View {
         if let url = FolderPicker.choose(startingAt: project.path) { project = store.addFavorite(url) }
     }
 
+    /// Text fields don't take images, so ⌘V with an image on the clipboard attaches it instead; text pastes as usual.
+    private func watchForPastedImages() {
+        guard pasteMonitor == nil else { return }
+        pasteMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            guard event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
+                  event.charactersIgnoringModifiers == "v" else { return event }
+            let pasted = PastedImage.read(from: .general)
+            guard !pasted.isEmpty else { return event }
+            images += pasted
+            return nil
+        }
+    }
+
     private func start() {
         guard canStart else { return }
         do {
@@ -381,7 +434,8 @@ struct NewTaskSheet: View {
                 effort: selectedEffort.isEmpty ? nil : selectedEffort,
                 project: project,
                 isolated: isGitProject && useWorktree,
-                taskType: TaskType(template: template)
+                taskType: TaskType(template: template),
+                images: images
             )
             dismiss()
         } catch {

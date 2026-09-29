@@ -13,8 +13,9 @@ struct AgentLauncher {
     let port: UInt16
 
     /// With `resuming`, the agent reopens its earlier conversation (`session.conversationID`) instead of getting the task.
+    /// `images` are the pasted image files the task's prompt points at.
     @MainActor
-    func spec(for session: AgentSession, resuming: Bool = false) throws -> LaunchSpec {
+    func spec(for session: AgentSession, resuming: Bool = false, images: [URL] = []) throws -> LaunchSpec {
         var variables = baseEnvironment(for: session)
         variables["AD_CONVERSATION"] = session.conversationID
         let command: String
@@ -29,7 +30,7 @@ struct AgentLauncher {
             // A fixed session id makes the conversation resumable even if the app quits before Claude reports anything.
             let conversation = resuming ? #" --resume "$AD_CONVERSATION""# : #" --session-id "$AD_CONVERSATION" -- "$AD_PROMPT""#
             command = #"exec claude --settings "$AD_SETTINGS" --mcp-config "$AD_MCP" --append-system-prompt "$AD_SYSPROMPT""#
-                + modelFlags(for: session, into: &variables) + conversation
+                + imageFlags(images, for: .claude, into: &variables) + modelFlags(for: session, into: &variables) + conversation
         case .codex:
             variables["AD_MCP_CMD"] = #"mcp_servers.agenticious.command="\#(tomlEscaped(mcpBinary))""#
             variables["AD_MCP_ENV"] = #"mcp_servers.agenticious.env={AGENTICIOUS_SESSION="\#(session.id.uuidString)",AGENTICIOUS_PORT="\#(port)"}"#
@@ -38,7 +39,7 @@ struct AgentLauncher {
             // Codex reports its thread id only when a turn completes. Without one, `codex resume` shows its picker for this folder.
             let conversation = !resuming ? #" -- "$AD_PROMPT""# : session.conversationID == nil ? "" : #" -- "$AD_CONVERSATION""#
             command = "exec codex" + (resuming ? " resume" : "") + #" -c "$AD_MCP_CMD" -c "$AD_MCP_ENV" -c "$AD_NOTIFY""#
-                + modelFlags(for: session, into: &variables) + conversation
+                + imageFlags(images, for: .codex, into: &variables) + modelFlags(for: session, into: &variables) + conversation
         }
 
         // A login + interactive shell picks up the user's PATH (nodenv, ~/.local/bin, …), which a GUI app doesn't inherit.
@@ -49,6 +50,19 @@ struct AgentLauncher {
             environment: variables.map { "\($0.key)=\($0.value)" },
             directory: session.directory.path
         )
+    }
+
+    /// Codex attaches each image to the first message; Claude reads them from their folder, allowed with `--add-dir`.
+    private func imageFlags(_ images: [URL], for agent: AgentKind, into variables: inout [String: String]) -> String {
+        guard let folder = images.first?.deletingLastPathComponent() else { return "" }
+        guard agent == .codex else {
+            variables["AD_IMAGES"] = folder.path
+            return #" --add-dir "$AD_IMAGES""#
+        }
+        return images.enumerated().map { index, image in
+            variables["AD_IMAGE_\(index)"] = image.path
+            return #" --image "$AD_IMAGE_\#(index)""#
+        }.joined()
     }
 
     /// Claude takes `--model` / `--effort`; Codex takes `-m` and the `model_reasoning_effort` config key.
@@ -83,7 +97,7 @@ struct AgentLauncher {
     // MARK: - Claude Code
 
     private func writeClaudeFiles(for session: AgentSession) throws -> (settings: String, mcp: String) {
-        let directory = try sessionDirectory(for: session)
+        let directory = try Self.sessionDirectory(for: session.id)
         let settingsURL = directory.appendingPathComponent("settings.json")
         let mcpURL = directory.appendingPathComponent("mcp.json")
 
@@ -140,9 +154,10 @@ struct AgentLauncher {
         "http://127.0.0.1:\(port)/hook/\(session.id.uuidString)/\(event)"
     }
 
-    private func sessionDirectory(for session: AgentSession) throws -> URL {
+    /// Per-session files (config, pasted images). Archiving the agent removes the folder.
+    static func sessionDirectory(for id: UUID) throws -> URL {
         let url = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Agenticious/sessions/\(session.id.uuidString)")
+            .appendingPathComponent("Agenticious/sessions/\(id.uuidString)")
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }
