@@ -95,7 +95,7 @@ final class SessionStore: ObservableObject {
         return favorites.first ?? .none
     }
 
-    var attentionCount: Int { sessions.filter { $0.status.needsAttention }.count }
+    var attentionCount: Int { sessions.filter { !$0.isMarkedFinished && $0.status.needsAttention }.count }
 
     var visibleProjectGroups: [ProjectGroup] { agentList.groups(from: projectGroups) }
     var visibleSessions: [AgentSession] { sessions.filter { agentList.includes(isMarkedFinished: $0.isMarkedFinished) } }
@@ -103,12 +103,49 @@ final class SessionStore: ObservableObject {
     func count(in list: AgentList) -> Int { sessions.filter { list.includes(isMarkedFinished: $0.isMarkedFinished) }.count }
 
     func markFinished(_ session: AgentSession, finished: Bool) {
+        guard !session.isArchiving else { return }
         guard !finished || session.canMarkFinished else { return }
-        if finished { notifications.playSound("Pop") }
-        session.isMarkedFinished = finished
+        if finished {
+            archive(session)
+            return
+        }
+        session.isMarkedFinished = false
         save(session)
-        if finished { show(.queue) }
-        else { selection = .session(session.id) }
+        selection = .session(session.id)
+    }
+
+    func archive(_ session: AgentSession) {
+        guard !session.isArchiving else { return }
+        session.isArchiving = true
+        let id = session.id
+        let processID = session.terminalView?.process.running == true ? session.terminalView?.process.shellPid : nil
+        let worktree = session.worktreeRemoved ? nil : session.worktree
+        let sharedWorktree = worktree.map { tree in
+            sessions.contains {
+                $0.id != id && (!$0.isMarkedFinished || $0.isRunning)
+                    && ($0.directory.path == tree.path || $0.directory.path.hasPrefix(tree.path + "/"))
+            }
+        } ?? false
+        Task {
+            let result = await Task.detached {
+                SessionCleanup.run(id: id, processID: processID, worktree: worktree, sharedWorktree: sharedWorktree)
+            }.value
+            if result.processesStopped {
+                if session.terminalView?.process.running == true { session.terminalView?.terminate() }
+                session.terminalView?.removeFromSuperview()
+                session.terminalView = nil
+                session.terminalBridge = nil
+                if session.isRunning || (!session.status.isFinished && session.status != .interrupted) { session.recordExit(nil) }
+                session.worktreeRemoved = session.worktreeRemoved || result.worktreeRemoved
+                session.isMarkedFinished = true
+                notifications.playSound("Pop")
+                if selection == .session(session.id) { show(.queue) }
+            }
+            session.isArchiving = false
+            save(session)
+            updateBadge()
+            if !result.warnings.isEmpty { alert = result.warnings.joined(separator: "\n\n") }
+        }
     }
 
     func show(_ list: AgentList) {
@@ -209,7 +246,7 @@ final class SessionStore: ObservableObject {
     }
 
     func stop(_ session: AgentSession) {
-        guard session.isRunning else { return }
+        guard session.isRunning, !session.isArchiving else { return }
         session.terminalView?.terminate()
         // SwiftTerm cancels its exit monitor when explicitly terminated.
         session.recordExit(nil)
@@ -218,6 +255,7 @@ final class SessionStore: ObservableObject {
     }
 
     func remove(_ session: AgentSession) {
+        guard !session.isArchiving else { return }
         stop(session)
         if selection == .session(session.id) { selection = .overview }
         subscriptions[session.id] = nil
@@ -233,6 +271,7 @@ final class SessionStore: ObservableObject {
 
     /// Removes the agent's worktree folder (git refuses if it has uncommitted changes). The branch stays.
     func deleteWorktree(of session: AgentSession) {
+        guard !session.isArchiving else { return }
         guard let worktree = session.worktree else { return }
 
         do {
@@ -264,7 +303,7 @@ final class SessionStore: ObservableObject {
     private func attachTerminal(to session: AgentSession, running spec: LaunchSpec) {
         let terminal = LocalProcessTerminalView(frame: NSRect(x: 0, y: 0, width: 900, height: 500))
         let bridge = TerminalBridge { [weak self, weak session, weak terminal] exitCode in
-            guard let session, session.isRunning, session.terminalView === terminal else { return }
+            guard let session, !session.isArchiving, session.isRunning, session.terminalView === terminal else { return }
             let oldStatus = session.status
             session.recordExit(exitCode)
             self?.notifyTransition(from: oldStatus, for: session)
@@ -335,7 +374,7 @@ final class SessionStore: ObservableObject {
     }
 
     private func handle(_ event: AgentEvent) -> Data? {
-        guard let session = session(event.sessionID) else { return nil }
+        guard let session = session(event.sessionID), !session.isArchiving, !session.isMarkedFinished else { return nil }
 
         let payload = (try? JSONSerialization.jsonObject(with: event.body)) as? [String: Any] ?? [:]
         if event.name == "StatusLine" { return statusLine(payload) }

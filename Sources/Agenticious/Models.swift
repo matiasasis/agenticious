@@ -116,6 +116,7 @@ final class AgentSession: ObservableObject, Identifiable {
     let taskType: TaskType?
 
     @Published var isMarkedFinished = false
+    @Published var isArchiving = false
     @Published var status: SessionStatus = .starting
     @Published var chunks: [Chunk] = []
     @Published private(set) var pullRequests: [PullRequestReference] = []
@@ -161,12 +162,9 @@ final class AgentSession: ObservableObject, Identifiable {
     var displayedTaskType: TaskType { taskType ?? TaskType.legacy(title: task) }
 
     var canMarkFinished: Bool {
-        guard !isMarkedFinished else { return false }
-        switch status {
-        case .done: return true
-        case .interrupted, .exited: return !isRunning
-        default: return false
-        }
+        guard !isMarkedFinished, !isArchiving else { return false }
+        if case .done = status { return true }
+        return false
     }
 
     func recordExit(_ code: Int32?) {
@@ -180,7 +178,7 @@ final class AgentSession: ObservableObject, Identifiable {
 
     /// Resuming reopens the conversation in the folder it ran in, so a deleted worktree can't come back.
     var canResume: Bool {
-        !isRunning && !worktreeRemoved && FileManager.default.fileExists(atPath: directory.path)
+        !isRunning && !isArchiving && !worktreeRemoved && FileManager.default.fileExists(atPath: directory.path)
     }
 
     var hasOpenChunks: Bool { chunks.contains { $0.status != .done } }

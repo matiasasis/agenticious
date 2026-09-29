@@ -20,14 +20,14 @@ final class AgentListTests: XCTestCase {
     }
 
     @MainActor
-    func testStoppedTasksCanBePutAwayWithIncompleteSteps() {
+    func testStoppedTasksUseArchiveInsteadOfMarkFinished() {
         let session = AgentSession(task: "Work", agent: .codex, project: .none, directory: URL(fileURLWithPath: "/tmp"))
         session.chunks = [Chunk(id: 1, title: "Stuck step", status: .inProgress)]
         for status in [SessionStatus.interrupted, .exited(nil), .exited(0), .exited(1)] {
             session.status = status
             session.isRunning = false
             session.isMarkedFinished = false
-            XCTAssertTrue(session.canMarkFinished)
+            XCTAssertFalse(session.canMarkFinished)
             session.isRunning = true
             XCTAssertFalse(session.canMarkFinished)
             session.isRunning = false
@@ -37,7 +37,7 @@ final class AgentListTests: XCTestCase {
     }
 
     @MainActor
-    func testStoppingAnUnfinishedAgentMakesItResumableAndFinishable() {
+    func testStoppingAnUnfinishedAgentMakesItResumable() {
         let session = AgentSession(task: "Work", agent: .codex, project: .none, directory: URL(fileURLWithPath: "/tmp"))
         session.status = .working
         session.isRunning = true
@@ -46,7 +46,7 @@ final class AgentListTests: XCTestCase {
         XCTAssertFalse(session.isRunning)
         XCTAssertEqual(session.status, .exited(nil))
         XCTAssertTrue(session.canResume)
-        XCTAssertTrue(session.canMarkFinished)
+        XCTAssertFalse(session.canMarkFinished)
         XCTAssertEqual(session.chunks.first?.status, .inProgress)
 
         session.status = .done("Already complete")

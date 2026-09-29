@@ -233,7 +233,8 @@ private struct SessionRow: View {
                             .background(AgenticiousStyle.lime.opacity(0.1), in: Capsule())
                     }
                     .buttonStyle(.plain)
-                    .help("Move between Queue and Finished without deleting history or changing unfinished steps.")
+                    .disabled(session.isArchiving)
+                    .help("Keep history and clean up resources. Worktrees with uncommitted changes are preserved.")
                 }
             }
         }
@@ -284,18 +285,22 @@ struct SessionMenu: View {
     let session: AgentSession
 
     var body: some View {
+        Button(session.isMarkedFinished ? "Retry archive cleanup" : "Archive agent", systemImage: "archivebox") { store.archive(session) }
+            .disabled(session.isArchiving)
         if session.isRunning {
             Button("Stop agent") { store.stop(session) }
+                .disabled(session.isArchiving)
         } else {
             Button("Resume") { store.resume(session) }
                 .disabled(!session.canResume)
         }
         if session.worktree != nil && !session.worktreeRemoved {
             Button("Delete worktree") { store.deleteWorktree(of: session) }
-                .disabled(session.isRunning)
+                .disabled(session.isRunning || session.isArchiving)
                 .help("Stop the agent first; git refuses if there are uncommitted changes.")
         }
         Button("Remove", role: .destructive) { store.remove(session) }
+            .disabled(session.isArchiving)
     }
 }
 
@@ -314,7 +319,7 @@ private struct OverviewView: View {
                 } else {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Finished agents").font(.system(size: 30, weight: .bold, design: .rounded))
-                        Text("Agents you marked as finished. Open any agent to revisit its work or move it back to Queue.")
+                        Text("Finished and archived agents. Open any agent to revisit its history.")
                             .foregroundStyle(.secondary)
                     }
                 }

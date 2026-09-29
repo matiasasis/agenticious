@@ -59,17 +59,12 @@ struct StatusDot: View {
 extension AgentSession {
     var archiveActionTitle: String {
         if isMarkedFinished { return "Move to Queue" }
-        return status == .interrupted || isExited ? "Close" : "Mark as finished"
+        return "Mark as finished"
     }
 
     var archiveActionSymbol: String {
         if isMarkedFinished { return "arrow.uturn.backward" }
-        return status == .interrupted || isExited ? "xmark.circle" : "checkmark.circle"
-    }
-
-    private var isExited: Bool {
-        if case .exited = status { return true }
-        return false
+        return "checkmark.circle"
     }
 }
 

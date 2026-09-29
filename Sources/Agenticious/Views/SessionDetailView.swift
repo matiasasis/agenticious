@@ -23,11 +23,22 @@ struct SessionDetailView: View {
                         Text("\(session.completedChunks)/\(session.chunks.count) steps")
                             .foregroundStyle(.secondary)
                     }
+                    Button { store.archive(session) } label: {
+                        Label(session.isArchiving ? "Archiving…" : "Archive", systemImage: "archivebox")
+                            .font(.system(size: 10, weight: .semibold))
+                            .padding(.horizontal, 8).padding(.vertical, 5)
+                            .foregroundStyle(.secondary)
+                            .background(Color.gray.opacity(0.15), in: Capsule())
+                    }
+                        .buttonStyle(.plain)
+                        .disabled(session.isArchiving)
+                        .help(session.isArchiving ? "Archiving…" : "Stop the agent, clean up its worktree, and archive its history.")
                     Spacer()
                     if session.isRunning {
                         Button("Stop agent", systemImage: "stop.fill") { store.stop(session) }
                             .buttonStyle(AgenticiousButtonStyle())
-                            .help("Stop the process. Once it exits, you can close this task or resume it later.")
+                            .disabled(session.isArchiving)
+                            .help("Stop the process without archiving its history.")
                     } else {
                         Button("Resume", systemImage: "play.fill") { store.resume(session) }
                             .buttonStyle(AgenticiousButtonStyle())
@@ -75,14 +86,15 @@ struct SessionDetailView: View {
             }
             if session.isMarkedFinished || session.canMarkFinished {
                 HStack {
-                    Text(session.isMarkedFinished ? "Saved in Finished. You can bring it back anytime." : "Keep this task in Queue until you’re ready to put it away.")
+                    Text(session.isMarkedFinished ? "History saved in Finished." : "Finishing stops the agent and cleans up its worktree.")
                         .font(.caption).foregroundStyle(.secondary)
                     Spacer()
                     Button(session.archiveActionTitle, systemImage: session.archiveActionSymbol) {
                         store.markFinished(session, finished: !session.isMarkedFinished)
                     }
                     .buttonStyle(AgenticiousButtonStyle())
-                    .help("Move between Queue and Finished without deleting history or changing unfinished steps.")
+                    .disabled(session.isArchiving)
+                    .help("Keep history and clean up resources. Worktrees with uncommitted changes are preserved.")
                 }
                 .padding(14).background(AgenticiousStyle.panel)
             }
@@ -108,7 +120,7 @@ struct SessionDetailView: View {
         case .interrupted:
             Banner(title: "Interrupted", text: session.isMarkedFinished
                    ? "This agent was interrupted. Resume to continue where it left off."
-                   : "Agenticious closed while this agent was running. Resume to continue, or Close to put it away.",
+                   : "Agenticious closed while this agent was running. Resume to continue, or Archive to put it away.",
                    systemImage: "pause.circle", color: .brown)
         default:
             EmptyView()
