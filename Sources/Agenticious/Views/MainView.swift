@@ -251,12 +251,7 @@ private struct SessionRow: View {
 
     private var details: some View {
         VStack(alignment: .leading, spacing: 9) {
-            HStack(spacing: 6) {
-                StatusDot(status: session.status)
-                Text(session.status.label).foregroundStyle(session.status.color)
-                Spacer(minLength: 4)
-                Text(session.agent.displayName).foregroundStyle(.secondary)
-            }.font(.system(size: 10, weight: .semibold))
+            header
             TaskHeading(type: session.displayedTaskType, task: session.task, isCompact: true)
             if !session.chunks.isEmpty {
                 HStack(spacing: 8) {
@@ -270,6 +265,26 @@ private struct SessionRow: View {
             }
             if case let .needsYou(reason) = session.status {
                 Text(reason).font(.caption).foregroundStyle(.orange).lineLimit(2)
+            }
+        }
+    }
+
+    private var header: some View {
+        let badge = AgentBadge(agent: session.agent, detail: session.modelSummary)
+        let status = HStack(spacing: 6) {
+            StatusDot(status: session.status)
+            Text(session.status.label).foregroundStyle(session.status.color)
+        }.font(.system(size: 10, weight: .semibold))
+
+        return ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                badge.fixedSize()
+                Spacer(minLength: 4)
+                status.fixedSize()
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                badge
+                status
             }
         }
     }
