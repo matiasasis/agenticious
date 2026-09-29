@@ -243,6 +243,7 @@ private struct SessionRow: View {
         .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12)
             .stroke(session.status.color.opacity(isSelected ? 1 : isHovered ? 0.8 : 0.45), lineWidth: isSelected ? 2 : 1))
+        .backgroundTask(session.backgroundTask, isCompact: true)
         .contentShape(RoundedRectangle(cornerRadius: 12))
         .onHover { isHovered = $0 }
         .help(session.task)
@@ -389,6 +390,7 @@ struct SessionCard: View {
                     .stroke(session.status.color.opacity(isHovered ? 0.8 : 0.45), lineWidth: 1)
             )
             .shadow(color: session.status.color.opacity(isHovered ? 0.14 : 0), radius: 16)
+            .backgroundTask(session.backgroundTask)
             .contentShape(RoundedRectangle(cornerRadius: 18))
             .onHover { isHovered = $0 }
     }

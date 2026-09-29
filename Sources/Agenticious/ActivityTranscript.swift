@@ -29,10 +29,27 @@ struct TranscriptResult {
     var url: URL?
     var conversationID: String?
     var notice: String?
+    /// The log's size and modification date when read; the same stamp next time means nothing new to parse.
+    var stamp: TranscriptStamp?
+    var isUnchanged = false
+}
+
+struct TranscriptStamp: Equatable {
+    let size: Int
+    let modified: Date?
+
+    init?(_ url: URL) {
+        guard let values = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey]),
+              let size = values.fileSize else { return nil }
+        self.size = size
+        modified = values.contentModificationDate
+    }
 }
 
 enum ActivityTranscript {
-    static func read(agent: AgentKind, sessionID: UUID, conversationID: String?, directory: String, cached: URL?) -> TranscriptResult {
+    /// With the `stamp` of the last read and an unchanged log, returns at once without reading it.
+    static func read(agent: AgentKind, sessionID: UUID, conversationID: String?, directory: String, cached: URL?,
+                     stamp previous: TranscriptStamp? = nil) -> TranscriptResult {
         let environment = ProcessInfo.processInfo.environment
         let home = FileManager.default.homeDirectoryForCurrentUser
         let root = agent == .claude
@@ -40,6 +57,8 @@ enum ActivityTranscript {
             : URL(fileURLWithPath: environment["CODEX_HOME"] ?? home.appendingPathComponent(".codex").path).appendingPathComponent("sessions")
         let url = cached ?? locate(root: root, agent: agent, sessionID: sessionID, conversationID: conversationID, directory: directory)
         guard let url else { return TranscriptResult(notice: "Waiting for this session’s activity log. The terminal remains available.") }
+        let stamp = TranscriptStamp(url)
+        if let stamp, stamp == previous { return TranscriptResult(url: url, stamp: stamp, isUnchanged: true) }
         do {
             let handle = try FileHandle(forReadingFrom: url)
             defer { try? handle.close() }
@@ -56,7 +75,8 @@ enum ActivityTranscript {
             }
             return TranscriptResult(entries: Array(entries.suffix(200)), url: url,
                                     conversationID: conversationID ?? metadataID(url),
-                                    notice: start > 0 || entries.count > 200 ? "Showing recent activity. Full history remains in the terminal and provider log." : nil)
+                                    notice: start > 0 || entries.count > 200 ? "Showing recent activity. Full history remains in the terminal and provider log." : nil,
+                                    stamp: stamp)
         } catch {
             return TranscriptResult(url: url, notice: "Could not read this session’s activity log. Use the terminal or retry.")
         }

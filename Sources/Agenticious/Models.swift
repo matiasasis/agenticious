@@ -109,10 +109,11 @@ final class AgentSession: ObservableObject, Identifiable {
     let prompt: String
     let agent: AgentKind
     let project: Project
-    let directory: URL
+    /// Where the agent runs. Settles once its worktree exists, which happens in the background after launch.
+    @Published var directory: URL
     let startedAt: Date
     /// Set when the agent runs in its own git worktree instead of the project checkout.
-    let worktree: Worktree?
+    @Published var worktree: Worktree?
     /// Nil leaves the CLI's own default in place.
     let model: ModelChoice?
     let effort: String?
@@ -120,6 +121,8 @@ final class AgentSession: ObservableObject, Identifiable {
 
     @Published var isMarkedFinished = false
     @Published var isArchiving = false
+    /// What the app is doing for this agent in the background, like starting or archiving it. Cards gray out and show it.
+    @Published var backgroundTask: String?
     @Published var status: SessionStatus = .starting
     @Published var chunks: [Chunk] = []
     @Published private(set) var pullRequests: [PullRequestReference] = []
@@ -184,7 +187,7 @@ final class AgentSession: ObservableObject, Identifiable {
 
     /// Resuming reopens the conversation in the folder it ran in, so a deleted worktree can't come back.
     var canResume: Bool {
-        !isRunning && !isArchiving && !worktreeRemoved && FileManager.default.fileExists(atPath: directory.path)
+        !isRunning && !isArchiving && backgroundTask == nil && !worktreeRemoved && FileManager.default.fileExists(atPath: directory.path)
     }
 
     var hasOpenChunks: Bool { chunks.contains { $0.status != .done } }
