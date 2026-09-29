@@ -11,71 +11,51 @@ struct ControlRoomHero: View {
     let isEmpty: Bool
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            hero(showArtwork: true)
-            hero(showArtwork: false)
+        VStack(alignment: .leading, spacing: 16) {
+            Label("THE CONTROL ROOM", systemImage: "sparkles")
+                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                .tracking(2)
+                .foregroundStyle(AgenticiousStyle.lime)
+            Text(isEmpty ? "Let's raise\nsome agents." : "Beautiful chaos.\nUnder control.")
+                .font(.system(size: 36, weight: .black, design: .rounded))
+                .tracking(-1.2)
+                .fixedSize(horizontal: true, vertical: false)
+            Text("Big ideas. Strange powers. Work getting done.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
         }
-        .background(AgenticiousStyle.panel)
-        .clipShape(RoundedRectangle(cornerRadius: 24))
-        .overlay(RoundedRectangle(cornerRadius: 24).stroke(AgenticiousStyle.violet.opacity(0.35)))
-    }
-
-    private func hero(showArtwork: Bool) -> some View {
-        HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 16) {
-                Label("THE CONTROL ROOM", systemImage: "sparkles")
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .tracking(2)
-                    .foregroundStyle(AgenticiousStyle.lime)
-                Text(isEmpty ? "Let's raise\nsome agents." : "Beautiful chaos.\nUnder control.")
-                    .font(.system(size: 36, weight: .black, design: .rounded))
-                    .tracking(-1.2)
-                    .fixedSize(horizontal: true, vertical: false)
-                Text("Big ideas. Strange powers. Work getting done.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(30)
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            if showArtwork,
-               let artwork = Bundle.module.url(forResource: "Mascot", withExtension: "png").flatMap(NSImage.init(contentsOf:)) {
-                Image(nsImage: artwork)
-                    .resizable()
-                    .interpolation(.high)
-                    .scaledToFit()
-                    .frame(width: 300, height: 300)
-                    .accessibilityHidden(true)
-            }
-        }
+        .padding(30)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background {
             LinearGradient(colors: [AgenticiousStyle.panel, AgenticiousStyle.violet.opacity(0.16)],
                            startPoint: .leading, endPoint: .bottomTrailing)
         }
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .overlay(RoundedRectangle(cornerRadius: 24).stroke(AgenticiousStyle.violet.opacity(0.35)))
     }
 }
 
+/// A count in the top bar, boxed like the usage limits beside it.
 struct DashboardMetric: View {
     let title: String
     let value: Int
     let color: Color
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
             Text("\(value)")
-                .font(.system(size: 28, weight: .bold, design: .rounded))
+                .font(.system(size: 17, weight: .bold, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(color)
             Text(title)
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                .font(.system(size: 9, weight: .bold, design: .monospaced))
                 .tracking(1)
                 .foregroundStyle(.secondary)
-            Spacer(minLength: 0)
         }
-        .padding(16)
-        .frame(maxWidth: .infinity)
-        .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 14))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(color.opacity(0.2)))
+        .fixedSize()
+        .padding(.horizontal, 10).padding(.vertical, 8)
+        .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(color.opacity(0.25)))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(value) \(title.lowercased())")
     }

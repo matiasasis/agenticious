@@ -54,7 +54,6 @@ struct AgenticiousApp: App {
 
         MenuBarExtra {
             MenuBarContent()
-                .environmentObject(store)
         } label: {
             HStack(spacing: 4) {
                 Image(nsImage: AgenticiousMenuIcon.image)

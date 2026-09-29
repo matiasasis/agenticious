@@ -287,6 +287,11 @@ struct ControlRoomBar: View {
                     Text("CONTROL ROOM").font(.system(size: 10, weight: .bold, design: .monospaced))
                         .tracking(1).foregroundStyle(AgenticiousStyle.violet)
                     Spacer(minLength: 8)
+                    AgentCounters()
+                    UsageBar()
+                }
+                HStack(spacing: 10) {
+                    AgentCounters()
                     UsageBar()
                 }
                 UsageBar()
@@ -301,6 +306,22 @@ struct ControlRoomBar: View {
         .padding(.horizontal, 18).padding(.vertical, 12)
         .background(AgenticiousStyle.ink)
         .overlay(alignment: .bottom) { Rectangle().fill(AgenticiousStyle.violet.opacity(0.25)).frame(height: 1) }
+    }
+}
+
+/// Queued, running and needs-you counts for the list being shown; the Finished list shows only its total.
+private struct AgentCounters: View {
+    @EnvironmentObject private var store: SessionStore
+
+    var body: some View {
+        HStack(spacing: 10) {
+            DashboardMetric(title: store.agentList == .queue ? "QUEUED" : "FINISHED", value: store.visibleSessions.count,
+                            color: AgenticiousStyle.violet)
+            if store.agentList == .queue {
+                DashboardMetric(title: "RUNNING", value: store.visibleSessions.filter(\.isRunning).count, color: AgenticiousStyle.lime)
+                DashboardMetric(title: "NEEDS YOU", value: store.attentionCount, color: .orange)
+            }
+        }
     }
 }
 

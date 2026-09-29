@@ -329,13 +329,6 @@ private struct OverviewView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                HStack(spacing: 12) {
-                    DashboardMetric(title: store.agentList == .queue ? "QUEUED" : "FINISHED", value: store.visibleSessions.count, color: AgenticiousStyle.violet)
-                    if store.agentList == .queue {
-                        DashboardMetric(title: "RUNNING", value: store.visibleSessions.filter(\.isRunning).count, color: AgenticiousStyle.lime)
-                        DashboardMetric(title: "NEEDS YOU", value: store.attentionCount, color: .orange)
-                    }
-                }
                 if let error = store.serverError {
                     Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red)
                 }
@@ -467,17 +460,9 @@ struct SessionCard: View {
 // MARK: - Menu bar
 
 struct MenuBarContent: View {
-    @EnvironmentObject private var store: SessionStore
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        ForEach(store.projectGroups.flatMap(\.sessions)) { session in
-            Button("\(session.status.needsAttention ? "✋ " : "")\(session.project.name): \(session.task.prefix(50))") {
-                store.selection = .session(session.id)
-                showMainWindow()
-            }
-        }
-        if !store.sessions.isEmpty { Divider() }
         Button("Open Agenticious", action: showMainWindow)
         Button("Quit Agenticious") { NSApp.terminate(nil) }
     }
