@@ -82,6 +82,7 @@ final class SessionStore: ObservableObject {
         openDatabase()
         startServer()
         snapshotter = LaunchOptions.current.snapshotDirectory.map(WindowSnapshotter.init)
+        notifications.perform = { [weak self] action, id, text in self?.perform(action, on: id, text: text) }
     }
 
     // MARK: - Reading
@@ -404,7 +405,30 @@ final class SessionStore: ObservableObject {
 
     private func notifyTransition(from oldStatus: SessionStatus, for session: AgentSession) {
         guard let event = AgentAlert.transition(from: oldStatus, to: session.status) else { return }
-        notifications.notify(event, sessionID: session.id, task: session.task)
+        notifications.notify(event, sessionID: session.id, task: session.task, detail: AgentAlert.detail(for: session.status))
+    }
+
+    private func perform(_ action: AgentNotificationAction, on id: UUID, text: String?) {
+        guard let session = session(id), !session.isMarkedFinished else { return }
+        switch action {
+        case .open: notifications.requestedSession = id
+        case .reply: reply(text ?? "", to: session)
+        case .resume: resume(session)
+        case .archive: archive(session)
+        }
+    }
+
+    /// Types the message into the agent's terminal and submits it. Only while the agent sits idle at its prompt:
+    /// a permission menu or a running turn could take the keystrokes as something else, so then it opens instead.
+    func reply(_ text: String, to session: AgentSession) {
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, session.isRunning, session.status == .yourTurn, let terminal = session.terminalView else {
+            notifications.requestedSession = session.id
+            return
+        }
+        terminal.send(txt: text)
+        // Sent on its own, so the CLI reads Enter rather than a newline inside pasted text.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { terminal.send(txt: "\r") }
     }
 
     /// Claude redraws its status line after every message, so this doubles as the feed for the toolbar's Claude limits.

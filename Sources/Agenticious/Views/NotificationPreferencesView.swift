@@ -9,7 +9,7 @@ struct NotificationPreferencesView: View {
         VStack(alignment: .leading, spacing: 18) {
             Label("A little noise. At the right time.", systemImage: "bell.badge")
                 .font(.headline).foregroundStyle(AgenticiousStyle.lime)
-            Text("Get a heads-up when an agent needs input, completes a mission, or stops unexpectedly. Click a notification to open that agent.")
+            Text("Get a heads-up when an agent needs you, finishes its turn, completes or ends a mission, or stops unexpectedly. Click a notification to open that agent, or use its buttons to reply, resume or archive without switching apps.")
                 .font(.callout).foregroundStyle(.secondary)
             if !notifications.available {
                 Text("Launch with script/run to enable macOS notifications.")
