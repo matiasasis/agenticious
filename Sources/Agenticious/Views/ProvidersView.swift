@@ -16,7 +16,7 @@ struct ProvidersView: View {
                     Button(diagnostics.isChecking ? "Checking…" : "Refresh", systemImage: "arrow.clockwise") {
                         Task { await diagnostics.refresh() }
                     }
-                    .buttonStyle(AgenticiousButtonStyle()).disabled(diagnostics.isChecking)
+                    .buttonStyle(AgenticiousButtonStyle()).disabled(diagnostics.isBusy)
                 }
                 HStack {
                     Picker("Check in", selection: $diagnostics.project) {
@@ -29,21 +29,32 @@ struct ProvidersView: View {
                         if let url = FolderPicker.choose() { diagnostics.project = store.addFavorite(url) }
                     }
                 }
-                .disabled(diagnostics.isChecking)
+                .disabled(diagnostics.isBusy)
                 Text(diagnostics.project.path ?? FileManager.default.homeDirectoryForCurrentUser.path)
                     .font(.caption.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
                 ForEach(AgentKind.allCases) { agent in
-                    ProviderCard(agent: agent, report: diagnostics.reports[agent], isChecking: diagnostics.isChecking)
+                    ProviderCard(agent: agent, report: diagnostics.reports[agent], isChecking: diagnostics.isBusy)
                 }
                 Text("Checks reflect the selected folder, not an existing agent’s worktree or session overrides. Refresh after signing in or changing configuration. Server URLs, tokens, and raw command output are not displayed.")
                     .font(.caption).foregroundStyle(.secondary)
             }.padding(28)
+        }
+        .alert("Could not disconnect", isPresented: Binding(
+            get: { diagnostics.disconnectError != nil },
+            set: { if !$0 { diagnostics.disconnectError = nil } }
+        )) {
+            Button("OK", role: .cancel) { diagnostics.disconnectError = nil }
+        } message: {
+            Text(diagnostics.disconnectError ?? "")
         }
         .onChange(of: diagnostics.project) { _, _ in Task { await diagnostics.refresh() } }
     }
 }
 
 private struct ProviderCard: View {
+    @EnvironmentObject private var diagnostics: ProviderDiagnostics
+    @State private var serverToDisconnect: String?
+
     let agent: AgentKind
     let report: ProviderReport?
     let isChecking: Bool
@@ -66,6 +77,16 @@ private struct ProviderCard: View {
                         .foregroundStyle(check.needsAttention ? Color.orange : AgenticiousStyle.violet)
                     Text(check.id).fontWeight(.semibold).frame(width: 170, alignment: .leading)
                     Text(check.message).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+                    if check.isClaudeAIConnector {
+                        Link("Manage in Claude", destination: URL(string: "https://claude.ai/customize/connectors")!)
+                            .font(.callout)
+                            .help("Disconnect account connectors in Claude’s connector settings.")
+                    } else if let server = check.serverName {
+                        Button("Disconnect", role: .destructive) { serverToDisconnect = server }
+                            .buttonStyle(AgenticiousButtonStyle(isPrimary: false, isCompact: true))
+                            .disabled(isChecking)
+                            .accessibilityLabel("Disconnect \(server) from \(agent.rawValue)")
+                    }
                 }.textSelection(.enabled)
             }
             Divider()
@@ -79,6 +100,17 @@ private struct ProviderCard: View {
         }
         .padding(20).background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 18))
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(AgenticiousStyle.violet.opacity(0.25)))
+        .alert("Disconnect \(serverToDisconnect ?? "server")?", isPresented: Binding(
+            get: { serverToDisconnect != nil },
+            set: { if !$0 { serverToDisconnect = nil } }
+        ), presenting: serverToDisconnect) { server in
+            Button("Disconnect", role: .destructive) {
+                Task { await diagnostics.disconnect(server, from: agent) }
+            }
+            Button("Cancel", role: .cancel) { serverToDisconnect = nil }
+        } message: { _ in
+            Text("This removes the server’s saved configuration for this provider, using the selected folder. Shared or user-level configuration can affect other projects. To reconnect, add the server again. Existing sessions may need to restart.")
+        }
     }
 }
 
@@ -121,7 +153,7 @@ struct ProviderStatusButton: View {
                 Divider()
                 HStack {
                     Button("Refresh", systemImage: "arrow.clockwise") { Task { await diagnostics.refresh() } }
-                        .disabled(diagnostics.isChecking)
+                        .disabled(diagnostics.isBusy)
                         .buttonStyle(AgenticiousButtonStyle(isPrimary: false, isCompact: true))
                     Spacer()
                     Button("Manage providers") {

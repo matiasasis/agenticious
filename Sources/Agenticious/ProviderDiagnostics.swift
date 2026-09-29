@@ -6,6 +6,8 @@ struct ProviderCheck: Identifiable {
     let id: String
     let message: String
     var needsAttention = false
+    var serverName: String?
+    var isClaudeAIConnector = false
 }
 
 struct ProviderReport {
@@ -18,12 +20,28 @@ struct ProviderReport {
 final class ProviderDiagnostics: ObservableObject {
     @Published private(set) var reports: [AgentKind: ProviderReport] = [:]
     @Published private(set) var isChecking = false
+    @Published private(set) var isDisconnecting = false
+    @Published var disconnectError: String?
     @Published var project = Project.none
 
     var attentionCount: Int { reports.values.reduce(0) { $0 + $1.attentionCount } }
 
+    var isBusy: Bool { isChecking || isDisconnecting }
+
+    func disconnect(_ server: String, from agent: AgentKind) async {
+        guard !isBusy else { return }
+        isDisconnecting = true
+        disconnectError = nil
+        let directory = project.path ?? FileManager.default.homeDirectoryForCurrentUser.path
+        disconnectError = await Task.detached {
+            ProviderProbe.disconnect(server, from: agent, directory: directory)
+        }.value
+        isDisconnecting = false
+        await refresh()
+    }
+
     func refresh() async {
-        guard !isChecking else { return }
+        guard !isBusy else { return }
         isChecking = true
         reports = [:]
         let directory = project.path ?? FileManager.default.homeDirectoryForCurrentUser.path
@@ -38,6 +56,17 @@ final class ProviderDiagnostics: ObservableObject {
 }
 
 enum ProviderProbe {
+    static func disconnect(_ server: String, from agent: AgentKind, directory: String,
+                           run: (String, String) -> DiagnosticCommand.Result = { DiagnosticCommand.run($0, directory: $1) }) -> String? {
+        let executable = agent == .claude ? "claude" : "codex"
+        let quotedName = "'" + server.replacingOccurrences(of: "'", with: "'\\''") + "'"
+        let result = run("\(executable) mcp remove -- \(quotedName)", directory)
+        guard result.failure == nil, result.exitCode == 0 else {
+            return "Could not disconnect this server. Check its configuration scope and permissions with the provider CLI in the selected folder, then refresh."
+        }
+        return nil
+    }
+
     static func check(_ agent: AgentKind, directory: String) -> ProviderReport {
         let authCommand = agent == .claude ? "claude auth status --json" : "codex login status"
         let mcpCommand = agent == .claude ? "claude mcp list" : "codex mcp list --json"
@@ -78,12 +107,12 @@ enum ProviderProbe {
                   entries.allSatisfy({ $0["name"] is String }) else { return unreadableServers }
             return entries.isEmpty ? [ProviderCheck(id: "MCP", message: "No configured servers")] : entries.map { entry in
                 let name = entry["name"] as? String ?? "MCP"
-                if entry["enabled"] as? Bool == false { return ProviderCheck(id: name, message: "Disabled") }
+                if entry["enabled"] as? Bool == false { return ProviderCheck(id: name, message: "Disabled", serverName: name) }
                 switch entry["auth_status"] as? String {
-                case "not_logged_in": return ProviderCheck(id: name, message: "Authentication required · run codex mcp login with this server name", needsAttention: true)
-                case "o_auth": return ProviderCheck(id: name, message: "OAuth configured · connection not checked")
-                case "bearer_token": return ProviderCheck(id: name, message: "Token configured · connection not checked")
-                default: return ProviderCheck(id: name, message: "Authentication not reported · connection not checked")
+                case "not_logged_in": return ProviderCheck(id: name, message: "Authentication required · run codex mcp login with this server name", needsAttention: true, serverName: name)
+                case "o_auth": return ProviderCheck(id: name, message: "OAuth configured · connection not checked", serverName: name)
+                case "bearer_token": return ProviderCheck(id: name, message: "Token configured · connection not checked", serverName: name)
+                default: return ProviderCheck(id: name, message: "Authentication not reported · connection not checked", serverName: name)
                 }
             }
         }
@@ -91,22 +120,28 @@ enum ProviderProbe {
             guard let separator = line.range(of: ": ") else { return nil }
             let name = String(line[..<separator.lowerBound])
             let status = String(line[separator.upperBound...])
-            if status.contains("✔ Connected") { return ProviderCheck(id: name, message: "Connected") }
+            if status.contains("✔ Connected") { return ProviderCheck(id: name, message: "Connected", serverName: name) }
             if status.contains("Needs authentication") || status.contains("Needs auth") {
-                return ProviderCheck(id: name, message: "Authentication required · open /mcp in Claude Code", needsAttention: true)
+                return ProviderCheck(id: name, message: "Authentication required · open /mcp in Claude Code", needsAttention: true, serverName: name)
             }
             if status.contains("Failed to connect") {
                 let reason: String
                 if status.contains("Incompatible auth server") { reason = "Incompatible authentication server" }
                 else if status.contains("HTTP 404") { reason = "MCP endpoint not found (404)" }
                 else { reason = "Connection failed" }
-                return ProviderCheck(id: name, message: reason + " · open /mcp in Claude Code", needsAttention: true)
+                return ProviderCheck(id: name, message: reason + " · open /mcp in Claude Code", needsAttention: true, serverName: name)
             }
-            if status.contains("Pending approval") { return ProviderCheck(id: name, message: "Pending approval · open /mcp in Claude Code", needsAttention: true) }
-            if status.localizedCaseInsensitiveContains("disabled") { return ProviderCheck(id: name, message: "Disabled") }
-            return ProviderCheck(id: name, message: "Status not recognized · check /mcp in Claude Code", needsAttention: true)
+            if status.contains("Pending approval") { return ProviderCheck(id: name, message: "Pending approval · open /mcp in Claude Code", needsAttention: true, serverName: name) }
+            if status.localizedCaseInsensitiveContains("disabled") { return ProviderCheck(id: name, message: "Disabled", serverName: name) }
+            return ProviderCheck(id: name, message: "Status not recognized · check /mcp in Claude Code", needsAttention: true, serverName: name)
         }
-        if !rows.isEmpty { return rows }
+        if !rows.isEmpty {
+            return rows.map { row in
+                var check = row
+                check.isClaudeAIConnector = check.id.hasPrefix("claude.ai ")
+                return check
+            }
+        }
         if result.output.localizedCaseInsensitiveContains("no mcp servers") { return [ProviderCheck(id: "MCP", message: "No configured servers")] }
         return unreadableServers
     }
