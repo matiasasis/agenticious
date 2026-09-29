@@ -119,9 +119,12 @@ struct ChunkList: View {
     let chunks: [Chunk]
     let limit: Int
 
+    /// An overflowing list gives its last row to the count, so it never grows past `limit` rows.
+    private var shown: Int { chunks.count > limit ? limit - 1 : limit }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            ForEach(chunks.prefix(limit)) { chunk in
+            ForEach(chunks.prefix(shown)) { chunk in
                 Label {
                     Text(chunk.title)
                         .foregroundStyle(chunk.status == .pending ? .secondary : .primary)
@@ -132,7 +135,10 @@ struct ChunkList: View {
                 .lineLimit(1)
             }
             if chunks.count > limit {
-                Text("+\(chunks.count - limit) more").font(.caption).foregroundStyle(.secondary)
+                Label("\(chunks.count - shown) more steps", systemImage: "ellipsis.circle")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
         }
     }

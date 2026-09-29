@@ -374,52 +374,91 @@ struct SessionCard: View {
     @ObservedObject var session: AgentSession
     @State private var isHovered = false
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                AgentBadge(agent: session.agent, detail: session.modelSummary)
-                Spacer()
-                StatusPill(status: session.status)
-            }
+    private static let stepRows = 5
+    private let titleFont = Font.title3.weight(.semibold)
 
+    var body: some View {
+        // Drawn over an invisible worst-case card, so every card has the same height and long content is cut, not grown.
+        sizingCard.hidden()
+            .overlay(alignment: .top) { content }
+            .padding(20)
+            .background(session.status.color.opacity(isHovered ? 0.16 : 0.1), in: RoundedRectangle(cornerRadius: 18))
+            .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 18))
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .stroke(session.status.color.opacity(isHovered ? 0.8 : 0.45), lineWidth: 1)
+            )
+            .shadow(color: session.status.color.opacity(isHovered ? 0.14 : 0), radius: 16)
+            .contentShape(RoundedRectangle(cornerRadius: 18))
+            .onHover { isHovered = $0 }
+    }
+
+    private var content: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 12) {
+                header
+                HStack(alignment: .top, spacing: 10) {
+                    TaskTypeIcon(type: session.displayedTaskType)
+                    Text(session.task)
+                        .font(titleFont)
+                        .lineLimit(2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .help(session.task)
+                }
+                ChunkStrip(chunks: session.chunks, style: .compact, isRunning: session.isRunning)
+                ChunkList(chunks: session.chunks, limit: Self.stepRows)
+                if case let .needsYou(reason) = session.status {
+                    Label(reason, systemImage: "hand.raised.fill")
+                        .font(.callout)
+                        .foregroundStyle(.orange)
+                        .lineLimit(2)
+                        .help(reason)
+                }
+            }
+            Spacer(minLength: 12)
+            VStack(alignment: .leading, spacing: 12) {
+                if let worktree = session.worktree { BranchLabel(worktree: worktree, isRemoved: session.worktreeRemoved) }
+                footer
+            }
+        }
+        .frame(maxHeight: .infinity)
+        .clipped()
+    }
+
+    /// Two title lines, a full step list, a two-line "needs you" reason and a branch: the most a card shows.
+    private var sizingCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            header
             HStack(alignment: .top, spacing: 10) {
                 TaskTypeIcon(type: session.displayedTaskType)
-                Text(session.task)
-                    .font(.title3.weight(.semibold))
-                    .lineLimit(3)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text(" ").font(titleFont).lineLimit(2, reservesSpace: true).frame(maxWidth: .infinity, alignment: .leading)
             }
-
-            ChunkStrip(chunks: session.chunks, style: .compact, isRunning: session.isRunning)
-            ChunkList(chunks: session.chunks, limit: 5)
-
-            if case let .needsYou(reason) = session.status {
-                Label(reason, systemImage: "hand.raised.fill")
-                    .font(.callout)
-                    .foregroundStyle(.orange)
-                    .lineLimit(2)
+            ChunkStrip(chunks: [], style: .compact)
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(0..<Self.stepRows, id: \.self) { _ in Label(" ", systemImage: "circle").font(.callout) }
             }
-
-            if let worktree = session.worktree { BranchLabel(worktree: worktree, isRemoved: session.worktreeRemoved) }
-
-            HStack {
-                Text(session.startedAt, style: .relative)
-                Spacer()
-                if !session.chunks.isEmpty { Text("\(session.completedChunks)/\(session.chunks.count) steps") }
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            Label(" ", systemImage: "hand.raised.fill").font(.callout).lineLimit(2, reservesSpace: true)
+            Label(" ", systemImage: "arrow.triangle.branch").font(.caption)
+            footer
         }
-        .padding(20)
-        .background(session.status.color.opacity(isHovered ? 0.16 : 0.1), in: RoundedRectangle(cornerRadius: 18))
-        .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 18))
-        .overlay(
-            RoundedRectangle(cornerRadius: 18)
-                .stroke(session.status.color.opacity(isHovered ? 0.8 : 0.45), lineWidth: 1)
-        )
-        .shadow(color: session.status.color.opacity(isHovered ? 0.14 : 0), radius: 16)
-        .contentShape(RoundedRectangle(cornerRadius: 18))
-        .onHover { isHovered = $0 }
+    }
+
+    private var header: some View {
+        HStack {
+            AgentBadge(agent: session.agent, detail: session.modelSummary)
+            Spacer()
+            StatusPill(status: session.status)
+        }
+    }
+
+    private var footer: some View {
+        HStack {
+            Text(session.startedAt, style: .relative)
+            Spacer()
+            if !session.chunks.isEmpty { Text("\(session.completedChunks)/\(session.chunks.count) steps") }
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
     }
 }
 
