@@ -161,8 +161,17 @@ final class AgentSession: ObservableObject, Identifiable {
     var displayedTaskType: TaskType { taskType ?? TaskType.legacy(title: task) }
 
     var canMarkFinished: Bool {
-        if case .done = status { return !isMarkedFinished }
-        return false
+        guard !isMarkedFinished else { return false }
+        switch status {
+        case .done: return true
+        case .interrupted, .exited: return !isRunning
+        default: return false
+        }
+    }
+
+    func recordExit(_ code: Int32?) {
+        isRunning = false
+        if case .done = status {} else { status = .exited(code) }
     }
 
     var completedChunks: Int { chunks.filter { $0.status == .done }.count }

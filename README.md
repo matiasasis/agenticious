@@ -106,6 +106,8 @@ The sidebar defaults to **Queue**, grouped by workspace. Tasks stay in **Queue**
 
 **Customize** keeps task presets, skills, and preferences together while the agent sidebar stays visible. Preferences can hide sidebar branch names and set the default worktree behavior for new agents. The macOS menu bar uses a monochrome Agenticious face, with a count only when agents need your attention.
 
+Interrupted and exited agents can also be marked as finished, even with incomplete steps. Their status, progress, and conversation are preserved so they can be resumed later. For an agent that is still running, use **Stop agent** in its details or right-click menu, then **Mark as finished** once it exits.
+
 ### Provider diagnostics
 
 Open the connection-status button beside the usage meters, then **Manage providers**, to check Claude Code and Codex account access and MCP status in your home folder or a selected project. The toolbar warning icon opens a compact provider summary. Checks run at launch and on refresh; changing the folder runs a fresh check. Authentication and connection failures include recovery instructions.

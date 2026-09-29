@@ -24,7 +24,11 @@ struct SessionDetailView: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    if !session.isRunning {
+                    if session.isRunning {
+                        Button("Stop agent", systemImage: "stop.fill") { store.stop(session) }
+                            .buttonStyle(AgenticiousButtonStyle())
+                            .help("Stop the process. Once it exits, you can mark this task as finished or resume it later.")
+                    } else {
                         Button("Resume", systemImage: "play.fill") { store.resume(session) }
                             .buttonStyle(AgenticiousButtonStyle())
                             .disabled(!session.canResume)
@@ -103,7 +107,7 @@ struct SessionDetailView: View {
             Banner(title: "Exited", text: "The agent process ended (code \(code.map(String.init) ?? "?")).",
                    systemImage: "stop.circle", color: .secondary)
         case .interrupted:
-            Banner(title: "Interrupted", text: "Agenticious closed while this agent was running. Resume to pick up where it left off.",
+            Banner(title: "Interrupted", text: "Agenticious closed while this agent was running. Resume to continue, or mark as finished to put it away.",
                    systemImage: "pause.circle", color: .brown)
         default:
             EmptyView()

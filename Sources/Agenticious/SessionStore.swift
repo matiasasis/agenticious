@@ -73,7 +73,6 @@ final class SessionStore: ObservableObject {
     private var database: SessionDatabase?
     private var subscriptions: [UUID: AnyCancellable] = [:]
     private var unsaved: Set<UUID> = []
-    private var expectedStops: Set<UUID> = []
     private var snapshotter: WindowSnapshotter?
     private var commandLineOptionsPending = true
 
@@ -210,8 +209,12 @@ final class SessionStore: ObservableObject {
     }
 
     func stop(_ session: AgentSession) {
-        if session.isRunning { expectedStops.insert(session.id) }
+        guard session.isRunning else { return }
         session.terminalView?.terminate()
+        // SwiftTerm cancels its exit monitor when explicitly terminated.
+        session.recordExit(nil)
+        save(session)
+        updateBadge()
     }
 
     func remove(_ session: AgentSession) {
@@ -260,14 +263,11 @@ final class SessionStore: ObservableObject {
 
     private func attachTerminal(to session: AgentSession, running spec: LaunchSpec) {
         let terminal = LocalProcessTerminalView(frame: NSRect(x: 0, y: 0, width: 900, height: 500))
-        let bridge = TerminalBridge { [weak self, weak session] exitCode in
-            guard let session else { return }
+        let bridge = TerminalBridge { [weak self, weak session, weak terminal] exitCode in
+            guard let session, session.isRunning, session.terminalView === terminal else { return }
             let oldStatus = session.status
-            session.isRunning = false
-            if case .done = session.status {} else { session.status = .exited(exitCode) }
-            if self?.expectedStops.remove(session.id) == nil {
-                self?.notifyTransition(from: oldStatus, for: session)
-            }
+            session.recordExit(exitCode)
+            self?.notifyTransition(from: oldStatus, for: session)
             self?.updateBadge()
         }
 
