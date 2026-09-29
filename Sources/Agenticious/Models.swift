@@ -36,6 +36,7 @@ enum SessionStatus: Equatable {
     /// The agent finished its turn and is idle, waiting for the next message. Nothing is blocked.
     case yourTurn
     case done(String?)
+    case ended(String)
     case exited(Int32?)
     /// Agenticious quit while the agent was still going. Resuming reopens its conversation.
     case interrupted
@@ -48,6 +49,7 @@ enum SessionStatus: Equatable {
         case .needsYou: "Needs you"
         case .yourTurn: "Your turn"
         case .done: "Done"
+        case .ended: "Ended"
         case .exited: "Exited"
         case .interrupted: "Interrupted"
         }
@@ -60,7 +62,7 @@ enum SessionStatus: Equatable {
 
     var isFinished: Bool {
         switch self {
-        case .done, .exited: true
+        case .done, .ended, .exited: true
         default: false
         }
     }
@@ -73,6 +75,7 @@ enum SessionStatus: Equatable {
         case .working, .starting, .waiting: 2
         case .interrupted: 3
         case .done: 4
+        case .ended: 5
         case .exited: 5
         }
     }
@@ -116,6 +119,7 @@ final class AgentSession: ObservableObject, Identifiable {
     let taskType: TaskType?
 
     @Published var isMarkedFinished = false
+    @Published var isArchiving = false
     @Published var status: SessionStatus = .starting
     @Published var chunks: [Chunk] = []
     @Published private(set) var pullRequests: [PullRequestReference] = []
@@ -161,8 +165,17 @@ final class AgentSession: ObservableObject, Identifiable {
     var displayedTaskType: TaskType { taskType ?? TaskType.legacy(title: task) }
 
     var canMarkFinished: Bool {
-        if case .done = status { return !isMarkedFinished }
+        guard !isMarkedFinished, !isArchiving else { return false }
+        if case .done = status { return true }
         return false
+    }
+
+    func recordExit(_ code: Int32?) {
+        isRunning = false
+        switch status {
+        case .done, .ended: break
+        default: status = .exited(code)
+        }
     }
 
     var completedChunks: Int { chunks.filter { $0.status == .done }.count }
@@ -171,7 +184,7 @@ final class AgentSession: ObservableObject, Identifiable {
 
     /// Resuming reopens the conversation in the folder it ran in, so a deleted worktree can't come back.
     var canResume: Bool {
-        !isRunning && !worktreeRemoved && FileManager.default.fileExists(atPath: directory.path)
+        !isRunning && !isArchiving && !worktreeRemoved && FileManager.default.fileExists(atPath: directory.path)
     }
 
     var hasOpenChunks: Bool { chunks.contains { $0.status != .done } }

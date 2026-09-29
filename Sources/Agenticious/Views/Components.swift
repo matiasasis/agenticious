@@ -56,6 +56,18 @@ struct StatusDot: View {
     }
 }
 
+extension AgentSession {
+    var archiveActionTitle: String {
+        if isMarkedFinished { return "Move to Queue" }
+        return "Mark as finished"
+    }
+
+    var archiveActionSymbol: String {
+        if isMarkedFinished { return "arrow.uturn.backward" }
+        return "checkmark.circle"
+    }
+}
+
 extension SessionStatus {
     var color: Color {
         switch self {
@@ -65,6 +77,7 @@ extension SessionStatus {
         case .needsYou: .orange
         case .yourTurn: AgenticiousStyle.violet
         case .done: .green
+        case .ended: .gray
         case .exited: .secondary
         case .interrupted: .brown
         }

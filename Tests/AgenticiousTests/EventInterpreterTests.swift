@@ -92,4 +92,72 @@ final class EventInterpreterTests: XCTestCase {
         EventInterpreter.apply("Stop", ["background_tasks": [], "session_crons": []], to: session)
         XCTAssertEqual(session.status, .done(nil))
     }
+    @MainActor
+    func testEndingClearsHumanRequestAndPreservesUnfinishedProgress() async {
+        let session = session()
+        session.status = .needsYou("Who owns this work?")
+        let chunks = session.chunks
+        EventInterpreter.apply("mcp", ["tool": "end", "args": ["reason": "Left the work to the other session."]], to: session)
+        XCTAssertEqual(session.status, .ended("Left the work to the other session."))
+        XCTAssertFalse(session.status.needsAttention)
+        XCTAssertFalse(session.canMarkFinished)
+        XCTAssertEqual(session.chunks, chunks)
+        for event in ["Stop", "codex-notify", "PostToolUse", "Notification"] {
+            EventInterpreter.apply(event, [:], to: session)
+            XCTAssertEqual(session.status, .ended("Left the work to the other session."))
+        }
+        XCTAssertNil(EventInterpreter.stopHookReply([:], for: session))
+        session.recordExit(0)
+        XCTAssertEqual(session.status, .ended("Left the work to the other session."))
+        EventInterpreter.apply("UserPromptSubmit", [:], to: session)
+        XCTAssertEqual(session.status, .working)
+    }
+
+    @MainActor
+    func testFinalHandoffMessageEndsOlderSessionsWithoutCompletingSteps() async {
+        for (event, field) in [("codex-notify", "last-assistant-message"), ("Stop", "last_assistant_message")] {
+            let session = session()
+            session.status = .needsYou("Should I leave it to the other session?")
+            let reason = "Stopped here and left PR #14770 to the other session. No changes or pushes made."
+            let payload: [String: Any] = [field: reason]
+            XCTAssertNil(EventInterpreter.stopHookReply(payload, for: session))
+            EventInterpreter.apply(event, payload, to: session)
+            XCTAssertEqual(session.status, .ended(reason))
+            XCTAssertEqual(session.completedChunks, 1)
+        }
+    }
+
+    @MainActor
+    func testPausesQuestionsAndQuotedInstructionsDoNotEndWork() async {
+        for text in ["Should I stop here and leave it to the other session?", "Stopped here to ask you what to do next.",
+                     "The other session asked me to stop a test server. I am continuing the fix.",
+                     "If requested, I will stop work and leave it to another session.",
+                     "Stopped here until the other session finishes.",
+                     "Stopped here and left it to the other session. Should I continue?"] {
+            let session = session()
+            session.status = .needsYou("What next?")
+            EventInterpreter.apply("codex-notify", ["last-assistant-message": text], to: session)
+            XCTAssertEqual(session.status, .needsYou("What next?"))
+        }
+        let session = session()
+        EventInterpreter.apply("mcp", ["tool": "end", "args": ["reason": "  "]], to: session)
+        XCTAssertEqual(session.status, .working)
+    }
+
+    @MainActor
+    func testEndedReasonPersistsAcrossRestartAndNewPlanCanRestartWork() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let database = try SessionDatabase(url: folder.appendingPathComponent("test.sqlite"))
+        let session = session()
+        session.status = .ended("Cancelled by user")
+        try database.save(session)
+        let restored = try XCTUnwrap(database.load().first)
+        XCTAssertEqual(restored.status, session.status)
+        XCTAssertEqual(restored.chunks, session.chunks)
+        XCTAssertFalse(restored.isMarkedFinished)
+        EventInterpreter.apply("mcp", ["tool": "set_plan", "args": ["chunks": ["New work"]]], to: restored)
+        XCTAssertEqual(restored.status, .working)
+    }
+
 }

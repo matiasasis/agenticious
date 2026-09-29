@@ -23,8 +23,23 @@ struct SessionDetailView: View {
                         Text("\(session.completedChunks)/\(session.chunks.count) steps")
                             .foregroundStyle(.secondary)
                     }
+                    Button { store.archive(session) } label: {
+                        Label(session.isArchiving ? "Archiving…" : "Archive", systemImage: "archivebox")
+                            .font(.system(size: 10, weight: .semibold))
+                            .padding(.horizontal, 8).padding(.vertical, 5)
+                            .foregroundStyle(.secondary)
+                            .background(Color.gray.opacity(0.15), in: Capsule())
+                    }
+                        .buttonStyle(.plain)
+                        .disabled(session.isArchiving)
+                        .help(session.isArchiving ? "Archiving…" : "Stop the agent, clean up its worktree, and archive its history.")
                     Spacer()
-                    if !session.isRunning {
+                    if session.isRunning {
+                        Button("Stop agent", systemImage: "stop.fill") { store.stop(session) }
+                            .buttonStyle(AgenticiousButtonStyle())
+                            .disabled(session.isArchiving)
+                            .help("Stop the process without archiving its history.")
+                    } else {
                         Button("Resume", systemImage: "play.fill") { store.resume(session) }
                             .buttonStyle(AgenticiousButtonStyle())
                             .disabled(!session.canResume)
@@ -71,15 +86,15 @@ struct SessionDetailView: View {
             }
             if session.isMarkedFinished || session.canMarkFinished {
                 HStack {
-                    Text(session.isMarkedFinished ? "Saved in Finished. You can bring it back anytime." : "Keep this task in Queue until you’re ready to put it away.")
+                    Text(session.isMarkedFinished ? "History saved in Finished." : "Finishing stops the agent and cleans up its worktree.")
                         .font(.caption).foregroundStyle(.secondary)
                     Spacer()
-                    Button(session.isMarkedFinished ? "Move to Queue" : "Mark as finished",
-                           systemImage: session.isMarkedFinished ? "arrow.uturn.backward" : "checkmark.circle") {
+                    Button(session.archiveActionTitle, systemImage: session.archiveActionSymbol) {
                         store.markFinished(session, finished: !session.isMarkedFinished)
                     }
                     .buttonStyle(AgenticiousButtonStyle())
-                    .help("Changes the task’s list without stopping its process or deleting its history.")
+                    .disabled(session.isArchiving)
+                    .help("Keep history and clean up resources. Worktrees with uncommitted changes are preserved.")
                 }
                 .padding(14).background(AgenticiousStyle.panel)
             }
@@ -99,11 +114,15 @@ struct SessionDetailView: View {
                    systemImage: "text.bubble", color: .purple)
         case let .done(summary):
             Banner(title: "Done", text: summary ?? "The agent marked the task complete.", systemImage: "checkmark.seal.fill", color: .green)
+        case let .ended(reason):
+            Banner(title: "Ended", text: reason, systemImage: "stop.circle.fill", color: .gray)
         case let .exited(code):
             Banner(title: "Exited", text: "The agent process ended (code \(code.map(String.init) ?? "?")).",
                    systemImage: "stop.circle", color: .secondary)
         case .interrupted:
-            Banner(title: "Interrupted", text: "Agenticious closed while this agent was running. Resume to pick up where it left off.",
+            Banner(title: "Interrupted", text: session.isMarkedFinished
+                   ? "This agent was interrupted. Resume to continue where it left off."
+                   : "Agenticious closed while this agent was running. Resume to continue, or Archive to put it away.",
                    systemImage: "pause.circle", color: .brown)
         default:
             EmptyView()

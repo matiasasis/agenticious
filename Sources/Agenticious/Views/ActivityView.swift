@@ -35,7 +35,7 @@ struct ActivityView: View {
             }
         }
         .background(AgenticiousStyle.ink)
-        .task(id: session.id) {
+        .task(id: "\(session.id)-\(session.isMarkedFinished)") {
             var cached: URL?
             var previousID = session.conversationID
             while !Task.isCancelled {
@@ -57,6 +57,7 @@ struct ActivityView: View {
                     session.conversationID = conversation
                     previousID = conversation
                 }
+                if session.isMarkedFinished { return }
                 do { try await Task.sleep(for: .seconds(2)) } catch { return }
             }
         }
