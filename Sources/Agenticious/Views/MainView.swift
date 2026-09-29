@@ -293,10 +293,10 @@ struct SessionMenu: View {
                 .disabled(session.isArchiving)
                 .help("Record that work was stopped or handed off. Archive to stop processes and clean up resources.")
         }
-        if session.isRunning {
+        if session.canStop {
             Button("Stop agent") { store.stop(session) }
                 .disabled(session.isArchiving)
-        } else {
+        } else if !session.isRunning {
             Button("Resume") { store.resume(session) }
                 .disabled(!session.canResume)
         }

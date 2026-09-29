@@ -185,6 +185,9 @@ final class AgentSession: ObservableObject, Identifiable {
 
     var allChunksDone: Bool { !chunks.isEmpty && completedChunks == chunks.count }
 
+    /// A finished agent's process only idles; Archive stops it along with the cleanup.
+    var canStop: Bool { isRunning && !status.isFinished }
+
     /// Resuming reopens the conversation in the folder it ran in, so a deleted worktree can't come back.
     var canResume: Bool {
         !isRunning && !isArchiving && backgroundTask == nil && !worktreeRemoved && FileManager.default.fileExists(atPath: directory.path)
