@@ -52,7 +52,11 @@ struct SessionDetailView: View {
                     PullRequestLinks(references: session.pullRequests).id(session.id)
                 }
 
-                ChunkStrip(chunks: session.chunks, style: .expanded, isRunning: session.isRunning)
+                if !session.startupSteps.isEmpty {
+                    StartupProgressView(steps: session.startupSteps)
+                } else if session.backgroundTask == nil {
+                    ChunkStrip(chunks: session.chunks, style: .expanded, isRunning: session.isRunning)
+                }
                 if let task = session.backgroundTask {
                     BackgroundTaskLabel(task: task)
                 } else {

@@ -253,6 +253,9 @@ private struct SessionRow: View {
         VStack(alignment: .leading, spacing: 9) {
             header
             TaskHeading(type: session.displayedTaskType, task: session.task, isCompact: true)
+            if !session.startupSteps.isEmpty {
+                StartupProgressView(steps: session.startupSteps, isCompact: true)
+            }
             if !session.chunks.isEmpty {
                 HStack(spacing: 8) {
                     ChunkStrip(chunks: session.chunks, style: .compact, isRunning: session.isRunning)
@@ -402,8 +405,12 @@ struct SessionCard: View {
             VStack(alignment: .leading, spacing: 12) {
                 header
                 TaskHeading(type: session.displayedTaskType, task: session.task)
-                ChunkStrip(chunks: session.chunks, style: .compact, isRunning: session.isRunning)
-                ChunkList(chunks: session.chunks, limit: Self.stepRows)
+                if !session.startupSteps.isEmpty {
+                    StartupProgressView(steps: session.startupSteps)
+                } else {
+                    ChunkStrip(chunks: session.chunks, style: .compact, isRunning: session.isRunning)
+                    ChunkList(chunks: session.chunks, limit: Self.stepRows)
+                }
                 if case let .needsYou(reason) = session.status {
                     Label(reason, systemImage: "hand.raised.fill")
                         .font(.callout)
