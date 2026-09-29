@@ -19,13 +19,32 @@ final class TaskConfigurationTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: folder) }
         var template = TaskTemplate(name: "Investigate", symbol: "magnifyingglass")
         let session = AgentSession(task: "Unrelated title", agent: .claude, project: .none, directory: folder,
-                                   taskType: TaskType(template: template))
+                                   taskType: TaskType(template: template, input: "  API timeout  ", notes: " Check retries\n"))
         template.symbol = "hammer"
         let database = try SessionDatabase(url: folder.appendingPathComponent("test.sqlite"))
         try database.save(session)
         let restored = try XCTUnwrap(database.load().first)
         XCTAssertEqual(restored.displayedTaskType.name, "Investigate")
         XCTAssertEqual(restored.displayedTaskType.symbol, "magnifyingglass")
+        XCTAssertEqual(restored.displayedTaskType.details(for: restored.task), "API timeout\nCheck retries")
+    }
+
+    func testOlderTaskMetadataSeparatesKnownPrefixesAndPreservesCustomTitles() throws {
+        let type = try JSONDecoder().decode(TaskType.self, from: Data(#"{"name":"Resolve & merge","symbol":"arrow.triangle.merge"}"#.utf8))
+        let url = "https://example.slack.com/archives/C0123456789/p1700000000000000"
+        XCTAssertEqual(type.details(for: "Resolve & merge: \(url)"), url)
+        XCTAssertEqual(type.details(for: "Address comments and merge PR 123"), "123")
+        XCTAssertEqual(type.details(for: "Resolve & merge"), "")
+        let custom = TaskType(template: .custom)
+        XCTAssertEqual(custom.details(for: "Explain https://example.com:8080"), "Explain https://example.com:8080")
+        XCTAssertEqual(custom.details(for: "Review PR 123"), "Review PR 123")
+    }
+
+    func testTaskDetailsSupportNotesWithoutInputAndEmptyOptionalInput() {
+        let template = TaskTemplate.defaults.first { $0.id == "fixCI" }!
+        XCTAssertEqual(TaskType(template: template, input: "", notes: " Check retries ").details(for: "Fix CI"), "Check retries")
+        XCTAssertEqual(TaskType(template: template, input: " \n").details(for: "Fix CI"), "")
+        XCTAssertEqual(TaskType(template: .custom, input: "Review PR 123").details(for: "Review PR 123"), "Review PR 123")
     }
 
     @MainActor
