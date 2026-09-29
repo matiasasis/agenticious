@@ -36,6 +36,7 @@ enum SessionStatus: Equatable {
     /// The agent finished its turn and is idle, waiting for the next message. Nothing is blocked.
     case yourTurn
     case done(String?)
+    case ended(String)
     case exited(Int32?)
     /// Agenticious quit while the agent was still going. Resuming reopens its conversation.
     case interrupted
@@ -48,6 +49,7 @@ enum SessionStatus: Equatable {
         case .needsYou: "Needs you"
         case .yourTurn: "Your turn"
         case .done: "Done"
+        case .ended: "Ended"
         case .exited: "Exited"
         case .interrupted: "Interrupted"
         }
@@ -60,7 +62,7 @@ enum SessionStatus: Equatable {
 
     var isFinished: Bool {
         switch self {
-        case .done, .exited: true
+        case .done, .ended, .exited: true
         default: false
         }
     }
@@ -73,6 +75,7 @@ enum SessionStatus: Equatable {
         case .working, .starting, .waiting: 2
         case .interrupted: 3
         case .done: 4
+        case .ended: 5
         case .exited: 5
         }
     }
@@ -169,7 +172,10 @@ final class AgentSession: ObservableObject, Identifiable {
 
     func recordExit(_ code: Int32?) {
         isRunning = false
-        if case .done = status {} else { status = .exited(code) }
+        switch status {
+        case .done, .ended: break
+        default: status = .exited(code)
+        }
     }
 
     var completedChunks: Int { chunks.filter { $0.status == .done }.count }

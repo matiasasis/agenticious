@@ -77,6 +77,7 @@ extension SessionStatus {
         case .needsYou: .orange
         case .yourTurn: AgenticiousStyle.violet
         case .done: .green
+        case .ended: .gray
         case .exited: .secondary
         case .interrupted: .brown
         }

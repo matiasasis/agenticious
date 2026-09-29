@@ -60,6 +60,15 @@ let tools: [[String: Any]] = [
         ],
     ],
     [
+        "name": "end",
+        "description": "End this task without claiming completion when the human cancels it, tells you to stop, or hands it to another session. Clears needs-human status and preserves unfinished steps. Does not archive or delete work.",
+        "inputSchema": [
+            "type": "object",
+            "properties": ["reason": ["type": "string", "minLength": 1]],
+            "required": ["reason"],
+        ],
+    ],
+    [
         "name": "finish",
         "description": "Mark the whole task complete, with a two-sentence summary of what changed.",
         "inputSchema": [

@@ -114,6 +114,8 @@ struct SessionDetailView: View {
                    systemImage: "text.bubble", color: .purple)
         case let .done(summary):
             Banner(title: "Done", text: summary ?? "The agent marked the task complete.", systemImage: "checkmark.seal.fill", color: .green)
+        case let .ended(reason):
+            Banner(title: "Ended", text: reason, systemImage: "stop.circle.fill", color: .gray)
         case let .exited(code):
             Banner(title: "Exited", text: "The agent process ended (code \(code.map(String.init) ?? "?")).",
                    systemImage: "stop.circle", color: .secondary)

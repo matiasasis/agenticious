@@ -14,6 +14,9 @@ enum ChunkingPrompt {
     with a one-line question first. Then ask it in the terminal and wait.
     4. If the plan changes, call `set_plan` again. Keep the titles of chunks you already finished.
     5. When the whole task is finished, call `finish` with a two-sentence summary of what changed.
+    If the human asks you to stop, cancel, or leave the work to another session, call `end` with the reason instead. \
+    This clears the old question and shows Ended without marking unfinished steps complete. Do not call `need_human` again \
+    after the decision is resolved. Call `set_plan` when deliberately starting work again.
 
     6. Whenever the task involves a pull request (implementation, creation, review, CI, comments, or merging), \
     identify its full repository URL and call `set_pull_requests` with its verified HTTPS URL as soon as you know it. \

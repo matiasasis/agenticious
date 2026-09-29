@@ -8,6 +8,14 @@ enum EventInterpreter {
         if let conversation = payload["session_id"] as? String ?? payload["thread-id"] as? String {
             session.conversationID = conversation
         }
+        if case .ended = session.status, name != "UserPromptSubmit" {
+            let tool = payload["tool"] as? String
+            guard name == "mcp", tool == "set_plan" || tool == "set_pull_requests" else { return }
+        }
+        if (name == "Stop" || name == "codex-notify"), let reason = endedReason(payload) {
+            end(reason, in: session)
+            return
+        }
 
         if name == "PostToolUse", let response = payload["tool_response"] {
             if let text = response as? String { session.recordPullRequests(in: text) }
@@ -41,13 +49,14 @@ enum EventInterpreter {
     static func stopHookReply(_ payload: [String: Any], for session: AgentSession) -> [String: Any]? {
         let alreadyNudged = payload["stop_hook_active"] as? Bool ?? false
         guard !alreadyNudged, !session.status.isFinished, !session.status.needsAttention,
+              endedReason(payload) == nil,
               !hasBackgroundWork(payload), let reason = stopNudge(for: session) else { return nil }
 
         return ["decision": "block", "reason": reason]
     }
 
     private static func stopNudge(for session: AgentSession) -> String? {
-        let closing = "Then call finish if the whole task is complete, or need_human if you're waiting on the human. " +
+        let closing = "Then call finish if the whole task is complete, end if work was cancelled or handed off, or need_human if you're waiting on the human. " +
             "Don't repeat your previous answer."
 
         switch session.planSource {
@@ -141,6 +150,10 @@ enum EventInterpreter {
         case "update_chunk": updateChunk(arguments, in: session)
         case "need_human": session.status = .needsYou(arguments["reason"] as? String ?? "Needs your input")
         case "finish": finish(arguments, in: session)
+        case "end":
+            if let reason = arguments["reason"] as? String, !reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                end(reason, in: session)
+            }
         default: break
         }
     }
@@ -173,5 +186,21 @@ enum EventInterpreter {
         }
         session.recordPullRequests(in: arguments["summary"] as? String ?? "")
         session.status = .done(arguments["summary"] as? String)
+    }
+
+    private static func end(_ reason: String, in session: AgentSession) {
+        session.recordPullRequests(in: reason)
+        session.status = .ended(reason)
+    }
+
+    private static func endedReason(_ payload: [String: Any]) -> String? {
+        guard let message = payload["last-assistant-message"] as? String ?? payload["last_assistant_message"] as? String else { return nil }
+        let text = message.trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "’", with: "'")
+        let stopped = #"(?i)^(?:[-•]\s*)?(?:stopped here\b|i(?:'ve| have)? stopped (?:work|working)\b|i(?:'ll| will) leave\b[^\n]*\bstop work here\b)"#
+        let resolved = #"(?i)\b(?:(?:left|leave)\b[^\n]*\bto (?:the )?(?:other|another) session|at your request|as requested|you (?:asked|directed)|handed (?:it |this |the work )?off|cancelled|canceled)\b"#
+        guard !text.contains("?"), text.range(of: stopped, options: .regularExpression) != nil,
+              text.range(of: resolved, options: .regularExpression) != nil else { return nil }
+        return message
     }
 }

@@ -153,6 +153,7 @@ struct SessionDatabase {
             }
             for chunk in session.chunks { session.recordPullRequests(in: chunk.note ?? "") }
             if case let .done(summary) = session.status { session.recordPullRequests(in: summary ?? "") }
+            if case let .ended(reason) = session.status { session.recordPullRequests(in: reason) }
             return session
         }
     }
@@ -180,6 +181,7 @@ struct SessionDatabase {
         case let .needsYou(reason): ("needs_you", reason)
         case .yourTurn: ("your_turn", nil)
         case let .done(summary): ("done", summary)
+        case let .ended(reason): ("ended", reason)
         case let .exited(code): ("exited", code.map(String.init))
         case .interrupted: ("interrupted", nil)
         }
@@ -188,6 +190,7 @@ struct SessionDatabase {
     private static func decode(_ status: String?, detail: String?) -> SessionStatus {
         switch status {
         case "done": .done(detail)
+        case "ended": .ended(detail ?? "Work was stopped.")
         case "exited": .exited(detail.flatMap { Int32($0) })
         case "needs_you": .needsYou(detail ?? "")
         case "your_turn": .yourTurn

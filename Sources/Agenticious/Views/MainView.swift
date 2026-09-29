@@ -287,6 +287,11 @@ struct SessionMenu: View {
     var body: some View {
         Button(session.isMarkedFinished ? "Retry archive cleanup" : "Archive agent", systemImage: "archivebox") { store.archive(session) }
             .disabled(session.isArchiving)
+        if !session.status.isFinished && !session.isMarkedFinished {
+            Button("Mark as ended", systemImage: "stop.circle") { store.markEnded(session) }
+                .disabled(session.isArchiving)
+                .help("Record that work was stopped or handed off. Archive to stop processes and clean up resources.")
+        }
         if session.isRunning {
             Button("Stop agent") { store.stop(session) }
                 .disabled(session.isArchiving)

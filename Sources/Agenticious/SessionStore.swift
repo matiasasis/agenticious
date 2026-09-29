@@ -148,6 +148,13 @@ final class SessionStore: ObservableObject {
         }
     }
 
+    func markEnded(_ session: AgentSession) {
+        guard !session.isArchiving, !session.isMarkedFinished else { return }
+        session.status = .ended("Work was stopped or handed off, as marked by you.")
+        save(session)
+        updateBadge()
+    }
+
     func show(_ list: AgentList) {
         agentList = list
         selection = .overview
