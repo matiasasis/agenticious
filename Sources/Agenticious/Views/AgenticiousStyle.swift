@@ -102,3 +102,20 @@ struct AgenticiousButtonStyle: ButtonStyle {
             .contentShape(Capsule())
     }
 }
+
+/// Small secondary actions beside the status pill, like Archive. A tint colours the text and fill; none is plain gray.
+struct PillButtonStyle: ButtonStyle {
+    var tint: Color?
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 10, weight: .semibold))
+            .padding(.horizontal, 8).padding(.vertical, 5)
+            .foregroundStyle(tint.map(AnyShapeStyle.init) ?? AnyShapeStyle(.secondary))
+            .background((tint ?? .gray).opacity(0.15), in: Capsule())
+            .brightness(configuration.isPressed ? -0.08 : 0)
+            .opacity(isEnabled ? 1 : 0.4)
+            .contentShape(Capsule())
+    }
+}

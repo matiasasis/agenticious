@@ -23,23 +23,18 @@ struct SessionDetailView: View {
                         Text("\(session.completedChunks)/\(session.chunks.count) steps")
                             .foregroundStyle(.secondary)
                     }
-                    Button { store.archive(session) } label: {
-                        Label(session.isArchiving ? "Archiving…" : "Archive", systemImage: "archivebox")
-                            .font(.system(size: 10, weight: .semibold))
-                            .padding(.horizontal, 8).padding(.vertical, 5)
-                            .foregroundStyle(.secondary)
-                            .background(Color.gray.opacity(0.15), in: Capsule())
-                    }
-                        .buttonStyle(.plain)
+                    Button(session.isArchiving ? "Archiving…" : "Archive", systemImage: "archivebox") { store.archive(session) }
+                        .buttonStyle(PillButtonStyle())
                         .disabled(session.isArchiving)
                         .help(session.isArchiving ? "Archiving…" : "Stop the agent, clean up its worktree, and archive its history.")
-                    Spacer()
-                    if session.isRunning {
+                    if session.canStop {
                         Button("Stop agent", systemImage: "stop.fill") { store.stop(session) }
-                            .buttonStyle(AgenticiousButtonStyle())
+                            .buttonStyle(PillButtonStyle(tint: .red))
                             .disabled(session.isArchiving)
                             .help("Stop the process without archiving its history.")
-                    } else {
+                    }
+                    Spacer()
+                    if !session.isRunning {
                         Button("Resume", systemImage: "play.fill") { store.resume(session) }
                             .buttonStyle(AgenticiousButtonStyle())
                             .disabled(!session.canResume)
