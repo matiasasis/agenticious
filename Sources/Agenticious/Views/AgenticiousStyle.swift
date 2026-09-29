@@ -38,16 +38,13 @@ struct ControlRoomHero: View {
             .padding(30)
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            if showArtwork {
-                Image("Mascot", bundle: .module)
+            if showArtwork,
+               let artwork = Bundle.module.url(forResource: "Mascot", withExtension: "png").flatMap(NSImage.init(contentsOf:)) {
+                Image(nsImage: artwork)
                     .resizable()
-                    .scaledToFill()
+                    .interpolation(.high)
+                    .scaledToFit()
                     .frame(width: 300, height: 300)
-                    .clipped()
-                    .mask(LinearGradient(stops: [
-                        .init(color: .clear, location: 0),
-                        .init(color: .black, location: 0.22)
-                    ], startPoint: .leading, endPoint: .trailing))
                     .accessibilityHidden(true)
             }
         }

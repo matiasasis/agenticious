@@ -119,7 +119,7 @@ private struct Sidebar: View {
         .safeAreaInset(edge: .top) {
             HStack(spacing: 10) {
                 if let icon = Bundle.module.url(forResource: "AppIcon", withExtension: "png").flatMap(NSImage.init(contentsOf:)) {
-                    Image(nsImage: icon).resizable().scaledToFit().frame(width: 96, height: 96)
+                    Image(nsImage: icon).resizable().interpolation(.high).scaledToFit().frame(width: 96, height: 96)
                         .accessibilityHidden(true)
                 }
                 VStack(alignment: .leading, spacing: 3) {
