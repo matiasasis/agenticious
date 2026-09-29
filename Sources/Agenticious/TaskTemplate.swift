@@ -152,18 +152,35 @@ struct TaskTemplate: Codable, Identifiable, Equatable {
 struct TaskType: Codable, Equatable {
     let name: String
     let symbol: String
+    let details: String?
 
-    init(template: TaskTemplate) {
+    init(template: TaskTemplate, input: String? = nil, notes: String = "") {
         name = template.name
         symbol = template.symbol
+        details = input.map {
+            [$0, notes].map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }.joined(separator: "\n")
+        }
+    }
+
+    private static let legacyPrefixes = [
+        ("Implement ", "implementTicket"), ("Resolve & merge:", "reviewComments"),
+        ("Address comments and merge PR ", "reviewComments"),
+        ("Review PRs:", "reviewPR"), ("Review PR ", "reviewPR"), ("Review PR:", "reviewPR"),
+        ("Fix CI ", "fixCI")
+    ]
+
+    func details(for title: String) -> String {
+        if let details { return details }
+        if let prefix = Self.legacyPrefixes.first(where: { title.hasPrefix($0.0) }),
+           Self.legacy(title: title).name == name {
+            return String(title.dropFirst(prefix.0.count)).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return title == name ? "" : title
     }
 
     static func legacy(title: String) -> TaskType {
-        let prefixes = [("Implement ", "implementTicket"), ("Resolve & merge:", "reviewComments"),
-                        ("Address comments and merge PR ", "reviewComments"),
-                        ("Review PRs:", "reviewPR"), ("Review PR ", "reviewPR"), ("Review PR:", "reviewPR"),
-                        ("Fix CI ", "fixCI")]
-        let id = prefixes.first { title.hasPrefix($0.0) }?.1
+        let id = legacyPrefixes.first { title.hasPrefix($0.0) }?.1
         return TaskType(template: TaskTemplate.defaults.first { $0.id == id } ?? .custom)
     }
 }

@@ -325,6 +325,34 @@ private struct AgentCounters: View {
     }
 }
 
+struct TaskHeading: View {
+    let type: TaskType
+    let task: String
+    var isCompact = false
+
+    var body: some View {
+        let details = type.details(for: task)
+        HStack(alignment: .top, spacing: isCompact ? 8 : 10) {
+            TaskTypeIcon(type: type)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(type.name)
+                    .font(isCompact ? .system(size: 13, weight: .semibold) : .title3.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                if !details.isEmpty {
+                    Text(details)
+                        .font(isCompact ? .system(size: 11) : .callout)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .multilineTextAlignment(.leading)
+        .help([type.name, details].filter { !$0.isEmpty }.joined(separator: "\n"))
+    }
+}
+
 struct TaskTypeIcon: View {
     let type: TaskType
 

@@ -434,7 +434,7 @@ struct NewTaskSheet: View {
                 effort: selectedEffort.isEmpty ? nil : selectedEffort,
                 project: project,
                 isolated: isGitProject && useWorktree,
-                taskType: TaskType(template: template),
+                taskType: TaskType(template: template, input: taskInput, notes: notes),
                 images: images
             )
             dismiss()

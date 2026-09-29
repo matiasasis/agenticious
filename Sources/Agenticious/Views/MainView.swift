@@ -257,13 +257,7 @@ private struct SessionRow: View {
                 Spacer(minLength: 4)
                 Text(session.agent.displayName).foregroundStyle(.secondary)
             }.font(.system(size: 10, weight: .semibold))
-            HStack(alignment: .top, spacing: 8) {
-                TaskTypeIcon(type: session.displayedTaskType)
-                Text(session.task)
-                    .font(.system(size: 13, weight: .semibold))
-                    .lineLimit(3).multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
+            TaskHeading(type: session.displayedTaskType, task: session.task, isCompact: true)
             if !session.chunks.isEmpty {
                 HStack(spacing: 8) {
                     ChunkStrip(chunks: session.chunks, style: .compact, isRunning: session.isRunning)
@@ -392,14 +386,7 @@ struct SessionCard: View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 12) {
                 header
-                HStack(alignment: .top, spacing: 10) {
-                    TaskTypeIcon(type: session.displayedTaskType)
-                    Text(session.task)
-                        .font(titleFont)
-                        .lineLimit(2)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .help(session.task)
-                }
+                TaskHeading(type: session.displayedTaskType, task: session.task)
                 ChunkStrip(chunks: session.chunks, style: .compact, isRunning: session.isRunning)
                 ChunkList(chunks: session.chunks, limit: Self.stepRows)
                 if case let .needsYou(reason) = session.status {
@@ -420,13 +407,15 @@ struct SessionCard: View {
         .clipped()
     }
 
-    /// Two title lines, a full step list, a two-line "needs you" reason and a branch: the most a card shows.
     private var sizingCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
             HStack(alignment: .top, spacing: 10) {
                 TaskTypeIcon(type: session.displayedTaskType)
-                Text(" ").font(titleFont).lineLimit(2, reservesSpace: true).frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(" ").font(titleFont).lineLimit(2, reservesSpace: true)
+                    Text(" ").font(.callout).lineLimit(3, reservesSpace: true)
+                }.frame(maxWidth: .infinity, alignment: .leading)
             }
             ChunkStrip(chunks: [], style: .compact)
             VStack(alignment: .leading, spacing: 4) {
