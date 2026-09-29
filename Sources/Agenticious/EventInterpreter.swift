@@ -174,10 +174,11 @@ enum EventInterpreter {
         guard let index = (arguments["index"] as? NSNumber)?.intValue,
               let position = session.chunks.firstIndex(where: { $0.id == index }) else { return }
 
-        session.chunks[position].status = ChunkStatus(rawValue: arguments["status"] as? String ?? "") ?? .inProgress
+        let status = ChunkStatus(rawValue: arguments["status"] as? String ?? "")
+        session.chunks[position].status = status ?? .inProgress
         session.chunks[position].note = arguments["note"] as? String
         session.recordPullRequests(in: arguments["note"] as? String ?? "")
-        if !session.status.needsAttention { session.status = .working }
+        if status == .inProgress || !session.status.needsAttention { session.status = .working }
     }
 
     private static func finish(_ arguments: [String: Any], in session: AgentSession) {

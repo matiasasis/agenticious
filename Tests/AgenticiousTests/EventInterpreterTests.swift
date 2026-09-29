@@ -16,6 +16,31 @@ final class EventInterpreterTests: XCTestCase {
     }
 
     @MainActor
+    func testResumedChunkClearsStaleHumanRequest() async {
+        let session = session()
+        for previous in [SessionStatus.needsYou("Use nine PRs?"), .yourTurn] {
+            session.status = previous
+            EventInterpreter.apply("mcp", ["tool": "update_chunk", "args": ["index": 2, "status": "in_progress"]], to: session)
+            XCTAssertEqual(session.status, .working)
+            XCTAssertEqual(session.chunks[1].status, .inProgress)
+        }
+        EventInterpreter.apply("mcp", ["tool": "need_human", "args": ["reason": "Approve deployment?"]], to: session)
+        XCTAssertEqual(session.status, .needsYou("Approve deployment?"))
+    }
+
+    @MainActor
+    func testBookkeepingAndInvalidChunkUpdatesPreserveHumanRequest() async {
+        let session = session()
+        session.status = .needsYou("Use nine PRs?")
+        for status in ["done", "blocked", "pending", "invalid", ""] {
+            EventInterpreter.apply("mcp", ["tool": "update_chunk", "args": ["index": 2, "status": status]], to: session)
+            XCTAssertEqual(session.status, .needsYou("Use nine PRs?"))
+        }
+        EventInterpreter.apply("mcp", ["tool": "update_chunk", "args": ["index": 99, "status": "in_progress"]], to: session)
+        XCTAssertEqual(session.status, .needsYou("Use nine PRs?"))
+    }
+
+    @MainActor
     func testBackgroundCIWaitDoesNotAskForHumanOrNudge() async {
         let session = session()
         XCTAssertNil(EventInterpreter.stopHookReply(backgroundStop, for: session))
