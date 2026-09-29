@@ -256,23 +256,88 @@ private struct LimitGauge: View {
 
 struct PullRequestLinks: View {
     let references: [PullRequestReference]
+    @State private var isExpanded = false
 
     var body: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 8) {
-                ForEach(references) { reference in
-                    Link(destination: reference.url) {
-                        Label(reference.label, systemImage: "arrow.triangle.pull")
-                            .font(.caption.weight(.semibold))
-                            .padding(.horizontal, 10).padding(.vertical, 6)
-                            .background(AgenticiousStyle.violet.opacity(0.12), in: Capsule())
+        VStack(alignment: .leading, spacing: 8) {
+            if isExpanded {
+                PullRequestFlowLayout {
+                    ForEach(references) { reference in
+                        link(reference)
                     }
-                    .foregroundStyle(AgenticiousStyle.violet)
-                    .help(reference.url.absoluteString)
-                    .linkCursor()
+                }
+                toggle
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    ForEach((0...references.count).reversed(), id: \.self) { count in
+                        HStack(spacing: 8) {
+                            ForEach(references.prefix(count)) { reference in
+                                link(reference)
+                            }
+                            if count < references.count { toggle }
+                        }.fixedSize()
+                    }
                 }
             }
-        }.scrollIndicators(.hidden)
+        }.frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var toggle: some View {
+        Button(isExpanded ? "Show less" : "See all (\(references.count))",
+               systemImage: isExpanded ? "chevron.up" : "chevron.down") {
+            isExpanded.toggle()
+        }
+        .buttonStyle(PillButtonStyle(tint: AgenticiousStyle.violet))
+    }
+
+    private func link(_ reference: PullRequestReference) -> some View {
+        Link(destination: reference.url) {
+            Label(reference.label, systemImage: "arrow.triangle.pull")
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .padding(.horizontal, 10).padding(.vertical, 6)
+                .background(AgenticiousStyle.violet.opacity(0.12), in: Capsule())
+        }
+        .foregroundStyle(AgenticiousStyle.violet)
+        .help(reference.url.absoluteString)
+        .linkCursor()
+    }
+}
+
+private struct PullRequestFlowLayout: Layout {
+    private let spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        arrangement(width: proposal.width ?? .infinity, subviews: subviews).size
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let layout = arrangement(width: bounds.width, subviews: subviews)
+        for (subview, frame) in zip(subviews, layout.frames) {
+            subview.place(at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY),
+                          anchor: .topLeading, proposal: ProposedViewSize(frame.size))
+        }
+    }
+
+    private func arrangement(width: CGFloat, subviews: Subviews) -> (size: CGSize, frames: [CGRect]) {
+        var frames: [CGRect] = []
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
+        for subview in subviews {
+            let ideal = subview.sizeThatFits(.unspecified)
+            let size = subview.sizeThatFits(ProposedViewSize(width: min(ideal.width, width), height: nil))
+            if x > 0 && x + size.width > width {
+                x = 0
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            frames.append(CGRect(origin: CGPoint(x: x, y: y), size: size))
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+        }
+        return (CGSize(width: frames.map(\.maxX).max() ?? 0, height: y + rowHeight), frames)
     }
 }
 
