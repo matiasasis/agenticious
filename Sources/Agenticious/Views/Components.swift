@@ -317,3 +317,41 @@ struct TaskTypeIcon: View {
             .accessibilityLabel(type.name)
     }
 }
+
+/// Grays a card out while the app works on its agent in the background, with a spinner saying what it's doing.
+struct BackgroundTaskOverlay: ViewModifier {
+    let task: String?
+    var isCompact = false
+
+    func body(content: Content) -> some View {
+        content
+            .saturation(task == nil ? 1 : 0)
+            .opacity(task == nil ? 1 : 0.45)
+            .overlay {
+                if let task { BackgroundTaskLabel(task: task, isCompact: isCompact) }
+            }
+            .animation(.easeInOut(duration: 0.2), value: task)
+    }
+}
+
+struct BackgroundTaskLabel: View {
+    let task: String
+    var isCompact = false
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ProgressView().controlSize(.small)
+            Text(task).font(isCompact ? .caption.weight(.semibold) : .callout.weight(.semibold))
+        }
+        .padding(.horizontal, isCompact ? 10 : 14).padding(.vertical, isCompact ? 6 : 8)
+        .background(AgenticiousStyle.panel, in: Capsule())
+        .overlay(Capsule().stroke(AgenticiousStyle.violet.opacity(0.4)))
+        .accessibilityElement(children: .combine)
+    }
+}
+
+extension View {
+    func backgroundTask(_ task: String?, isCompact: Bool = false) -> some View {
+        modifier(BackgroundTaskOverlay(task: task, isCompact: isCompact))
+    }
+}

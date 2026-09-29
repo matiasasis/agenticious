@@ -8,9 +8,11 @@ struct CleanupResult {
 }
 
 enum SessionCleanup {
+    /// `progress` hears each step as it starts, for the card to show.
     static func run(id: UUID, processID: Int32?, worktree: Worktree?, sharedWorktree: Bool,
-                    supportDirectory: URL? = nil) -> CleanupResult {
+                    supportDirectory: URL? = nil, progress: (String) -> Void = { _ in }) -> CleanupResult {
         var result = CleanupResult()
+        progress("Stopping the agent…")
         do {
             try stopProcesses(id: id, processID: processID)
             result.processesStopped = true
@@ -22,6 +24,7 @@ enum SessionCleanup {
             if sharedWorktree {
                 result.warnings.append("Archived the agent, but kept its worktree because another queued agent uses it.")
             } else {
+                progress("Removing its worktree…")
                 do {
                     try Worktrees.remove(worktree)
                     result.worktreeRemoved = true
@@ -30,6 +33,7 @@ enum SessionCleanup {
                 }
             }
         }
+        progress("Cleaning up…")
         let support = supportDirectory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let configuration = support.appendingPathComponent("Agenticious/sessions/\(id.uuidString)")
         do {

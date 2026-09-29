@@ -116,8 +116,9 @@ final class SessionStore: ObservableObject {
     }
 
     func archive(_ session: AgentSession) {
-        guard !session.isArchiving else { return }
+        guard !session.isArchiving, session.backgroundTask == nil else { return }
         session.isArchiving = true
+        session.backgroundTask = "Archiving…"
         let id = session.id
         let processID = session.terminalView?.process.running == true ? session.terminalView?.process.shellPid : nil
         let worktree = session.worktreeRemoved ? nil : session.worktree
@@ -129,7 +130,11 @@ final class SessionStore: ObservableObject {
         } ?? false
         Task {
             let result = await Task.detached {
-                SessionCleanup.run(id: id, processID: processID, worktree: worktree, sharedWorktree: sharedWorktree)
+                SessionCleanup.run(id: id, processID: processID, worktree: worktree, sharedWorktree: sharedWorktree) { step in
+                    Task { @MainActor in
+                        if let session = self.session(id), session.isArchiving { session.backgroundTask = step }
+                    }
+                }
             }.value
             if result.processesStopped {
                 if session.terminalView?.process.running == true { session.terminalView?.terminate() }
@@ -143,6 +148,7 @@ final class SessionStore: ObservableObject {
                 if selection == .session(session.id) { show(.queue) }
             }
             session.isArchiving = false
+            session.backgroundTask = nil
             save(session)
             updateBadge()
             if !result.warnings.isEmpty { alert = result.warnings.joined(separator: "\n\n") }
@@ -204,6 +210,7 @@ final class SessionStore: ObservableObject {
 
     // MARK: - Sessions
 
+    /// The card appears at once; creating the worktree and starting the CLI happen in the background, shown on the card.
     @discardableResult
     func launch(
         task: String, prompt: String? = nil, agent: AgentKind, model: ModelChoice? = nil, effort: String? = nil,
@@ -211,22 +218,43 @@ final class SessionStore: ObservableObject {
     ) throws -> AgentSession {
         let id = UUID()
         let imageFiles = try PastedImage.save(images, into: AgentLauncher.sessionDirectory(for: id).appendingPathComponent("images"))
-        let worktree = try isolated ? project.path.map { try Worktrees.create(in: $0, for: task) } : nil
-        let directory = try worktree.map { directory(inside: $0, for: project) } ?? directory(for: project)
         let session = AgentSession(
             id: id, task: task, prompt: (prompt ?? task) + PastedImage.instructions(for: imageFiles), agent: agent,
-            project: project, directory: directory, worktree: worktree, model: model, effort: effort, taskType: taskType
+            project: project, directory: URL(fileURLWithPath: project.path ?? NSHomeDirectory()),
+            model: model, effort: effort, taskType: taskType
         )
         if agent == .claude { session.conversationID = session.id.uuidString.lowercased() }
-        let spec = try AgentLauncher(port: port).spec(for: session, images: imageFiles)
-
-        attachTerminal(to: session, running: spec)
+        let worktreeIn = isolated ? project.path : nil
+        session.backgroundTask = worktreeIn == nil ? "Starting \(agent.displayName)…" : "Creating its worktree…"
         sessions.insert(session, at: 0)
-        track(session)
-        save(session)
         selection = .session(session.id)
 
+        Task { await start(session, worktreeIn: worktreeIn, images: imageFiles) }
         return session
+    }
+
+    /// Saved and tracked only once running, so a launch that fails leaves nothing behind in the database.
+    private func start(_ session: AgentSession, worktreeIn projectPath: String?, images: [URL]) async {
+        do {
+            if let projectPath {
+                let task = session.task
+                let worktree = try await Task.detached { try Worktrees.create(in: projectPath, for: task) }.value
+                session.worktree = worktree
+                session.directory = directory(inside: worktree, for: session.project)
+                session.backgroundTask = "Starting \(session.agent.displayName)…"
+            } else {
+                session.directory = try directory(for: session.project)
+            }
+            attachTerminal(to: session, running: try AgentLauncher(port: port).spec(for: session, images: images))
+            session.backgroundTask = nil
+            track(session)
+            save(session)
+        } catch {
+            sessions.removeAll { $0.id == session.id }
+            if selection == .session(session.id) { selection = .overview }
+            if let folder = try? AgentLauncher.sessionDirectory(for: session.id) { try? FileManager.default.removeItem(at: folder) }
+            alert = "Couldn't start the agent: \(error.localizedDescription)"
+        }
     }
 
     /// Starts the agent again on its earlier conversation, in the same folder, still reporting to this session.

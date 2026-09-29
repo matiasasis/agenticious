@@ -56,7 +56,11 @@ struct SessionDetailView: View {
                 if !session.pullRequests.isEmpty { PullRequestLinks(references: session.pullRequests) }
 
                 ChunkStrip(chunks: session.chunks, style: .expanded, isRunning: session.isRunning)
-                statusBanner
+                if let task = session.backgroundTask {
+                    BackgroundTaskLabel(task: task)
+                } else {
+                    statusBanner
+                }
             }
             .padding(20)
             .background(AgenticiousStyle.panel)
@@ -76,6 +80,10 @@ struct SessionDetailView: View {
             }.padding(12).background(AgenticiousStyle.panel)
             if showActivity {
                 ActivityView(session: session) { showActivity = false }
+            } else if session.terminalView == nil, let task = session.backgroundTask {
+                ContentUnavailableView { Label(task, systemImage: "hourglass") } description: {
+                    Text("The terminal opens once \(session.agent.displayName) is running.")
+                }
             } else if session.terminalView == nil {
                 ContentUnavailableView(
                     "Not running", systemImage: "moon.zzz",

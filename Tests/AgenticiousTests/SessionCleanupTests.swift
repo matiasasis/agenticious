@@ -36,7 +36,10 @@ final class SessionCleanupTests: XCTestCase {
         let id = UUID()
         let configuration = root.appendingPathComponent("Agenticious/sessions/\(id.uuidString)")
         try FileManager.default.createDirectory(at: configuration, withIntermediateDirectories: true)
-        let result = SessionCleanup.run(id: id, processID: nil, worktree: worktree, sharedWorktree: false, supportDirectory: root)
+        var steps: [String] = []
+        let result = SessionCleanup.run(id: id, processID: nil, worktree: worktree, sharedWorktree: false,
+                                        supportDirectory: root) { steps.append($0) }
+        XCTAssertEqual(steps, ["Stopping the agent…", "Removing its worktree…", "Cleaning up…"])
         XCTAssertTrue(result.processesStopped)
         XCTAssertTrue(result.worktreeRemoved, result.warnings.joined(separator: "; "))
         XCTAssertFalse(FileManager.default.fileExists(atPath: worktree.path))

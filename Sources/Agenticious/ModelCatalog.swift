@@ -34,9 +34,23 @@ enum ModelCatalog {
 
     // MARK: - Codex
 
+    private static let codexLock = NSLock()
+    nonisolated(unsafe) private static var codexCatalog: (modified: Date?, models: [ModelChoice])?
+
     /// Codex caches the models it offers with each one's reasoning levels. List the ones its own picker lists.
+    /// Parsed again only when Codex rewrites that cache.
     private static func codexModels() -> [ModelChoice] {
         let cache = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".codex/models_cache.json")
+        let modified = (try? cache.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+        return codexLock.withLock {
+            if let codexCatalog, codexCatalog.modified == modified, modified != nil { return codexCatalog.models }
+            let models = parseCodexModels(cache)
+            codexCatalog = (modified, models)
+            return models
+        }
+    }
+
+    private static func parseCodexModels(_ cache: URL) -> [ModelChoice] {
         guard let data = try? Data(contentsOf: cache),
               let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
               let models = object["models"] as? [[String: Any]] else {

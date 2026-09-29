@@ -6,6 +6,7 @@ struct ActivityView: View {
     let openTerminal: () -> Void
     @State private var entries: [ActivityEntry] = []
     @State private var notice: String?
+    @State private var loadedSession: UUID?
     @State private var followLatest = true
 
     var body: some View {
@@ -25,7 +26,9 @@ struct ActivityView: View {
                     }.padding(20)
                 }
                 .overlay {
-                    if entries.isEmpty {
+                    if loadedSession != session.id {
+                        BackgroundTaskLabel(task: "Loading activity…")
+                    } else if entries.isEmpty {
                         ContentUnavailableView("No activity yet", systemImage: "text.bubble", description: Text("Messages and tool calls appear here when the provider writes them to this session’s log."))
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .allowsHitTesting(false)
@@ -36,22 +39,33 @@ struct ActivityView: View {
         }
         .background(AgenticiousStyle.ink)
         .task(id: "\(session.id)-\(session.isMarkedFinished)") {
+            if loadedSession != session.id {
+                entries = []
+                notice = nil
+            }
             var cached: URL?
+            var stamp: TranscriptStamp?
             var previousID = session.conversationID
             while !Task.isCancelled {
                 let agent = session.agent
                 let id = session.id
                 let conversation = session.conversationID
                 let directory = session.directory.path
-                if previousID != conversation { cached = nil; previousID = conversation }
+                if previousID != conversation { cached = nil; stamp = nil; previousID = conversation }
                 let file = cached
+                let lastStamp = stamp
                 let result = await Task.detached(priority: .utility) {
-                    ActivityTranscript.read(agent: agent, sessionID: id, conversationID: conversation, directory: directory, cached: file)
+                    ActivityTranscript.read(agent: agent, sessionID: id, conversationID: conversation, directory: directory,
+                                            cached: file, stamp: lastStamp)
                 }.value
                 guard !Task.isCancelled else { return }
                 cached = result.url
-                entries = result.entries
-                notice = result.notice
+                stamp = result.stamp
+                if !result.isUnchanged {
+                    entries = result.entries
+                    notice = result.notice
+                }
+                loadedSession = id
                 if session.conversationID == nil, let conversation = result.conversationID {
                     session.objectWillChange.send()
                     session.conversationID = conversation
