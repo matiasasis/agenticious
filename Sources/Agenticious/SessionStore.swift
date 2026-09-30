@@ -70,6 +70,7 @@ final class SessionStore: ObservableObject {
     let presets = TaskPresetStore()
     let skillLocations = SkillLocations()
     private var server: EventServer?
+    private var backgroundRefresh: BackgroundRefresh?
     private var database: SessionDatabase?
     private var subscriptions: [UUID: AnyCancellable] = [:]
     private var unsaved: Set<UUID> = []
@@ -83,6 +84,11 @@ final class SessionStore: ObservableObject {
         startServer()
         snapshotter = LaunchOptions.current.snapshotDirectory.map(WindowSnapshotter.init)
         notifications.perform = { [weak self] action, id, text in self?.perform(action, on: id, text: text) }
+        let (usage, diagnostics) = (usage, diagnostics)
+        backgroundRefresh = BackgroundRefresh(jobs: [
+            .init(check: .providers, lastChecked: { diagnostics.lastChecked }, run: { Task { await diagnostics.refresh() } }),
+            .init(check: .usage, lastChecked: { usage.lastChecked }, run: usage.refresh),
+        ])
     }
 
     // MARK: - Reading

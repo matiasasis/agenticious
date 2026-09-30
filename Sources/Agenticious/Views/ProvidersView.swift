@@ -163,6 +163,5 @@ struct ProviderStatusButton: View {
                 }
             }.padding(20).frame(width: 360).background(AgenticiousStyle.ink)
         }
-        .task { if diagnostics.reports.isEmpty { await diagnostics.refresh() } }
     }
 }

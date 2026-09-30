@@ -22,8 +22,22 @@ struct TaskTemplate: Codable, Identifiable, Equatable {
     }
 
     func title(for value: String) -> String {
-        let title = titlePattern.replacingOccurrences(of: "{{input}}", with: value).trimmingCharacters(in: .whitespacesAndNewlines)
+        let title = titlePattern.replacingOccurrences(of: "{{input}}", with: Self.withoutSnippets(value))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         return title.isEmpty ? name : title
+    }
+
+    /// Code snippets stay in the prompt but would swamp a card title.
+    static func withoutSnippets(_ text: String) -> String {
+        var isInSnippet = false
+        return text.components(separatedBy: "\n").filter { line in
+            if line.trimmingCharacters(in: .whitespaces).hasPrefix("```") {
+                isInSnippet.toggle()
+                return false
+            }
+            return !isInSnippet
+        }
+        .joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     func instructions(for value: String, notes: String = "") -> String {
