@@ -23,6 +23,7 @@ final class ProviderDiagnostics: ObservableObject {
     @Published private(set) var isDisconnecting = false
     @Published var disconnectError: String?
     @Published var project = Project.none
+    private(set) var lastChecked: Date?
 
     var attentionCount: Int { reports.values.reduce(0) { $0 + $1.attentionCount } }
 
@@ -51,6 +52,7 @@ final class ProviderDiagnostics: ObservableObject {
             }
             for await (agent, report) in group { reports[agent] = report }
         }
+        lastChecked = Date()
         isChecking = false
     }
 }

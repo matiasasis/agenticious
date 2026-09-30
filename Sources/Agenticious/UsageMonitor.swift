@@ -35,22 +35,20 @@ final class UsageMonitor: ObservableObject {
     @Published private(set) var codexLimits: [UsageLimit] = []
     @Published private(set) var claudeReading: ClaudeReading?
     @Published private(set) var claudeTokensToday: Int?
-
-    private var timer: Timer?
+    private(set) var lastChecked: Date?
 
     init() {
         claudeReading = UserDefaults.standard.data(forKey: Self.claudeReadingKey)
             .flatMap { try? JSONDecoder().decode(ClaudeReading.self, from: $0) }
-        refresh()
-        timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.refresh() }
-        }
     }
 
+    /// Today's tokens only stand in for Claude's limits, so they aren't read once a status line has reported them.
     func refresh() {
+        lastChecked = Date()
+        let needsTokenEstimate = claudeReading == nil
         Task.detached(priority: .utility) {
             let codex = UsageReader.codexLimits()
-            let claude = UsageReader.claudeTokensToday()
+            let claude = needsTokenEstimate ? UsageReader.claudeTokensToday() : nil
             await MainActor.run {
                 self.codexLimits = codex
                 self.claudeTokensToday = claude
@@ -77,11 +75,28 @@ enum UsageReader {
     // MARK: - Codex
 
     /// The newest log can predate its first rate-limit line (a session that just started), so look a few back.
-    static func codexLimits() -> [UsageLimit] {
-        let logs = allFiles(in: home.appendingPathComponent(".codex/sessions"), modifiedAfter: .distantPast)
-            .sorted { modified($0) > modified($1) }
-            .prefix(5)
-        return logs.lazy.compactMap(codexLimits(in:)).first ?? []
+    static func codexLimits(sessions: URL = home.appendingPathComponent(".codex/sessions")) -> [UsageLimit] {
+        recentCodexLogs(in: sessions).prefix(5).lazy.compactMap(codexLimits(in:)).first ?? []
+    }
+
+    /// Logs are filed under sessions/YYYY/MM/DD by start date, so only the newest few day folders are read instead of
+    /// the whole history. Several days are kept because a session started yesterday may be the one still writing.
+    static func recentCodexLogs(in sessions: URL, days: Int = 3) -> [URL] {
+        var folders: [URL] = []
+        search: for year in subfolders(of: sessions) {
+            for month in subfolders(of: year) {
+                for day in subfolders(of: month) {
+                    folders.append(day)
+                    if folders.count == days { break search }
+                }
+            }
+        }
+        return folders
+            .flatMap { (try? FileManager.default.contentsOfDirectory(at: $0, includingPropertiesForKeys: [.contentModificationDateKey])) ?? [] }
+            .filter { $0.pathExtension == "jsonl" }
+            .map { ($0, modified($0)) }
+            .sorted { $0.1 > $1.1 }
+            .map(\.0)
     }
 
     private static func codexLimits(in log: URL) -> [UsageLimit]? {
@@ -146,6 +161,12 @@ enum UsageReader {
     private static func allFiles(in directory: URL, modifiedAfter date: Date) -> [URL] {
         let enumerator = FileManager.default.enumerator(at: directory, includingPropertiesForKeys: [.contentModificationDateKey])
         return (enumerator?.allObjects as? [URL] ?? []).filter { $0.pathExtension == "jsonl" && modified($0) >= date }
+    }
+
+    private static func subfolders(of directory: URL) -> [URL] {
+        ((try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.isDirectoryKey])) ?? [])
+            .filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true }
+            .sorted { $0.lastPathComponent > $1.lastPathComponent }
     }
 
     private static func modified(_ url: URL) -> Date {
