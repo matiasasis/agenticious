@@ -21,7 +21,6 @@ struct NewTaskSheet: View {
     @StateObject private var repository = WorkspaceRepository()
     @State private var loadedPreset = false
     @State private var showingModels = false
-    @FocusState private var missionFocused: Bool
     @State private var skillPaths: [String] = []
     @State private var task = ""
     @State private var templateValue = ""
@@ -65,7 +64,6 @@ struct NewTaskSheet: View {
         .background(AgenticiousStyle.ink)
         .tint(AgenticiousStyle.lime)
         .preferredColorScheme(.dark)
-        .defaultFocus($missionFocused, true)
         .dropDestination(for: URL.self) { urls, _ in
             let dropped = urls.compactMap(PastedImage.init(file:))
             images += dropped
@@ -113,31 +111,26 @@ struct NewTaskSheet: View {
         if template.isCustom {
             VStack(alignment: .leading, spacing: 8) {
                 Text("The mission").font(.headline)
-                editor($task, minHeight: 100)
+                editor($task, minHeight: 100, focusOnAppear: true)
                     .accessibilityLabel("Task")
-                    .focused($missionFocused)
-                Text("Describe the outcome. Your agent will break it into steps.")
+                Text("Describe the outcome. Your agent will break it into steps. Type ``` for a code snippet.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         } else {
             VStack(alignment: .leading, spacing: 12) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(template.fieldLabel).font(.headline)
-                    TextField(template.fieldPlaceholder, text: $templateValue, axis: .vertical)
-                        .lineLimit(1...5)
-                        .textFieldStyle(.plain)
-                        .font(.title3)
-                        .padding(12)
-                        .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 10))
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(AgenticiousStyle.violet.opacity(0.3)))
+                    SnippetEditor(text: $templateValue, placeholder: template.fieldPlaceholder,
+                                  font: .preferredFont(forTextStyle: .title3), minHeight: 44, maxHeight: 200, focusOnAppear: true)
+                        .id(template.id)
                         .accessibilityLabel(template.fieldLabel)
-                        .focused($missionFocused)
                     Text("Title: \(template.title(for: trimmedValue.isEmpty && template.isFieldRequired ? "…" : trimmedValue))")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Text("Notes (optional)").font(.headline)
                 editor($notes, minHeight: 90)
                     .accessibilityLabel("Notes (optional)")
+                Text("Type ``` for a code snippet.").font(.caption).foregroundStyle(.secondary)
             }
         }
     }
@@ -349,14 +342,8 @@ struct NewTaskSheet: View {
         .overlay(alignment: .top) { Rectangle().fill(AgenticiousStyle.violet.opacity(0.2)).frame(height: 1) }
     }
 
-    private func editor(_ text: Binding<String>, minHeight: CGFloat) -> some View {
-        TextEditor(text: text)
-            .font(.body)
-            .scrollContentBackground(.hidden)
-            .padding(10)
-            .frame(minHeight: minHeight)
-            .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 10))
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(AgenticiousStyle.violet.opacity(0.3)))
+    private func editor(_ text: Binding<String>, minHeight: CGFloat, focusOnAppear: Bool = false) -> some View {
+        SnippetEditor(text: text, minHeight: minHeight, focusOnAppear: focusOnAppear)
     }
 
     private var trimmedValue: String { templateValue.trimmingCharacters(in: .whitespacesAndNewlines) }
