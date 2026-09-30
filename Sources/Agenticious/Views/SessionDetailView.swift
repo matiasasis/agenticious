@@ -54,7 +54,7 @@ struct SessionDetailView: View {
 
                 if !session.startupSteps.isEmpty {
                     StartupProgressView(steps: session.startupSteps)
-                } else if session.backgroundTask == nil {
+                } else if session.backgroundTask == nil, session.startupPrompt == nil {
                     ChunkStrip(chunks: session.chunks, style: .expanded, isRunning: session.isRunning)
                 }
                 if let task = session.backgroundTask {
@@ -75,7 +75,7 @@ struct SessionDetailView: View {
                     .buttonStyle(AgenticiousButtonStyle(isPrimary: !showActivity, isCompact: true))
                 Spacer()
                 if session.status.needsAttention || session.status == .yourTurn {
-                    Button("Reply / approve in terminal", systemImage: "arrow.right") { showActivity = false }
+                    Button(session.startupPrompt == nil ? "Reply / approve in terminal" : "Review startup prompt", systemImage: "arrow.right") { showActivity = false }
                         .buttonStyle(AgenticiousButtonStyle(isCompact: true))
                 }
             }.padding(12).background(AgenticiousStyle.panel)
@@ -107,6 +107,9 @@ struct SessionDetailView: View {
                 }
                 .padding(14).background(AgenticiousStyle.panel)
             }
+        }
+        .onChange(of: session.startupPrompt, initial: true) { _, prompt in
+            if prompt != nil { showActivity = false }
         }
     }
 

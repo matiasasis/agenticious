@@ -364,6 +364,7 @@ final class SessionStore: ObservableObject {
         var previousID = session.conversationID
         while session.isRunning, session.chunks.isEmpty, !session.status.isFinished,
               session.terminalView === terminal, self.session(session.id) != nil {
+            updateStartupPrompt(of: session, terminal: terminal)
             let agent = session.agent
             let id = session.id
             let conversation = session.conversationID
@@ -390,6 +391,16 @@ final class SessionStore: ObservableObject {
             }
             do { try await Task.sleep(for: .seconds(2)) } catch { return }
         }
+    }
+
+    private func updateStartupPrompt(of session: AgentSession, terminal: LocalProcessTerminalView) {
+        guard session.status == .starting || session.startupPrompt != nil else { return }
+        let oldStatus = session.status
+        let prompt = StartupPrompt.detect(in: terminal.getTerminal(), agent: session.agent)
+        StartupPromptInterpreter.apply(prompt, to: session)
+        guard session.status != oldStatus else { return }
+        notifyTransition(from: oldStatus, for: session)
+        updateBadge()
     }
 
     /// Re-publish every session change so lists re-sort when an agent flips to "needs you", and save it.

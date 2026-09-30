@@ -407,7 +407,7 @@ struct SessionCard: View {
                 TaskHeading(type: session.displayedTaskType, task: session.task)
                 if !session.startupSteps.isEmpty {
                     StartupProgressView(steps: session.startupSteps)
-                } else {
+                } else if session.startupPrompt == nil {
                     ChunkStrip(chunks: session.chunks, style: .compact, isRunning: session.isRunning)
                     ChunkList(chunks: session.chunks, limit: Self.stepRows)
                 }
