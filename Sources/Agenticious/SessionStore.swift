@@ -355,6 +355,52 @@ final class SessionStore: ObservableObject {
         session.terminalBridge = bridge
         session.isRunning = true
         if terminal.process.running { notifications.playSummonSound() }
+        Task { await monitorStartup(of: session, terminal: terminal) }
+    }
+
+    private func monitorStartup(of session: AgentSession, terminal: LocalProcessTerminalView) async {
+        var cached: URL?
+        var stamp: TranscriptStamp?
+        var previousID = session.conversationID
+        while session.isRunning, session.chunks.isEmpty, !session.status.isFinished,
+              session.terminalView === terminal, self.session(session.id) != nil {
+            updateStartupPrompt(of: session, terminal: terminal)
+            let agent = session.agent
+            let id = session.id
+            let conversation = session.conversationID
+            let directory = session.directory.path
+            if previousID != conversation { cached = nil; stamp = nil; previousID = conversation }
+            let file = cached
+            let lastStamp = stamp
+            let result = await Task.detached(priority: .utility) {
+                ActivityTranscript.read(agent: agent, sessionID: id, conversationID: conversation,
+                                        directory: directory, cached: file, stamp: lastStamp)
+            }.value
+            guard session.isRunning, session.chunks.isEmpty, !session.isArchiving,
+                  session.terminalView === terminal else { return }
+            if session.conversationID != conversation { continue }
+            cached = result.url
+            stamp = result.stamp
+            if !result.isUnchanged {
+                session.startupProgress.update(from: result)
+                if session.status == .starting, !result.entries.isEmpty { session.status = .working }
+            }
+            if session.conversationID == nil, let conversation = result.conversationID {
+                session.conversationID = conversation
+                previousID = conversation
+            }
+            do { try await Task.sleep(for: .seconds(2)) } catch { return }
+        }
+    }
+
+    private func updateStartupPrompt(of session: AgentSession, terminal: LocalProcessTerminalView) {
+        guard session.status == .starting || session.startupPrompt != nil else { return }
+        let oldStatus = session.status
+        let prompt = StartupPrompt.detect(in: terminal.getTerminal(), agent: session.agent)
+        StartupPromptInterpreter.apply(prompt, to: session)
+        guard session.status != oldStatus else { return }
+        notifyTransition(from: oldStatus, for: session)
+        updateBadge()
     }
 
     /// Re-publish every session change so lists re-sort when an agent flips to "needs you", and save it.

@@ -123,7 +123,13 @@ final class AgentSession: ObservableObject, Identifiable {
     @Published var isArchiving = false
     /// What the app is doing for this agent in the background, like starting or archiving it. Cards gray out and show it.
     @Published var backgroundTask: String?
-    @Published var status: SessionStatus = .starting
+    @Published var status: SessionStatus = .starting {
+        didSet {
+            if let startupPrompt, status != .needsYou(startupPrompt.reason) { self.startupPrompt = nil }
+        }
+    }
+    @Published var startupProgress = StartupProgress()
+    @Published var startupPrompt: StartupPrompt?
     @Published var chunks: [Chunk] = []
     @Published private(set) var pullRequests: [PullRequestReference] = []
     @Published var lastActivity = Date()
@@ -182,6 +188,12 @@ final class AgentSession: ObservableObject, Identifiable {
     }
 
     var completedChunks: Int { chunks.filter { $0.status == .done }.count }
+
+    var startupSteps: [Chunk] {
+        guard chunks.isEmpty, backgroundTask == nil, !isArchiving, !isMarkedFinished,
+              status == .starting || (status == .working && isRunning) else { return [] }
+        return startupProgress.steps(for: agent, submitted: status == .working)
+    }
 
     var allChunksDone: Bool { !chunks.isEmpty && completedChunks == chunks.count }
 

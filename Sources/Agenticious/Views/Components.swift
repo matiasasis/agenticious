@@ -84,6 +84,37 @@ extension SessionStatus {
     }
 }
 
+struct StartupProgressView: View {
+    let steps: [Chunk]
+    var isCompact = false
+
+    private var visibleSteps: [Chunk] {
+        if isCompact { return steps.last(where: { $0.status == .inProgress }).map { [$0] } ?? [] }
+        return steps
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(visibleSteps) { step in
+                HStack(spacing: 8) {
+                    if step.status == .inProgress {
+                        ProgressView().controlSize(.mini).frame(width: 14)
+                    } else {
+                        Image(systemName: step.status.symbol).foregroundStyle(step.status.color).frame(width: 14)
+                    }
+                    Text(step.title)
+                        .foregroundStyle(step.status == .inProgress ? .primary : .secondary)
+                        .lineLimit(1)
+                        .help(step.title)
+                }
+                .accessibilityElement(children: .combine)
+            }
+        }
+        .font(isCompact ? .caption : .callout)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 struct ChunkStrip: View {
     enum Style { case compact, expanded }
 
