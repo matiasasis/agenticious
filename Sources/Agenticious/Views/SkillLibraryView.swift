@@ -163,19 +163,54 @@ private struct SkillDetailView: View {
 struct SkillProjectPicker: View {
     @EnvironmentObject private var store: SessionStore
     @Binding var project: Project
+    @State private var choosing = false
 
     var body: some View {
-        HStack {
-            Picker("Project", selection: $project) {
-                Text("Personal skills only").tag(Project.none)
-                ForEach(choices) { Text($0.name).tag($0) }
+        Button { choosing.toggle() } label: {
+            HStack(spacing: 10) {
+                Image(systemName: project == .none ? "person" : "folder").foregroundStyle(AgenticiousStyle.violet)
+                Text(project == .none ? "Personal skills only" : project.name).font(.callout.weight(.semibold)).lineLimit(1)
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.up.chevron.down").font(.caption).foregroundStyle(AgenticiousStyle.violet)
             }
-            Button("Choose project folder", systemImage: "folder.badge.plus") {
-                if let url = FolderPicker.choose(startingAt: project.path) { project = Project(path: url.path) }
-            }
-            .labelStyle(.iconOnly)
-            .buttonStyle(.borderless)
+            .padding(.horizontal, 12).frame(height: 36)
+            .background(AgenticiousStyle.ink, in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(AgenticiousStyle.violet.opacity(0.3)))
+            .contentShape(RoundedRectangle(cornerRadius: 10))
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Project")
+        .accessibilityValue(project == .none ? "Personal skills only" : project.name)
+        .popover(isPresented: $choosing) {
+            VStack(alignment: .leading, spacing: 4) {
+                option("Personal skills only", symbol: "person", value: .none)
+                ForEach(choices) { option($0.name, symbol: "folder", value: $0) }
+                Divider().padding(.vertical, 4)
+                Button {
+                    choosing = false
+                    if let url = FolderPicker.choose(startingAt: project.path) { project = Project(path: url.path) }
+                } label: {
+                    Label("Choose project folder…", systemImage: "folder.badge.plus").padding(10).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(8).frame(width: 300).background(AgenticiousStyle.panel)
+        }
+    }
+
+    private func option(_ title: String, symbol: String, value: Project) -> some View {
+        Button {
+            project = value
+            choosing = false
+        } label: {
+            HStack {
+                Label(title, systemImage: symbol).lineLimit(1)
+                Spacer()
+                if project == value { Image(systemName: "checkmark").foregroundStyle(AgenticiousStyle.lime) }
+            }
+            .padding(10).contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private var choices: [Project] {
