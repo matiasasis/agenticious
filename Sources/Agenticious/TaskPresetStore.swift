@@ -6,9 +6,12 @@ final class TaskPresetStore: ObservableObject {
     @Published private(set) var presets = TaskTemplate.defaults
     @Published private(set) var loadError: String?
     let url: URL
+    private let defaults: UserDefaults
+    private static let usesKey = "taskPresetUses"
 
-    init(url: URL = TaskPresetStore.defaultURL) {
+    init(url: URL = TaskPresetStore.defaultURL, defaults: UserDefaults = .standard) {
         self.url = url
+        self.defaults = defaults
         guard FileManager.default.fileExists(atPath: url.path) else { return }
         do {
             let saved = try JSONDecoder().decode([TaskTemplate].self, from: Data(contentsOf: url))
@@ -25,6 +28,25 @@ final class TaskPresetStore: ObservableObject {
     }
 
     func preset(id: String) -> TaskTemplate { presets.first { $0.id == id } ?? presets.first { $0.isCustom } ?? .custom }
+
+    /// The custom task first, then the most started; ties keep the saved order.
+    var presetsByUse: [TaskTemplate] {
+        let uses = defaults.dictionary(forKey: Self.usesKey) as? [String: Int] ?? [:]
+        return presets.enumerated()
+            .sorted { a, b in
+                if a.element.isCustom != b.element.isCustom { return a.element.isCustom }
+                let (left, right) = (uses[a.element.id] ?? 0, uses[b.element.id] ?? 0)
+                return left != right ? left > right : a.offset < b.offset
+            }
+            .map(\.element)
+    }
+
+    func recordUse(of preset: TaskTemplate) {
+        var uses = defaults.dictionary(forKey: Self.usesKey) as? [String: Int] ?? [:]
+        uses[preset.id, default: 0] += 1
+        defaults.set(uses, forKey: Self.usesKey)
+        objectWillChange.send()
+    }
 
     func save(_ preset: TaskTemplate) throws {
         var updated = presets

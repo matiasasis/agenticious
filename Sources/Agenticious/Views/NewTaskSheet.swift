@@ -40,7 +40,7 @@ struct NewTaskSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            TaskTemplatePicker(selection: $template, templates: presets.presets)
+            TaskTemplatePicker(selection: $template, templates: presets.presetsByUse)
                 .padding(.horizontal, 24)
                 .padding(.vertical, 12)
             ScrollView {
@@ -424,6 +424,7 @@ struct NewTaskSheet: View {
                 taskType: TaskType(template: template, input: taskInput, notes: notes),
                 images: images
             )
+            presets.recordUse(of: template)
             dismiss()
         } catch {
             launchError = error.localizedDescription
@@ -431,43 +432,86 @@ struct NewTaskSheet: View {
     }
 }
 
+/// Tasks wrap into a grid of at most two rows; the rest sit behind "more", with the selected task always shown.
 private struct TaskTemplatePicker: View {
     @Binding var selection: TaskTemplate
     let templates: [TaskTemplate]
+    @State private var width: CGFloat = 900
+    @State private var showingAll = false
+
+    private static let chipWidth: CGFloat = 180
+    private static let spacing: CGFloat = 8
+    private static let rows = 2
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Choose a task").font(.headline)
-            ScrollView(.horizontal) {
-                HStack(spacing: 8) {
-                    ForEach(templates) { template in
-                        Button { selection = template } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: template.symbol).font(.callout)
-                                Text(template.shortName).font(.system(size: 12, weight: .semibold)).lineLimit(1)
-                                Image(systemName: "checkmark.circle.fill").opacity(selection == template ? 1 : 0)
-                            }
-                            .padding(.horizontal, 12).frame(height: 40)
-                            .foregroundStyle(selection == template ? AgenticiousStyle.lime : .primary)
-                            .background(selection == template ? AgenticiousStyle.lime.opacity(0.1) : AgenticiousStyle.panel,
-                                        in: RoundedRectangle(cornerRadius: 12))
-                            .overlay(RoundedRectangle(cornerRadius: 12)
-                                .stroke(selection == template ? AgenticiousStyle.lime : AgenticiousStyle.violet.opacity(0.25)))
-                            .contentShape(RoundedRectangle(cornerRadius: 12))
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(template.name)
-                        .accessibilityValue(selection == template ? "Selected" : "Not selected")
-                        .accessibilityAddTraits(selection == template ? .isSelected : [])
-                        .help(template.summary)
-                    }
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: Self.chipWidth), spacing: Self.spacing)], alignment: .leading, spacing: Self.spacing) {
+                ForEach(visible) { chip($0) }
+                if overflows { moreButton }
+            }
+            .background {
+                GeometryReader { proxy in
+                    Color.clear
+                        .onAppear { width = proxy.size.width }
+                        .onChange(of: proxy.size.width) { _, newWidth in width = newWidth }
                 }
             }
-            .scrollIndicators(.hidden)
             Text(selection.summary)
                 .font(.callout).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
+    }
+
+    /// Matches how an adaptive grid fills its width, so "more" lands in the last slot of the second row.
+    private var capacity: Int {
+        max(1, Int((width + Self.spacing) / (Self.chipWidth + Self.spacing))) * Self.rows
+    }
+
+    private var overflows: Bool { templates.count > capacity }
+
+    private var visible: [TaskTemplate] {
+        guard overflows, !showingAll else { return templates }
+        var shown = Array(templates.prefix(capacity - 1))
+        if !shown.contains(where: { $0.id == selection.id }), let selected = templates.first(where: { $0.id == selection.id }) {
+            shown[shown.count - 1] = selected
+        }
+        return shown
+    }
+
+    private func chip(_ template: TaskTemplate) -> some View {
+        let isSelected = selection.id == template.id
+        return Button { selection = template } label: {
+            HStack(spacing: 8) {
+                Image(systemName: template.symbol).font(.callout)
+                Text(template.shortName).font(.system(size: 12, weight: .semibold)).lineLimit(1)
+                Spacer(minLength: 0)
+                Image(systemName: "checkmark.circle.fill").opacity(isSelected ? 1 : 0)
+            }
+            .padding(.horizontal, 12).frame(height: 40)
+            .foregroundStyle(isSelected ? AgenticiousStyle.lime : .primary)
+            .background(isSelected ? AgenticiousStyle.lime.opacity(0.1) : AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(isSelected ? AgenticiousStyle.lime : AgenticiousStyle.violet.opacity(0.25)))
+            .contentShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(template.name)
+        .accessibilityValue(isSelected ? "Selected" : "Not selected")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .help(template.summary.isEmpty ? template.name : template.name + " · " + template.summary)
+    }
+
+    private var moreButton: some View {
+        Button { withAnimation(.snappy) { showingAll.toggle() } } label: {
+            Label(showingAll ? "Show less" : "\(templates.count - visible.count) more", systemImage: showingAll ? "chevron.up" : "ellipsis")
+                .font(.system(size: 12, weight: .semibold))
+                .frame(maxWidth: .infinity).frame(height: 40)
+                .foregroundStyle(AgenticiousStyle.violet)
+                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(AgenticiousStyle.violet.opacity(0.4), style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
+                .contentShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(showingAll ? "Show fewer tasks" : "Show all tasks")
     }
 }
 
