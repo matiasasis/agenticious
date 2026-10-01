@@ -124,6 +124,7 @@ final class SessionStore: ObservableObject {
     func archive(_ session: AgentSession) {
         guard !session.isArchiving, session.backgroundTask == nil else { return }
         session.isArchiving = true
+        session.releaseQuestion()
         session.backgroundTask = "Archiving…"
         let id = session.id
         let processID = session.terminalView?.process.running == true ? session.terminalView?.process.shellPid : nil
@@ -454,7 +455,10 @@ final class SessionStore: ObservableObject {
     private func startServer() {
         do {
             let server = try EventServer(port: port) { [weak self] event, reply in
-                Task { @MainActor in reply(self?.handle(event)) }
+                Task { @MainActor in
+                    guard let self else { return reply(nil) }
+                    if event.name == "AskUserQuestion" { self.hold(event, reply: reply) } else { reply(self.handle(event)) }
+                }
             }
             server.start()
             self.server = server
@@ -470,6 +474,8 @@ final class SessionStore: ObservableObject {
         if event.name == "StatusLine" { return statusLine(payload) }
 
         session.lastActivity = Date()
+
+        if Self.movesPastQuestion(event.name, payload) { session.releaseQuestion() }
 
         if event.name == "Stop", let reply = EventInterpreter.stopHookReply(payload, for: session) {
             session.status = .working
@@ -498,11 +504,52 @@ final class SessionStore: ObservableObject {
         }
     }
 
+    // MARK: - Questions
+
+    /// Keeps Claude's AskUserQuestion hook waiting while the question shows in Activity. Subagents, and agents
+    /// Agenticious isn't showing, get no reply, so Claude's own menu appears.
+    private func hold(_ event: AgentEvent, reply: @escaping (Data?) -> Void) {
+        let payload = (try? JSONSerialization.jsonObject(with: event.body)) as? [String: Any] ?? [:]
+        let input = payload["tool_input"] as? [String: Any] ?? [:]
+        let questions = AgentQuestion.parse(input)
+        guard let session = session(event.sessionID), session.isRunning, !session.isArchiving,
+              payload["agent_id"] == nil, let first = questions.first else { return reply(nil) }
+
+        session.releaseQuestion()
+        session.lastActivity = Date()
+        session.pendingQuestion = PendingQuestion(toolUseID: payload["tool_use_id"] as? String ?? "", questions: questions,
+                                                  input: input, respond: reply)
+        let oldStatus = session.status
+        session.isAwaitingPermission = false
+        session.status = .needsYou(first.text)
+        notifyTransition(from: oldStatus, for: session)
+        updateBadge()
+    }
+
+    /// Sends the answers through the held hook; Claude continues as if they were picked in its menu.
+    func answer(_ session: AgentSession, with answers: [String: String]) {
+        guard let question = session.pendingQuestion else { return }
+        session.pendingQuestion = nil
+        question.respond(PendingQuestion.hookReply(input: question.input, answers: answers))
+        session.status = .working
+        updateBadge()
+    }
+
+    /// Any later step of the main agent means the held question was answered or abandoned elsewhere.
+    private static func movesPastQuestion(_ event: String, _ payload: [String: Any]) -> Bool {
+        guard payload["agent_id"] == nil else { return false }
+        switch event {
+        case "PreToolUse": return payload["tool_name"] as? String != "AskUserQuestion"
+        case "PostToolUse", "Stop", "UserPromptSubmit": return true
+        default: return false
+        }
+    }
+
     /// Types the message into the agent's terminal and submits it. Only while the agent sits idle at its prompt:
     /// a permission menu or a running turn could take the keystrokes as something else, so then it opens instead.
     func reply(_ text: String, to session: AgentSession) {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, session.isRunning, session.status == .yourTurn, let terminal = session.terminalView else {
+        guard !text.isEmpty, session.canReplyInline, let terminal = session.terminalView else {
             notifications.requestedSession = session.id
             return
         }
