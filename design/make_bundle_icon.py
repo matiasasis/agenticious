@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Put the app icon's face on a rounded tile in the app's purple ink, for the bundle icon macOS shows on notifications:
+"""Put the app icon's face on a rounded tile in the app's purple ink: the macOS app icon (Dock, Finder, notifications).
 uv run --with pillow design/make_bundle_icon.py
 """
 from pathlib import Path
@@ -8,7 +8,7 @@ from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
 ROOT = Path(__file__).parent.parent
 FACE = ROOT / "Sources/Agenticious/Resources/AppIcon.png"
-OUT = ROOT / "Resources/BundleIcon.png"
+OUT = ROOT / "Sources/Agenticious/Resources/BundleIcon.png"
 
 CANVAS = 1024
 TILE = 824  # Apple's macOS icon grid: an 824pt rounded square centred on 1024

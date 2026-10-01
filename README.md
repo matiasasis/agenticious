@@ -111,7 +111,7 @@ Every agent has an **Archive** button beside its status and step count, plus an 
 
 ### Provider diagnostics
 
-Open the connection-status button beside the usage meters, then **Manage providers**, to check Claude Code and Codex account access and MCP status in your home folder or a selected project. The toolbar warning icon opens a compact provider summary. Checks run at launch and on refresh; changing the folder runs a fresh check. Authentication and connection failures include recovery instructions.
+Open the connection-status button beside the usage meters, then **Manage providers**, to check Claude Code and Codex account access and MCP status in your home folder or a selected project. The toolbar warning icon opens a compact provider summary. Checks run while Agenticious is the active app, at the interval set in **Preferences → Background refresh** (every 6 hours by default); **Refresh** and changing the folder run a fresh check. Authentication and connection failures include recovery instructions.
 
 Claude checks MCP connections; Codex reports configured authentication without claiming the server is reachable. Session-only MCP overrides and worktree configuration can differ from these folder checks. Raw command output, server URLs, and credentials are not shown. Run the displayed provider commands in that folder for full details, then refresh after fixing an issue.
 
