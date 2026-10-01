@@ -423,24 +423,26 @@ private struct AgentCounters: View {
 }
 
 struct TaskHeading: View {
+    enum Size { case compact, regular, large }
+
     let type: TaskType
     let task: String
-    var isCompact = false
+    var size = Size.regular
 
     var body: some View {
         let details = type.details(for: task)
-        HStack(alignment: .top, spacing: isCompact ? 8 : 10) {
-            TaskTypeIcon(type: type)
-            VStack(alignment: .leading, spacing: 4) {
+        HStack(alignment: .top, spacing: spacing) {
+            TaskTypeIcon(type: type, size: size)
+            VStack(alignment: .leading, spacing: size == .large ? 6 : 4) {
                 Text(type.name)
-                    .font(isCompact ? .system(size: 13, weight: .semibold) : .title3.weight(.semibold))
+                    .font(titleFont)
                     .foregroundStyle(.primary)
                     .lineLimit(2)
                 if !details.isEmpty {
                     Text(details)
-                        .font(isCompact ? .system(size: 11) : .callout)
+                        .font(detailsFont)
                         .foregroundStyle(.secondary)
-                        .lineLimit(3)
+                        .lineLimit(size == .large ? 4 : 3)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -448,17 +450,43 @@ struct TaskHeading: View {
         .multilineTextAlignment(.leading)
         .help([type.name, details].filter { !$0.isEmpty }.joined(separator: "\n"))
     }
+
+    private var spacing: CGFloat {
+        switch size {
+        case .compact: 8
+        case .regular: 10
+        case .large: 14
+        }
+    }
+
+    private var titleFont: Font {
+        switch size {
+        case .compact: .system(size: 13, weight: .semibold)
+        case .regular: .title3.weight(.semibold)
+        case .large: .system(size: 26, weight: .bold)
+        }
+    }
+
+    private var detailsFont: Font {
+        switch size {
+        case .compact: .system(size: 11)
+        case .regular: .callout
+        case .large: .title3
+        }
+    }
 }
 
 struct TaskTypeIcon: View {
     let type: TaskType
+    var size = TaskHeading.Size.regular
 
     var body: some View {
+        let isLarge = size == .large
         Image(systemName: NSImage(systemSymbolName: type.symbol, accessibilityDescription: nil) == nil ? "sparkles" : type.symbol)
-            .font(.system(size: 13, weight: .semibold))
+            .font(.system(size: isLarge ? 20 : 13, weight: .semibold))
             .foregroundStyle(AgenticiousStyle.violet)
-            .frame(width: 26, height: 26)
-            .background(AgenticiousStyle.violet.opacity(0.12), in: RoundedRectangle(cornerRadius: 7))
+            .frame(width: isLarge ? 40 : 26, height: isLarge ? 40 : 26)
+            .background(AgenticiousStyle.violet.opacity(0.12), in: RoundedRectangle(cornerRadius: isLarge ? 10 : 7))
             .help(type.name)
             .accessibilityLabel(type.name)
     }

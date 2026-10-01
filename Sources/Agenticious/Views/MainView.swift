@@ -252,7 +252,7 @@ private struct SessionRow: View {
     private var details: some View {
         VStack(alignment: .leading, spacing: 9) {
             header
-            TaskHeading(type: session.displayedTaskType, task: session.task, isCompact: true)
+            TaskHeading(type: session.displayedTaskType, task: session.task, size: .compact)
             if !session.startupSteps.isEmpty {
                 StartupProgressView(steps: session.startupSteps, isCompact: true)
             }
