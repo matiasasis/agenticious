@@ -137,6 +137,8 @@ final class AgentSession: ObservableObject, Identifiable {
     @Published var isRunning = false
 
     var planSource: PlanSource = .none
+    /// Needs you because of a permission prompt, which a subagent can be the one waiting on.
+    var isAwaitingPermission = false
     /// The CLI's own session id (Claude's session id, Codex's thread id), which is what `--resume` takes.
     var conversationID: String?
     var terminalView: LocalProcessTerminalView?

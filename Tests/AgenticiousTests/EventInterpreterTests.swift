@@ -16,6 +16,44 @@ final class EventInterpreterTests: XCTestCase {
     }
 
     @MainActor
+    func testQuestionToolsNeedTheHumanUntilAnswered() async {
+        let session = session()
+        EventInterpreter.apply("mcp", ["tool": "need_human", "args": ["reason": "How should the epic relate to SK-93?"]], to: session)
+        let ask: [String: Any] = ["tool_name": "AskUserQuestion", "tool_input": ["questions": [["question": "Reuse SK-93 or create a new epic?"]]]]
+        EventInterpreter.apply("PreToolUse", ask, to: session)
+        XCTAssertEqual(session.status, .needsYou("Reuse SK-93 or create a new epic?"))
+        EventInterpreter.apply("PostToolUse", ask, to: session)
+        XCTAssertEqual(session.status, .working)
+
+        EventInterpreter.apply("PreToolUse", ["tool_name": "ExitPlanMode", "tool_input": ["plan": "Do it"]], to: session)
+        XCTAssertEqual(session.status, .needsYou("Review the agent's plan"))
+    }
+
+    @MainActor
+    func testSubagentToolsLeaveTheMainAgentStatusAlone() async {
+        let session = session()
+        let subagentTool: [String: Any] = ["tool_name": "Grep", "agent_id": "explore-1", "agent_type": "Explore"]
+        session.status = .needsYou("Reuse SK-93 or create a new epic?")
+        EventInterpreter.apply("PreToolUse", subagentTool, to: session)
+        EventInterpreter.apply("PostToolUse", subagentTool, to: session)
+        XCTAssertEqual(session.status, .needsYou("Reuse SK-93 or create a new epic?"))
+
+        session.status = .waiting
+        EventInterpreter.apply("PostToolUse", subagentTool.merging(["tool_name": "TodoWrite", "tool_input": ["todos": [["content": "Grep jobs"]]]]) { $1 }, to: session)
+        XCTAssertEqual(session.status, .waiting)
+        XCTAssertEqual(session.chunks.map(\.title), ["Resolve conflicts", "CI green and merge"])
+    }
+
+    @MainActor
+    func testSubagentProgressClearsItsAnsweredPermissionPrompt() async {
+        let session = session()
+        EventInterpreter.apply("Notification", ["message": "Claude needs your permission to use Bash"], to: session)
+        XCTAssertEqual(session.status, .needsYou("Claude needs your permission to use Bash"))
+        EventInterpreter.apply("PostToolUse", ["tool_name": "Bash", "agent_id": "explore-1"], to: session)
+        XCTAssertEqual(session.status, .working)
+    }
+
+    @MainActor
     func testResumedChunkClearsStaleHumanRequest() async {
         let session = session()
         for previous in [SessionStatus.needsYou("Use nine PRs?"), .yourTurn] {
