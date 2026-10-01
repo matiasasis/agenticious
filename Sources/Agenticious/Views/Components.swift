@@ -4,17 +4,43 @@ struct AgentBadge: View {
     let agent: AgentKind
     var detail: String?
 
-    var body: some View {
-        Text([agent.displayName, detail].compactMap { $0 }.joined(separator: " · "))
-            .font(.caption.weight(.semibold))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(tint.opacity(0.15), in: Capsule())
-            .foregroundStyle(tint)
-    }
+    /// One colour for every provider, kept out of the status palette; the logo and name tell them apart.
+    private static let tint = Color.blue
 
-    /// Kept out of the status palette (orange is Needs you, teal is Waiting) so a badge never reads as a status.
-    private var tint: Color { agent == .claude ? .pink : .blue }
+    var body: some View {
+        HStack(spacing: 5) {
+            ProviderIcon(agent: agent, size: 11)
+            Text(agent.displayName).font(.caption.weight(.semibold))
+            if let detail {
+                Text(detail).font(.caption2).opacity(0.75)
+            }
+        }
+        .lineLimit(1)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(Self.tint.opacity(0.15), in: Capsule())
+        .foregroundStyle(Self.tint)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel([agent.displayName, detail].compactMap { $0 }.joined(separator: ", "))
+    }
+}
+
+/// The provider's monochrome mark, tinted by the surrounding foreground style.
+struct ProviderIcon: View {
+    let agent: AgentKind
+    var size: CGFloat = 24
+
+    private static let images: [AgentKind: NSImage] = Dictionary(uniqueKeysWithValues: AgentKind.allCases.map { agent in
+        let file = agent == .claude ? ("ClaudeIcon", "png") : ("CodexIcon", "svg")
+        return (agent, Bundle.module.url(forResource: file.0, withExtension: file.1).flatMap(NSImage.init(contentsOf:)) ?? NSImage())
+    })
+
+    var body: some View {
+        Image(nsImage: Self.images[agent] ?? NSImage())
+            .renderingMode(.template)
+            .resizable().scaledToFit().frame(width: size, height: size)
+            .accessibilityHidden(true)
+    }
 }
 
 struct BranchLabel: View {

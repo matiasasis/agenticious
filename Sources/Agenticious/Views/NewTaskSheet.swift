@@ -173,7 +173,7 @@ struct NewTaskSheet: View {
                 ForEach(AgentKind.allCases) { choice in
                     Button { agent = choice } label: {
                         HStack(spacing: 8) {
-                            ProviderIcon(agent: choice)
+                            ProviderIcon(agent: choice).foregroundStyle(Color.primary)
                             Text(choice.displayName).font(.callout.weight(.semibold)).lineLimit(1)
                             Image(systemName: "checkmark.circle.fill").opacity(agent == choice ? 1 : 0)
                         }
@@ -546,23 +546,5 @@ private struct SummonChoiceCard: View {
         .accessibilityLabel(title + ", " + subtitle)
         .accessibilityValue(isSelected ? "Selected" : "Not selected")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
-    }
-}
-
-private struct ProviderIcon: View {
-    let agent: AgentKind
-
-    private var image: NSImage {
-        let name = agent == .claude ? "ClaudeIcon" : "CodexIcon"
-        return Bundle.module.url(forResource: name, withExtension: agent == .claude ? "png" : "svg")
-            .flatMap(NSImage.init(contentsOf:)) ?? NSImage()
-    }
-
-    var body: some View {
-        Image(nsImage: image)
-            .renderingMode(.template)
-            .resizable().scaledToFit().frame(width: 24, height: 24)
-            .foregroundStyle(Color.primary)
-            .accessibilityHidden(true)
     }
 }

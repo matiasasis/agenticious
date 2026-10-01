@@ -34,4 +34,6 @@ for size in 16 32 128 256 512; do
 done
 iconutil -c icns "$ICON_DIR" -o "$APP_DIR/Contents/Resources/Agenticious.icns"
 codesign --force --deep --sign - "$APP_DIR"
+# Launch Services and Notification Center cache app icons; re-registering makes a changed icon show up.
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP_DIR"
 exec open "$APP_DIR"
