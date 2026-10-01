@@ -22,10 +22,11 @@ final class AgentNotificationsTests: XCTestCase {
         XCTAssertNil(AgentAlert.transition(from: .ended("Cancelled"), to: .ended("Handed off")))
     }
 
-    func testBannersCarryTheStatusDetailAndMatchingButtons() {
-        XCTAssertEqual(AgentAlert.detail(for: .needsYou("Approve the migration")), "Approve the migration")
-        XCTAssertEqual(AgentAlert.detail(for: .ended("Handed off")), "Handed off")
-        XCTAssertEqual(AgentAlert.detail(for: .exited(2)), "Exited with code 2.")
+    func testBannersSayWhatHappenedBrieflyWithMatchingButtons() {
+        XCTAssertEqual(AgentAlert.needsYou.message(task: "Implement SK-4505"), "Needs you · Implement SK-4505")
+        XCTAssertEqual(AgentAlert.completed.message(task: "Fix the flaky spec\nIt fails on CI only"), "Mission complete · Fix the flaky spec")
+        XCTAssertEqual(AgentAlert.failed.message(task: String(repeating: "a", count: 80)), "Stopped unexpectedly · " + String(repeating: "a", count: 59) + "…")
+        XCTAssertEqual(AgentAlert.ended.message(task: ""), "Ended")
         XCTAssertEqual(AgentAlert.yourTurn.actions, [.reply, .open])
         XCTAssertEqual(AgentAlert.completed.actions, [.archive, .open])
         XCTAssertEqual(AgentAlert.failed.actions, [.resume, .open])

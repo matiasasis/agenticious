@@ -13,7 +13,8 @@ struct AgentBadge: View {
             .foregroundStyle(tint)
     }
 
-    private var tint: Color { agent == .claude ? .orange : .teal }
+    /// Kept out of the status palette (orange is Needs you, teal is Waiting) so a badge never reads as a status.
+    private var tint: Color { agent == .claude ? .pink : .blue }
 }
 
 struct BranchLabel: View {
