@@ -19,6 +19,7 @@ struct ActivityEntry: Identifiable, Equatable {
         case "Read", "read_file": "Read file"
         case "Edit", "Write", "apply_patch": "Edit files"
         case "Glob", "Grep": "Search files"
+        case "AskUserQuestion": "Asked you"
         default: title.replacingOccurrences(of: "mcp__", with: "MCP · ").replacingOccurrences(of: "__", with: " · ")
         }
     }
@@ -180,7 +181,10 @@ enum ActivityTranscript {
     }
 
     private static func tool(id: String, name: String, input: [String: Any], directory: String?) -> ActivityEntry {
-        let body = input["command"] as? String ?? input["cmd"] as? String ?? input["code"] as? String ?? input["input"] as? String ?? text(input)
+        let questions = name == "AskUserQuestion" ? AgentQuestion.parse(input) : []
+        let body = !questions.isEmpty ? questions.map { question in
+            ([question.text] + question.options.map { "  • " + $0.label }).joined(separator: "\n")
+        }.joined(separator: "\n\n") : input["command"] as? String ?? input["cmd"] as? String ?? input["code"] as? String ?? input["input"] as? String ?? text(input)
         return ActivityEntry(id: id, kind: .tool, title: name, body: bounded(body),
                              directory: input["workdir"] as? String ?? directory,
                              file: input["file_path"] as? String ?? input["path"] as? String, state: .running)

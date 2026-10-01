@@ -17,6 +17,15 @@ struct ActivityView: View {
                 Toggle("Follow latest", isOn: $followLatest).toggleStyle(.checkbox).font(.caption)
                 Button("Respond in terminal", action: openTerminal).buttonStyle(AgenticiousButtonStyle(isPrimary: false, isCompact: true))
             }.padding(12)
+            if let question = session.pendingQuestion {
+                ScrollView {
+                    QuestionCard(session: session, questions: question.questions, openTerminal: openTerminal)
+                        .id(question.toolUseID)
+                        .padding(.horizontal, 20).padding(.bottom, 12)
+                }
+                .frame(maxHeight: 460)
+                .fixedSize(horizontal: false, vertical: true)
+            }
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 16) {
@@ -36,6 +45,7 @@ struct ActivityView: View {
                 }
                 .onChange(of: entries) { _, _ in if followLatest { proxy.scrollTo("latest", anchor: .bottom) } }
             }
+            if session.canReplyInline { ReplyComposer(session: session) }
         }
         .background(AgenticiousStyle.ink)
         .task(id: "\(session.id)-\(session.isMarkedFinished)") {

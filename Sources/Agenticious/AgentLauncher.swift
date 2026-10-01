@@ -111,7 +111,11 @@ struct AgentLauncher {
         [
             "hooks": [
                 "UserPromptSubmit": [hookEntry(session, "UserPromptSubmit")],
-                "PreToolUse": [hookEntry(session, "PreToolUse", matcher: "*")],
+                "PreToolUse": [
+                    hookEntry(session, "PreToolUse", matcher: "*"),
+                    // Held open until the human answers in Activity; the reply fills in the answers. A day, then the terminal menu.
+                    hookEntry(session, "AskUserQuestion", matcher: "AskUserQuestion", passReplyToClaude: true, timeout: 86_400),
+                ],
                 "PostToolUse": [hookEntry(session, "PostToolUse", matcher: "*")],
                 "Notification": [hookEntry(session, "Notification")],
                 "Stop": [hookEntry(session, "Stop", passReplyToClaude: true)],
@@ -124,10 +128,13 @@ struct AgentLauncher {
     }
 
     /// With `passReplyToClaude`, the app's HTTP response becomes the hook's stdout, which Claude reads as a decision.
-    private func hookEntry(_ session: AgentSession, _ event: String, matcher: String? = nil, passReplyToClaude: Bool = false) -> [String: Any] {
+    private func hookEntry(_ session: AgentSession, _ event: String, matcher: String? = nil, passReplyToClaude: Bool = false,
+                           timeout: Int? = nil) -> [String: Any] {
         let output = passReplyToClaude ? "2>/dev/null" : ">/dev/null 2>&1"
-        let command = "curl -s -m 5 -X POST --data-binary @- '\(hookURL(session, event))' \(output) || true"
-        var entry: [String: Any] = ["hooks": [["type": "command", "command": command]]]
+        let command = "curl -s -m \(timeout ?? 5) -X POST --data-binary @- '\(hookURL(session, event))' \(output) || true"
+        var hook: [String: Any] = ["type": "command", "command": command]
+        if let timeout { hook["timeout"] = timeout }
+        var entry: [String: Any] = ["hooks": [hook]]
         if let matcher { entry["matcher"] = matcher }
         return entry
     }

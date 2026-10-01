@@ -139,6 +139,8 @@ final class AgentSession: ObservableObject, Identifiable {
     var planSource: PlanSource = .none
     /// Needs you because of a permission prompt, which a subagent can be the one waiting on.
     var isAwaitingPermission = false
+    /// A question Claude asked with AskUserQuestion, waiting for an answer in Activity.
+    @Published var pendingQuestion: PendingQuestion?
     /// The CLI's own session id (Claude's session id, Codex's thread id), which is what `--resume` takes.
     var conversationID: String?
     var terminalView: LocalProcessTerminalView?
@@ -182,11 +184,26 @@ final class AgentSession: ObservableObject, Identifiable {
     }
 
     func recordExit(_ code: Int32?) {
+        releaseQuestion()
         isRunning = false
         switch status {
         case .done, .ended: break
         default: status = .exited(code)
         }
+    }
+
+    /// Hands a held question back to Claude without answers: its own menu appears in the terminal, or, once the
+    /// agent has moved on, the stale hook simply ends.
+    func releaseQuestion() {
+        pendingQuestion?.respond(nil)
+        pendingQuestion = nil
+    }
+
+    /// Typing a reply is safe while the agent waits at its prompt: after its turn, or after asking via need_human.
+    /// Permission menus, startup prompts and held questions take keystrokes as choices, so they're answered elsewhere.
+    var canReplyInline: Bool {
+        guard isRunning, terminalView != nil, pendingQuestion == nil, startupPrompt == nil else { return false }
+        return status == .yourTurn || (status.needsAttention && !isAwaitingPermission)
     }
 
     var completedChunks: Int { chunks.filter { $0.status == .done }.count }

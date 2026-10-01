@@ -72,8 +72,12 @@ struct SessionDetailView: View {
                 Button("Terminal", systemImage: "terminal") { showActivity = false }
                     .buttonStyle(AgenticiousButtonStyle(isPrimary: !showActivity, isCompact: true))
                 Spacer()
-                if session.status.needsAttention || session.status == .yourTurn {
-                    Button(session.startupPrompt == nil ? "Reply / approve in terminal" : "Review startup prompt", systemImage: "arrow.right") { showActivity = false }
+                if session.pendingQuestion != nil, !showActivity {
+                    Button("Answer in Activity", systemImage: "questionmark.bubble") { showActivity = true }
+                        .buttonStyle(AgenticiousButtonStyle(isCompact: true))
+                } else if session.pendingQuestion == nil, !session.canReplyInline,
+                          session.status.needsAttention || session.status == .yourTurn {
+                    Button(session.startupPrompt == nil ? "Approve in terminal" : "Review startup prompt", systemImage: "arrow.right") { showActivity = false }
                         .buttonStyle(AgenticiousButtonStyle(isCompact: true))
                 }
             }.padding(12).background(AgenticiousStyle.panel)
@@ -108,6 +112,9 @@ struct SessionDetailView: View {
         }
         .onChange(of: session.startupPrompt, initial: true) { _, prompt in
             if prompt != nil { showActivity = false }
+        }
+        .onChange(of: session.pendingQuestion?.toolUseID, initial: true) { _, id in
+            if id != nil { showActivity = true }
         }
     }
 
