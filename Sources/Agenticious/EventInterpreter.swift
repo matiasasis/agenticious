@@ -81,16 +81,46 @@ enum EventInterpreter {
 
     private static func toolStarted(_ payload: [String: Any], in session: AgentSession) {
         guard let tool = payload["tool_name"] as? String, !tool.hasPrefix("mcp__agenticious__") else { return }
-        session.status = .working
+        guard !isSubagent(payload) else { return subagentProgressed(session) }
+
+        session.isAwaitingPermission = false
+        session.status = question(asked: tool, input: payload["tool_input"]).map(SessionStatus.needsYou) ?? .working
     }
 
     private static func toolFinished(_ payload: [String: Any], in session: AgentSession) {
         let tool = payload["tool_name"] as? String ?? ""
         // Our own MCP calls already set the status; a trailing PostToolUse must not undo a need_human.
         guard !tool.hasPrefix("mcp__agenticious__") else { return }
+        guard !isSubagent(payload) else { return subagentProgressed(session) }
 
+        session.isAwaitingPermission = false
         session.status = .working
         if tool == "TodoWrite" { mirrorTodoList(payload, in: session) }
+    }
+
+    /// Claude sets `agent_id` only on hooks fired inside a subagent. Its tools say nothing about the main agent,
+    /// which may be asking the human or waiting on that subagent, except that a permission prompt was answered.
+    private static func isSubagent(_ payload: [String: Any]) -> Bool {
+        payload["agent_id"] != nil
+    }
+
+    private static func subagentProgressed(_ session: AgentSession) {
+        guard session.isAwaitingPermission else { return }
+        session.isAwaitingPermission = false
+        session.status = .working
+    }
+
+    /// Tools that stop and wait for the human, with what they ask.
+    private static func question(asked tool: String, input: Any?) -> String? {
+        switch tool {
+        case "AskUserQuestion":
+            let questions = (input as? [String: Any])?["questions"] as? [[String: Any]] ?? []
+            return questions.first?["question"] as? String ?? "Answer the agent's question"
+        case "ExitPlanMode":
+            return "Review the agent's plan"
+        default:
+            return nil
+        }
     }
 
     private static func notified(_ payload: [String: Any], session: AgentSession) {
@@ -101,6 +131,7 @@ enum EventInterpreter {
                 session.status = .yourTurn
             }
         } else {
+            session.isAwaitingPermission = true
             session.status = .needsYou(message)
         }
     }
@@ -148,7 +179,9 @@ enum EventInterpreter {
             session.recordPullRequests(in: (arguments["urls"] as? [String] ?? []).joined(separator: "\n"))
         case "set_plan": setPlan(arguments, in: session)
         case "update_chunk": updateChunk(arguments, in: session)
-        case "need_human": session.status = .needsYou(arguments["reason"] as? String ?? "Needs your input")
+        case "need_human":
+            session.isAwaitingPermission = false
+            session.status = .needsYou(arguments["reason"] as? String ?? "Needs your input")
         case "finish": finish(arguments, in: session)
         case "end":
             if let reason = arguments["reason"] as? String, !reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
