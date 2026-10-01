@@ -16,7 +16,8 @@ enum StartupPrompt: Equatable {
         let screen = String(decoding: terminal.getBufferAsData(), as: UTF8.self)
             .split(separator: "\n", omittingEmptySubsequences: false).dropLast().suffix(terminal.rows)
             .joined(separator: " ")
-        let text = screen.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        // Claude Code skips spaces by moving the cursor, leaving null cells between words.
+        let text = screen.split { $0.isWhitespace || $0 == "\0" }.joined(separator: " ")
         switch agent {
         case .codex:
             guard text.contains("Folder access"), text.contains("Trust this folder?"),
