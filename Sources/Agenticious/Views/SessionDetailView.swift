@@ -11,10 +11,8 @@ struct SessionDetailView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 12) {
-                Text(session.task)
-                    .font(.system(size: 26, weight: .bold))
+                TaskHeading(type: session.displayedTaskType, task: session.task, size: .large)
                     .textSelection(.enabled)
-                    .lineLimit(4)
 
                 HStack(spacing: 12) {
                     AgentBadge(agent: session.agent, detail: session.modelSummary)
