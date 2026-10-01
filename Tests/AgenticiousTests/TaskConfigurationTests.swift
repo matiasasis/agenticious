@@ -89,6 +89,22 @@ final class TaskConfigurationTests: XCTestCase {
     }
 
     @MainActor
+    func testPresetsAreOfferedByUseWithTheCustomTaskFirst() throws {
+        let domain = "TaskConfigurationTests.\(UUID())"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: domain))
+        defer { defaults.removePersistentDomain(forName: domain) }
+        let store = TaskPresetStore(url: directory.appendingPathComponent("presets.json"), defaults: defaults)
+        XCTAssertEqual(store.presetsByUse.map(\.id), store.presets.map(\.id))
+
+        let fixCI = store.preset(id: "fixCI"), review = store.preset(id: "reviewPR")
+        store.recordUse(of: fixCI)
+        store.recordUse(of: fixCI)
+        store.recordUse(of: review)
+        store.recordUse(of: .custom)
+        XCTAssertEqual(store.presetsByUse.map(\.id), ["custom", "fixCI", "reviewPR", "implementTicket", "reviewComments"])
+    }
+
+    @MainActor
     func testInvalidPresetCannotReplaceSavedData() async throws {
         let url = directory.appendingPathComponent("presets.json")
         let store = TaskPresetStore(url: url)
