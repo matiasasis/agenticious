@@ -1,39 +1,36 @@
 import AppKit
 
+/// The wordmark's "A" (SF Pro Rounded, black) with a spark: solid shapes that stay crisp at menu bar size.
 @MainActor
 enum AgenticiousMenuIcon {
     static let image: NSImage = {
-        let image = NSImage(size: NSSize(width: 20, height: 20), flipped: false) { _ in
-            NSColor.black.setFill()
-            let face = NSBezierPath()
-            face.move(to: NSPoint(x: 3, y: 12))
-            face.line(to: NSPoint(x: 1, y: 10))
-            face.line(to: NSPoint(x: 3, y: 9))
-            face.curve(to: NSPoint(x: 10, y: 1), controlPoint1: NSPoint(x: 3, y: 4), controlPoint2: NSPoint(x: 6, y: 1))
-            face.curve(to: NSPoint(x: 17, y: 9), controlPoint1: NSPoint(x: 14, y: 1), controlPoint2: NSPoint(x: 17, y: 4))
-            face.line(to: NSPoint(x: 19, y: 10))
-            face.line(to: NSPoint(x: 17, y: 12))
-            face.close()
-            face.appendOval(in: NSRect(x: 4.5, y: 7, width: 4, height: 4))
-            face.appendOval(in: NSRect(x: 11.5, y: 7, width: 4, height: 4))
-            let grin = NSBezierPath()
-            grin.move(to: NSPoint(x: 6, y: 5.5))
-            grin.line(to: NSPoint(x: 14, y: 5.5))
-            grin.curve(to: NSPoint(x: 6, y: 5.5), controlPoint1: NSPoint(x: 12, y: 1.5), controlPoint2: NSPoint(x: 8, y: 1.5))
-            grin.close()
-            face.append(grin)
-            face.windingRule = .evenOdd
-            face.fill()
-            NSBezierPath(ovalIn: NSRect(x: 6, y: 8, width: 1.5, height: 2)).fill()
-            NSBezierPath(ovalIn: NSRect(x: 12.5, y: 8, width: 1.5, height: 2)).fill()
+        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { bounds in
+            let base = NSFont.systemFont(ofSize: 16, weight: .black)
+            let font = base.fontDescriptor.withDesign(.rounded).flatMap { NSFont(descriptor: $0, size: 16) } ?? base
+            let letter = NSAttributedString(string: "A", attributes: [.font: font, .foregroundColor: NSColor.black])
+            let size = letter.size()
+            letter.draw(at: NSPoint(x: bounds.midX - size.width / 2 - 1.5, y: bounds.midY - size.height / 2 - 1 - font.descender / 2))
 
-            let hat = NSBezierPath(roundedRect: NSRect(x: 5, y: 14, width: 10, height: 5), xRadius: 1, yRadius: 1)
-            hat.append(NSBezierPath(roundedRect: NSRect(x: 2, y: 12, width: 16, height: 1), xRadius: 0.5, yRadius: 0.5))
-            hat.fill()
+            NSColor.black.setFill()
+            spark(center: NSPoint(x: 15, y: 14.5), radius: 3.2).fill()
             return true
         }
         image.isTemplate = true
         image.accessibilityDescription = "Agenticious"
         return image
     }()
+
+    /// A four-point star with pinched sides, like the sparkles used across the app.
+    private static func spark(center c: NSPoint, radius r: CGFloat) -> NSBezierPath {
+        let pinch = r * 0.28
+        let path = NSBezierPath()
+        path.move(to: NSPoint(x: c.x, y: c.y + r))
+        for (tip, control) in [((r, 0.0), (pinch, pinch)), ((0, -r), (pinch, -pinch)), ((-r, 0), (-pinch, -pinch)), ((0, r), (-pinch, pinch))] {
+            let point = NSPoint(x: c.x + tip.0, y: c.y + tip.1)
+            let handle = NSPoint(x: c.x + control.0, y: c.y + control.1)
+            path.curve(to: point, controlPoint1: handle, controlPoint2: handle)
+        }
+        path.close()
+        return path
+    }
 }
