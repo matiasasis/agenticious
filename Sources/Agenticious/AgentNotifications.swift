@@ -23,26 +23,21 @@ enum AgentAlert: String, CaseIterable {
         }
     }
 
-    var title: String {
+    var summary: String {
         switch self {
-        case .needsYou: return "Your agent needs you"
-        case .yourTurn: return "Your turn"
+        case .needsYou: return "Needs you"
+        case .yourTurn: return "Finished its turn"
         case .completed: return "Mission complete"
-        case .ended: return "Agent ended"
-        case .failed: return "Agent stopped unexpectedly"
+        case .ended: return "Ended"
+        case .failed: return "Stopped unexpectedly"
         }
     }
 
-    /// What the status itself says: the blocking question, the summary, or why it ended.
-    static func detail(for status: SessionStatus) -> String? {
-        switch status {
-        case .needsYou(let reason): return reason
-        case .yourTurn: return "Finished its turn and is waiting for your next message."
-        case .done(let summary): return summary
-        case .ended(let reason): return reason
-        case .exited(let code): return code.map { "Exited with code \($0)." }
-        default: return nil
-        }
+    /// One glanceable line: what happened, and to which agent. The details are a click away in the app.
+    func message(task: String) -> String {
+        let line = task.split(whereSeparator: \.isNewline).first.map { $0.trimmingCharacters(in: .whitespaces) } ?? ""
+        let name = line.count > 60 ? line.prefix(59) + "…" : line
+        return name.isEmpty ? summary : "\(summary) · \(name)"
     }
 
     var sound: String {
@@ -125,7 +120,7 @@ final class AgentNotifications: NSObject, ObservableObject, UNUserNotificationCe
         } catch { self.error = error.localizedDescription }
     }
 
-    func notify(_ event: AgentAlert, sessionID: UUID, task: String, detail: String? = nil) {
+    func notify(_ event: AgentAlert, sessionID: UUID, message: String) {
         Task {
             await refreshAuthorization()
             guard bannersEnabled, authorization == .authorized, let center else {
@@ -133,9 +128,8 @@ final class AgentNotifications: NSObject, ObservableObject, UNUserNotificationCe
                 return
             }
             let content = UNMutableNotificationContent()
-            content.title = event.title
-            content.subtitle = String(task.prefix(200))
-            content.body = String((detail ?? "").prefix(300))
+            content.title = "AGENTICIOUS"
+            content.body = message
             content.categoryIdentifier = event.rawValue
             content.threadIdentifier = sessionID.uuidString
             content.userInfo = ["sessionID": sessionID.uuidString]
@@ -158,8 +152,7 @@ final class AgentNotifications: NSObject, ObservableObject, UNUserNotificationCe
     }
 
     func sendTest() {
-        notify(.completed, sessionID: UUID(), task: "All connected. Your agents can reach you here.",
-               detail: "Agent banners come with buttons to reply, resume or archive.")
+        notify(.completed, sessionID: UUID(), message: "Notifications are on. Your agents can reach you here.")
     }
 
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,

@@ -485,7 +485,7 @@ final class SessionStore: ObservableObject {
 
     private func notifyTransition(from oldStatus: SessionStatus, for session: AgentSession) {
         guard let event = AgentAlert.transition(from: oldStatus, to: session.status) else { return }
-        notifications.notify(event, sessionID: session.id, task: session.task, detail: AgentAlert.detail(for: session.status))
+        notifications.notify(event, sessionID: session.id, message: event.message(task: session.task))
     }
 
     private func perform(_ action: AgentNotificationAction, on id: UUID, text: String?) {
