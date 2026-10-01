@@ -165,18 +165,41 @@ private struct Banner: View {
 struct TerminalContainer: NSViewRepresentable {
     @ObservedObject var session: AgentSession
 
-    func makeNSView(context: Context) -> NSView {
-        NSView()
+    func makeNSView(context: Context) -> PaddedTerminalHost {
+        PaddedTerminalHost()
     }
 
-    func updateNSView(_ container: NSView, context: Context) {
+    func updateNSView(_ container: PaddedTerminalHost, context: Context) {
         guard let terminal = session.terminalView, terminal.superview !== container else { return }
 
         // Resuming swaps in a new terminal; drop the one whose process ended.
         container.subviews.forEach { $0.removeFromSuperview() }
-        terminal.frame = container.bounds
-        terminal.autoresizingMask = [.width, .height]
+        container.layer?.backgroundColor = terminal.nativeBackgroundColor.cgColor
         container.addSubview(terminal)
+        container.needsLayout = true
         DispatchQueue.main.async { terminal.window?.makeFirstResponder(terminal) }
+    }
+}
+
+/// Insets the terminal from the pane edges and fills the margin with the terminal's background,
+/// so the text gets breathing room without a visible seam.
+final class PaddedTerminalHost: NSView {
+    private let padding = NSEdgeInsets(top: 8, left: 12, bottom: 8, right: 8)
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    override func layout() {
+        super.layout()
+        let inner = NSRect(
+            x: padding.left, y: padding.bottom,
+            width: max(0, bounds.width - padding.left - padding.right),
+            height: max(0, bounds.height - padding.top - padding.bottom)
+        )
+        subviews.forEach { $0.frame = inner }
     }
 }
