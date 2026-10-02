@@ -150,6 +150,7 @@ final class TaskConfigurationTests: XCTestCase {
         let store = TaskPresetStore(url: url)
         XCTAssertNotNil(store.loadError)
         XCTAssertThrowsError(try store.save(TaskTemplate(name: "New")))
+        XCTAssertThrowsError(try store.move(id: "fixCI", to: 0))
         XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), "broken json")
     }
 
