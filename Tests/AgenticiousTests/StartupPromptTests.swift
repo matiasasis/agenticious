@@ -67,6 +67,19 @@ final class StartupPromptTests: XCTestCase {
         XCTAssertNil(StartupPrompt.detect(in: host.terminal, agent: .codex))
     }
 
+    func testDetectsClaudeTrustDrawnWithCursorMovesInsteadOfSpaces() {
+        let host = terminal(columns: 140)
+        let words = claudeTrustScreen.components(separatedBy: "\n").map { line in
+            var column = 1
+            return line.split(separator: " ", omittingEmptySubsequences: false).map { word in
+                defer { column += word.count + 1 }
+                return "\u{1b}[\(column)G" + word
+            }.joined()
+        }
+        feed(words.joined(separator: "\n"), to: host)
+        XCTAssertEqual(StartupPrompt.detect(in: host.terminal, agent: .claude), .folderTrust(.claude))
+    }
+
     func testDetectsClaudeTrustWithRestrictedPermissionsChoice() {
         let host = terminal()
         feed(claudeTrustScreen.replacingOccurrences(of: "No, exit", with: "No, continue without these permissions"), to: host)
