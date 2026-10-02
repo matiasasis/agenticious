@@ -40,7 +40,7 @@ struct NewTaskSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            TaskTemplatePicker(selection: $template, templates: presets.presetsByUse)
+            TaskTemplatePicker(selection: $template, templates: presets.offeredPresets)
                 .padding(.horizontal, 24)
                 .padding(.vertical, 12)
             ScrollView {

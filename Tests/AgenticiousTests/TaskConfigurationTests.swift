@@ -94,14 +94,43 @@ final class TaskConfigurationTests: XCTestCase {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: domain))
         defer { defaults.removePersistentDomain(forName: domain) }
         let store = TaskPresetStore(url: directory.appendingPathComponent("presets.json"), defaults: defaults)
-        XCTAssertEqual(store.presetsByUse.map(\.id), store.presets.map(\.id))
+        XCTAssertEqual(store.offeredPresets.map(\.id), store.presets.map(\.id))
 
         let fixCI = store.preset(id: "fixCI"), review = store.preset(id: "reviewPR")
         store.recordUse(of: fixCI)
         store.recordUse(of: fixCI)
         store.recordUse(of: review)
         store.recordUse(of: .custom)
-        XCTAssertEqual(store.presetsByUse.map(\.id), ["custom", "fixCI", "reviewPR", "implementTicket", "reviewComments"])
+        XCTAssertEqual(store.offeredPresets.map(\.id), ["custom", "fixCI", "reviewPR", "implementTicket", "reviewComments"])
+    }
+
+    @MainActor
+    func testArrangedPresetsAreOfferedInTheirSavedOrderAcrossRelaunch() throws {
+        let domain = "TaskConfigurationTests.\(UUID())"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: domain))
+        defer { defaults.removePersistentDomain(forName: domain) }
+        let url = directory.appendingPathComponent("presets.json")
+        let store = TaskPresetStore(url: url, defaults: defaults)
+        store.recordUse(of: store.preset(id: "fixCI"))
+        store.order = .arranged
+
+        try store.move(id: "reviewComments", to: 0)
+        try store.move(id: "custom", to: store.presets.count - 1)
+
+        let reloaded = TaskPresetStore(url: url, defaults: defaults)
+        XCTAssertEqual(reloaded.order, .arranged)
+        XCTAssertEqual(reloaded.offeredPresets.map(\.id), ["reviewComments", "implementTicket", "reviewPR", "fixCI", "custom"])
+    }
+
+    @MainActor
+    func testMovingPastEitherEndKeepsThePresetAtThatEndAndUnknownIDsAreIgnored() throws {
+        let store = TaskPresetStore(url: directory.appendingPathComponent("presets.json"))
+
+        try store.move(id: "fixCI", to: -1)
+        try store.move(id: "reviewPR", to: store.presets.count)
+        try store.move(id: "dropped text", to: 0)
+
+        XCTAssertEqual(store.presets.map(\.id), ["fixCI", "custom", "implementTicket", "reviewComments", "reviewPR"])
     }
 
     @MainActor

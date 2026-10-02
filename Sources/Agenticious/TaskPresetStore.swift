@@ -8,6 +8,7 @@ final class TaskPresetStore: ObservableObject {
     let url: URL
     private let defaults: UserDefaults
     private static let usesKey = "taskPresetUses"
+    private static let orderKey = "taskPresetOrder"
 
     init(url: URL = TaskPresetStore.defaultURL, defaults: UserDefaults = .standard) {
         self.url = url
@@ -29,8 +30,18 @@ final class TaskPresetStore: ObservableObject {
 
     func preset(id: String) -> TaskTemplate { presets.first { $0.id == id } ?? presets.first { $0.isCustom } ?? .custom }
 
+    var order: TaskPresetOrder {
+        get { defaults.string(forKey: Self.orderKey).flatMap(TaskPresetOrder.init) ?? .mostUsed }
+        set {
+            objectWillChange.send()
+            defaults.set(newValue.rawValue, forKey: Self.orderKey)
+        }
+    }
+
+    var offeredPresets: [TaskTemplate] { order == .arranged ? presets : presetsByUse }
+
     /// The custom task first, then the most started; ties keep the saved order.
-    var presetsByUse: [TaskTemplate] {
+    private var presetsByUse: [TaskTemplate] {
         let uses = defaults.dictionary(forKey: Self.usesKey) as? [String: Int] ?? [:]
         return presets.enumerated()
             .sorted { a, b in
@@ -52,6 +63,15 @@ final class TaskPresetStore: ObservableObject {
         var updated = presets
         if let index = updated.firstIndex(where: { $0.id == preset.id }) { updated[index] = preset }
         else { updated.append(preset) }
+        try persist(updated)
+    }
+
+    /// Moves the preset so it sits at `index`, clamped to either end; unknown IDs are ignored.
+    func move(id: String, to index: Int) throws {
+        guard let current = presets.firstIndex(where: { $0.id == id }) else { return }
+        var updated = presets
+        let moved = updated.remove(at: current)
+        updated.insert(moved, at: min(max(index, 0), updated.count))
         try persist(updated)
     }
 
@@ -77,6 +97,20 @@ final class TaskPresetStore: ObservableObject {
         }
         for value in values {
             if let message = value.validationMessage { throw ConfigurationError(message) }
+        }
+    }
+}
+
+enum TaskPresetOrder: String, CaseIterable, Identifiable {
+    case mostUsed
+    case arranged
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .mostUsed: "Most used"
+        case .arranged: "As arranged"
         }
     }
 }

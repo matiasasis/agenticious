@@ -5,6 +5,7 @@ struct TaskSettingsView: View {
     @EnvironmentObject private var presets: TaskPresetStore
     @State private var editing: TaskTemplate?
     @State private var deleting: TaskTemplate?
+    @State private var dropTarget: String?
     @State private var error: String?
 
     var body: some View {
@@ -23,8 +24,9 @@ struct TaskSettingsView: View {
                     Text(loadError).foregroundStyle(.orange)
                     Button("Show saved presets") { NSWorkspace.shared.activateFileViewerSelecting([presets.url]) }
                 }
+                orderPicker
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 280), spacing: 16)], spacing: 16) {
-                    ForEach(presets.presets) { preset in
+                    ForEach(Array(presets.presets.enumerated()), id: \.element.id) { index, preset in
                         VStack(alignment: .leading, spacing: 14) {
                             HStack(spacing: 12) {
                                 Image(systemName: preset.symbol)
@@ -32,6 +34,10 @@ struct TaskSettingsView: View {
                                     .frame(width: 40, height: 40)
                                     .background(AgenticiousStyle.lime.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
                                 Text(preset.name).font(.title3.bold())
+                                Spacer(minLength: 0)
+                                Image(systemName: "line.3.horizontal")
+                                    .foregroundStyle(.secondary)
+                                    .help("Drag to reorder")
                             }
                             .foregroundStyle(AgenticiousStyle.lime)
                             Text(preset.summary.isEmpty ? "Your reusable agent prompt." : preset.summary)
@@ -50,6 +56,15 @@ struct TaskSettingsView: View {
                         .padding(20)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 18))
+                        .overlay(RoundedRectangle(cornerRadius: 18).stroke(AgenticiousStyle.lime, lineWidth: 2).opacity(dropTarget == preset.id ? 1 : 0))
+                        .draggable(preset.id)
+                        .dropDestination(for: String.self) { ids, _ in
+                            guard let id = ids.first, id != preset.id else { return false }
+                            move(id, to: index)
+                            return true
+                        } isTargeted: { dropTarget = $0 ? preset.id : (dropTarget == preset.id ? nil : dropTarget) }
+                        .accessibilityAction(named: "Move earlier") { move(preset.id, to: index - 1) }
+                        .accessibilityAction(named: "Move later") { move(preset.id, to: index + 1) }
                     }
                 }
                 Text("Saved on this Mac for your user account. Changes apply to new tasks; running agents keep their original prompts.")
@@ -70,6 +85,29 @@ struct TaskSettingsView: View {
             }
         } message: { Text("Existing agent sessions will be kept.") }
         .alert(error ?? "", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) { Button("OK") {} }
+    }
+
+    private var orderPicker: some View {
+        HStack(spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Order in the Summon sheet").font(.headline)
+                Text(presets.order == .arranged ? "Drag the cards below to arrange them."
+                     : "The custom task first, then the presets you start most.")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Picker("Order in the Summon sheet", selection: $presets.order) {
+                ForEach(TaskPresetOrder.allCases) { Text($0.title).tag($0) }
+            }
+            .labelsHidden().pickerStyle(.segmented).fixedSize()
+        }
+        .padding(20)
+        .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    private func move(_ id: String, to index: Int) {
+        do { try presets.move(id: id, to: index) }
+        catch { self.error = error.localizedDescription }
     }
 }
 
