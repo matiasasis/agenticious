@@ -256,7 +256,7 @@ private struct SessionRow: View {
             if !session.startupSteps.isEmpty {
                 StartupProgressView(steps: session.startupSteps, isCompact: true)
             }
-            if !session.chunks.isEmpty {
+            if !session.isChat, !session.chunks.isEmpty {
                 HStack(spacing: 8) {
                     ChunkStrip(chunks: session.chunks, style: .compact, isRunning: session.isRunning)
                     Text("\(session.completedChunks)/\(session.chunks.count)")
@@ -407,7 +407,7 @@ struct SessionCard: View {
                 TaskHeading(type: session.displayedTaskType, task: session.task)
                 if !session.startupSteps.isEmpty {
                     StartupProgressView(steps: session.startupSteps)
-                } else if session.startupPrompt == nil {
+                } else if !session.isChat, session.startupPrompt == nil {
                     ChunkStrip(chunks: session.chunks, style: .compact, isRunning: session.isRunning)
                     ChunkList(chunks: session.chunks, limit: Self.stepRows)
                 }

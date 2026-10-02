@@ -17,15 +17,22 @@ struct SessionDetailView: View {
                 HStack(spacing: 12) {
                     AgentBadge(agent: session.agent, detail: session.modelSummary)
                     StatusPill(status: session.status)
-                    if !session.chunks.isEmpty {
+                    if !session.isChat, !session.chunks.isEmpty {
                         Text("\(session.completedChunks)/\(session.chunks.count) steps")
                             .foregroundStyle(.secondary)
                     }
-                    Button(session.isArchiving ? "Archiving…" : "Archive", systemImage: "archivebox") { store.archive(session) }
-                        .buttonStyle(PillButtonStyle())
-                        .disabled(session.isArchiving)
-                        .help(session.isArchiving ? "Archiving…" : "Stop the agent, clean up its worktree, and archive its history.")
-                    if session.canStop {
+                    if session.isChat && !session.isMarkedFinished {
+                        Button(session.isArchiving ? "Ending chat…" : "End chat", systemImage: "stop.circle") { store.endChat(session) }
+                            .buttonStyle(AgenticiousButtonStyle(isCompact: true))
+                            .disabled(!session.canEndChat)
+                            .help("Stop the agent and save this conversation in Finished.")
+                    } else {
+                        Button(session.isArchiving ? "Archiving…" : "Archive", systemImage: "archivebox") { store.archive(session) }
+                            .buttonStyle(PillButtonStyle())
+                            .disabled(session.isArchiving)
+                            .help(session.isArchiving ? "Archiving…" : "Stop the agent, clean up its worktree, and archive its history.")
+                    }
+                    if session.canStop && !session.isChat {
                         Button("Stop agent", systemImage: "stop.fill") { store.stop(session) }
                             .buttonStyle(PillButtonStyle(tint: .red))
                             .disabled(session.isArchiving)
@@ -50,9 +57,9 @@ struct SessionDetailView: View {
                     PullRequestLinks(references: session.pullRequests).id(session.id)
                 }
 
-                if !session.startupSteps.isEmpty {
+                if !session.isChat, !session.startupSteps.isEmpty {
                     StartupProgressView(steps: session.startupSteps)
-                } else if session.backgroundTask == nil, session.startupPrompt == nil {
+                } else if !session.isChat, session.backgroundTask == nil, session.startupPrompt == nil {
                     ChunkStrip(chunks: session.chunks, style: .expanded, isRunning: session.isRunning)
                 }
                 if let task = session.backgroundTask {
@@ -67,7 +74,7 @@ struct SessionDetailView: View {
             Divider()
 
             HStack(spacing: 8) {
-                Button("Activity", systemImage: "text.bubble") { showActivity = true }
+                Button(session.isChat ? "Chat" : "Activity", systemImage: "text.bubble") { showActivity = true }
                     .buttonStyle(AgenticiousButtonStyle(isPrimary: showActivity, isCompact: true))
                 Button("Terminal", systemImage: "terminal") { showActivity = false }
                     .buttonStyle(AgenticiousButtonStyle(isPrimary: !showActivity, isCompact: true))

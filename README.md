@@ -138,3 +138,7 @@ Provider icons use monochrome template rendering. The Claude mark comes from the
 ### Ended tasks
 
 Agents report **Ended** with the `end` tool when you cancel work, ask them to stop, or hand it to another session. This clears Needs you while retaining the reason and unfinished steps; it does not claim success or archive resources. Clear final stop-and-handoff messages are also recognized from provider completion notifications for older sessions. Questions, conditional suggestions, and ordinary pauses are not treated as endings. For an already-stale session, right-click its card and choose **Mark as ended**. Archive remains the action that stops processes and cleans up resources. A new plan or resumed session can start work again.
+
+## Chat tasks
+
+Choose **Chat** when summoning an agent to research a question or talk through an idea. Chat uses the selected workspace for context without creating a worktree, and does not require a step plan. The conversation shows your question, the agent's replies, and follow-up messages; **Research activity** reveals tool calls when you want the supporting detail. Replies support formatting, code blocks, and clickable source links. Answers leave the chat open for your next message. **End chat** stops the agent and saves the conversation in **Finished**, without marking unfinished research steps complete.

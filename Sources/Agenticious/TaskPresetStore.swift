@@ -17,6 +17,7 @@ final class TaskPresetStore: ObservableObject {
             let saved = try JSONDecoder().decode([TaskTemplate].self, from: Data(contentsOf: url))
             try validate(saved)
             presets = saved
+            if !presets.contains(where: \.isChat) { presets.insert(.chat, at: min(1, presets.count)) }
         } catch {
             loadError = "Could not load presets: \(error.localizedDescription). Your saved file has been preserved."
         }
@@ -56,7 +57,7 @@ final class TaskPresetStore: ObservableObject {
     }
 
     func remove(_ preset: TaskTemplate) throws {
-        guard !preset.isCustom else { throw ConfigurationError("The custom task cannot be deleted.") }
+        guard !preset.isCustom, !preset.isChat else { throw ConfigurationError("The custom task and Chat cannot be deleted.") }
         try persist(presets.filter { $0.id != preset.id })
     }
 

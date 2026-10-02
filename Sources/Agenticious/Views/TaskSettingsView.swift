@@ -41,7 +41,7 @@ struct TaskSettingsView: View {
                                 Button("Edit preset", systemImage: "pencil") { editing = preset }
                                     .buttonStyle(AgenticiousButtonStyle(isCompact: true))
                                 Spacer()
-                                if !preset.isCustom {
+                                if !preset.isCustom, !preset.isChat {
                                     Button("Delete preset", systemImage: "trash", role: .destructive) { deleting = preset }
                                         .labelStyle(.iconOnly).buttonStyle(.borderless).tint(.red)
                                 }

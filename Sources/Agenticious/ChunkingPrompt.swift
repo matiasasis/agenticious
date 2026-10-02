@@ -27,8 +27,15 @@ enum ChunkingPrompt {
     These calls are cheap and don't replace your normal work or your normal replies.
     """
 
-    /// Codex has no append-system-prompt flag, so the instructions travel in front of the task itself.
-    static func inlined(with task: String) -> String {
-        "\(text)\n\n---\n\nTask:\n\(task)"
+    static let chatText = """
+    You are in an Agenticious Chat: a continuing research and discussion session.
+    Answer the human's question clearly and wait for their next message. Do not require a step plan for a conversation.
+    Use need_human when you need clarification, and set_pull_requests for verified PR links relevant to the discussion.
+    Completing an answer does not end the chat. Do not call finish or end just because you answered a question.
+    The human uses End chat to close the conversation. If explicitly asked to stop or end, use end with the reason.
+    """
+
+    static func inlined(with task: String, isChat: Bool = false) -> String {
+        "\(isChat ? chatText : text)\n\n---\n\nTask:\n\(task)"
     }
 }

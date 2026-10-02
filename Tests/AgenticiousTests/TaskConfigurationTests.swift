@@ -101,7 +101,7 @@ final class TaskConfigurationTests: XCTestCase {
         store.recordUse(of: fixCI)
         store.recordUse(of: review)
         store.recordUse(of: .custom)
-        XCTAssertEqual(store.presetsByUse.map(\.id), ["custom", "fixCI", "reviewPR", "implementTicket", "reviewComments"])
+        XCTAssertEqual(store.presetsByUse.map(\.id), ["custom", "fixCI", "reviewPR", "chat", "implementTicket", "reviewComments"])
     }
 
     @MainActor

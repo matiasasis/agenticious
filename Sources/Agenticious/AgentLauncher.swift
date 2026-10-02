@@ -25,7 +25,7 @@ struct AgentLauncher {
             let files = try writeClaudeFiles(for: session)
             variables["AD_SETTINGS"] = files.settings
             variables["AD_MCP"] = files.mcp
-            variables["AD_SYSPROMPT"] = ChunkingPrompt.text
+            variables["AD_SYSPROMPT"] = session.isChat ? ChunkingPrompt.chatText : ChunkingPrompt.text
             variables["AD_PROMPT"] = session.prompt
             // A fixed session id makes the conversation resumable even if the app quits before Claude reports anything.
             let conversation = resuming ? #" --resume "$AD_CONVERSATION""# : #" --session-id "$AD_CONVERSATION" -- "$AD_PROMPT""#
@@ -35,7 +35,7 @@ struct AgentLauncher {
             variables["AD_MCP_CMD"] = #"mcp_servers.agenticious.command="\#(tomlEscaped(mcpBinary))""#
             variables["AD_MCP_ENV"] = #"mcp_servers.agenticious.env={AGENTICIOUS_SESSION="\#(session.id.uuidString)",AGENTICIOUS_PORT="\#(port)"}"#
             variables["AD_NOTIFY"] = #"notify=['/bin/sh','-c','curl -s -m 2 -X POST --data-binary "$1" \#(hookURL(session, "codex-notify")) >/dev/null 2>&1','sh']"#
-            variables["AD_PROMPT"] = "Agenticious session ID: \(session.id.uuidString)\n" + ChunkingPrompt.inlined(with: session.prompt)
+            variables["AD_PROMPT"] = "Agenticious session ID: \(session.id.uuidString)\n" + ChunkingPrompt.inlined(with: session.prompt, isChat: session.isChat)
             // Codex reports its thread id only when a turn completes. Without one, `codex resume` shows its picker for this folder.
             let conversation = !resuming ? #" -- "$AD_PROMPT""# : session.conversationID == nil ? "" : #" -- "$AD_CONVERSATION""#
             command = "exec codex" + (resuming ? " resume" : "") + #" -c "$AD_MCP_CMD" -c "$AD_MCP_ENV" -c "$AD_NOTIFY""#

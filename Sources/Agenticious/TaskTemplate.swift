@@ -13,6 +13,7 @@ struct TaskTemplate: Codable, Identifiable, Equatable {
     var skillPaths: [String] = []
 
     var isCustom: Bool { id == "custom" }
+    var isChat: Bool { id == "chat" }
     var shortName: String { name }
     var validationMessage: String? {
         if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "Give this preset a name." }
@@ -48,8 +49,23 @@ struct TaskTemplate: Codable, Identifiable, Equatable {
     }
 
     static let custom = TaskTemplate(id: "custom", name: "Custom task", summary: "Give your agent a mission in your own words.")
+    static let chat = TaskTemplate(
+        id: "chat", name: "Chat", summary: "Research a question or think something through together.",
+        symbol: "bubble.left.and.bubble.right", fieldLabel: "Question or topic",
+        fieldPlaceholder: "What would you like to explore?", titlePattern: "Chat: {{input}}",
+        prompt: """
+        Research or discuss this question with the human:
+        {{input}}
+
+        Lead with a direct answer, then explain the evidence, open questions, and useful next steps.
+        Read referenced sources and link to evidence. Distinguish verified facts from assumptions.
+        Ask a focused clarification when needed and make space for follow-up questions.
+        This is a conversation: do not implement changes, post reviews, or merge PRs unless explicitly asked.
+        """
+    )
     static let defaults: [TaskTemplate] = [
         custom,
+        chat,
         TaskTemplate(id: "implementTicket", name: "Implement", summary: "Turn a ticket into tested code and a draft pull request.",
                      symbol: "hammer", fieldLabel: "Ticket", fieldPlaceholder: "Ticket ID or URL",
                      titlePattern: "Implement {{input}}", prompt: """
@@ -167,10 +183,14 @@ struct TaskType: Codable, Equatable {
     let name: String
     let symbol: String
     let details: String?
+    let templateID: String?
+
+    var isChat: Bool { templateID == "chat" }
 
     init(template: TaskTemplate, input: String? = nil, notes: String = "") {
         name = template.name
         symbol = template.symbol
+        templateID = template.id
         details = input.map {
             [$0, notes].map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .filter { !$0.isEmpty }.joined(separator: "\n")
