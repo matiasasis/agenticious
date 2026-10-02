@@ -166,6 +166,18 @@ final class TaskConfigurationTests: XCTestCase {
         }
     }
 
+    func testImplementPresetAcceptsATicketOrAMission() throws {
+        let preset = try XCTUnwrap(TaskTemplate.defaults.first { $0.id == "implementTicket" })
+        for input in ["SK-123", "https://example.atlassian.net/browse/SK-123", "Add a dark mode toggle to the settings screen"] {
+            let task = try TaskPrompt(template: preset, input: input, notes: "", skillPaths: [])
+            XCTAssertEqual(task.title, "Implement \(input)")
+            XCTAssertTrue(task.instructions.contains(input))
+            XCTAssertFalse(task.instructions.contains("{{input}}"))
+            XCTAssertFalse(task.instructions.contains("Implement ticket"))
+        }
+        XCTAssertThrowsError(try TaskPrompt(template: preset, input: " ", notes: "", skillPaths: []))
+    }
+
     func testInputIsRetainedWhenPromptHasNoPlaceholder() throws {
         let preset = TaskTemplate(name: "Explain", prompt: "Explain this carefully.")
         let prompt = try TaskPrompt(template: preset, input: "An unusual API", notes: "", skillPaths: [])
