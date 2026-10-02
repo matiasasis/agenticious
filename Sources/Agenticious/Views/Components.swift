@@ -165,7 +165,7 @@ struct ChunkStrip: View {
                 }
             }
         } else {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 8)], spacing: 8) {
+            ChunkGridLayout {
                 ForEach(chunks) { chunk in ChunkBox(chunk: chunk) }
             }
         }
@@ -204,33 +204,73 @@ struct ChunkList: View {
 
 private struct ChunkBox: View {
     let chunk: Chunk
+    @State private var showingDetails = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
-                Image(systemName: chunk.status.symbol)
+        Button { showingDetails.toggle() } label: {
+            HStack(spacing: 8) {
                 Text("\(chunk.id)")
+                    .font(.caption.weight(.bold).monospacedDigit())
+                    .foregroundStyle(chunk.status.color)
+                    .frame(width: 24, height: 24)
+                    .background(chunk.status.color.opacity(0.15), in: Circle())
+                Text(chunk.title)
+                    .font(.callout.weight(.medium))
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .font(.caption.weight(.bold))
-            .foregroundStyle(chunk.status.color)
-
-            Text(chunk.title)
-                .font(.callout.weight(.medium))
-                .lineLimit(2)
-
-            if let note = chunk.note {
-                Text(note).font(.caption).foregroundStyle(.secondary).lineLimit(2)
-            }
+            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity, minHeight: ChunkGridLayout.cardHeight, maxHeight: ChunkGridLayout.cardHeight)
+            .background(chunk.status.color.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(chunk.status.color.opacity(0.5)))
+            .contentShape(RoundedRectangle(cornerRadius: 8))
         }
-        .padding(10)
-        .frame(maxWidth: .infinity, minHeight: 108, maxHeight: 108, alignment: .topLeading)
-        .background(chunk.status.color.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(chunk.status.color.opacity(0.5)))
-        .help([chunk.title, chunk.note].compactMap { $0 }.joined(separator: "\n"))
+        .buttonStyle(.plain)
+        .accessibilityLabel("Step \(chunk.id): \(chunk.title), \(chunk.status.label)")
+        .accessibilityHint("Show step details")
+        .help("Show step details")
+        .popover(isPresented: $showingDetails) { ChunkDetails(chunk: chunk) }
+    }
+}
+
+struct ChunkDetails: View {
+    let chunk: Chunk
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Label("Step \(chunk.id) · \(chunk.status.label)", systemImage: chunk.status.symbol)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(chunk.status.color)
+                Text(chunk.title).font(.headline)
+                if let note = chunk.note, !note.isEmpty {
+                    Text(note).font(.callout).foregroundStyle(.secondary)
+                } else {
+                    Text("No details yet.").font(.callout).foregroundStyle(.secondary)
+                }
+            }
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
+        }
+        .frame(width: 340)
+        .frame(maxHeight: 320)
+        .fixedSize(horizontal: false, vertical: true)
     }
 }
 
 extension ChunkStatus {
+    var label: String {
+        switch self {
+        case .pending: "Pending"
+        case .inProgress: "In progress"
+        case .done: "Done"
+        case .blocked: "Blocked"
+        }
+    }
+
     var color: Color {
         switch self {
         case .pending: .gray
