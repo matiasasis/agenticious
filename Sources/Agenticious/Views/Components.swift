@@ -208,24 +208,14 @@ private struct ChunkBox: View {
 
     var body: some View {
         Button { showingDetails.toggle() } label: {
-            HStack(spacing: 8) {
-                Text("\(chunk.id)")
-                    .font(.caption.weight(.bold).monospacedDigit())
-                    .foregroundStyle(chunk.status.color)
-                    .frame(width: 24, height: 24)
-                    .background(chunk.status.color.opacity(0.15), in: Circle())
-                Text(chunk.title)
-                    .font(.callout.weight(.medium))
-                    .foregroundStyle(.primary)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .padding(.horizontal, 10)
-            .frame(maxWidth: .infinity, minHeight: ChunkGridLayout.cardHeight, maxHeight: ChunkGridLayout.cardHeight)
-            .background(chunk.status.color.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(chunk.status.color.opacity(0.5)))
-            .contentShape(RoundedRectangle(cornerRadius: 8))
+            ChunkHeading(chunk: chunk, titleLineLimit: 2)
+                .multilineTextAlignment(.leading)
+                .padding(.horizontal, 12)
+                .frame(maxWidth: .infinity, minHeight: ChunkGridLayout.cardHeight, maxHeight: ChunkGridLayout.cardHeight,
+                       alignment: .leading)
+                .background(chunk.status.color.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(chunk.status.color.opacity(0.5)))
+                .contentShape(RoundedRectangle(cornerRadius: 8))
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Step \(chunk.id): \(chunk.title), \(chunk.status.label)")
@@ -241,10 +231,7 @@ struct ChunkDetails: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                Label("Step \(chunk.id) · \(chunk.status.label)", systemImage: chunk.status.symbol)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(chunk.status.color)
-                Text(chunk.title).font(.headline)
+                ChunkHeading(chunk: chunk)
                 if let note = chunk.note, !note.isEmpty {
                     Text(note).font(.callout).foregroundStyle(.secondary)
                 } else {
@@ -258,6 +245,23 @@ struct ChunkDetails: View {
         .frame(width: 340)
         .frame(maxHeight: 320)
         .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+private struct ChunkHeading: View {
+    let chunk: Chunk
+    var titleLineLimit: Int?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Label("Step \(chunk.id) · \(chunk.status.label)", systemImage: chunk.status.symbol)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(chunk.status.color)
+            Text(chunk.title)
+                .font(.headline)
+                .foregroundStyle(.primary)
+                .lineLimit(titleLineLimit)
+        }
     }
 }
 
