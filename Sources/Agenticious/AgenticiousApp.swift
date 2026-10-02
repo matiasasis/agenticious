@@ -46,6 +46,10 @@ struct AgenticiousApp: App {
         .defaultSize(width: 1400, height: 880)
         .windowStyle(.hiddenTitleBar)
         .commands {
+            CommandGroup(replacing: .newItem) {
+                Button("Summon agent") { store.composer = Composer(project: store.composerProject) }
+                    .keyboardShortcut("n")
+            }
             CommandGroup(replacing: .appSettings) {
                 Button("Settings…") { store.selection = .settings }
                     .keyboardShortcut(",")

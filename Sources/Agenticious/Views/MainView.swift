@@ -11,7 +11,7 @@ struct MainView: View {
                 .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 420)
         } detail: {
             detail
-                .safeAreaInset(edge: .top, spacing: 0) { ControlRoomBar(project: defaultProject) }
+                .safeAreaInset(edge: .top, spacing: 0) { ControlRoomBar() }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .background(AgenticiousStyle.ink)
         }

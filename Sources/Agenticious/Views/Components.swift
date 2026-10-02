@@ -296,11 +296,15 @@ extension ChunkStatus {
 
 struct UsageBar: View {
     @EnvironmentObject private var usage: UsageMonitor
+    var isStacked = false
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 10) { vendors }
-            VStack(alignment: .leading, spacing: 6) { vendors }
+        Group {
+            if isStacked {
+                VStack(alignment: .leading, spacing: 6) { vendors }
+            } else {
+                HStack(spacing: 10) { vendors }
+            }
         }
         .foregroundStyle(.secondary)
     }
@@ -499,30 +503,28 @@ private struct PullRequestFlowLayout: Layout {
 }
 
 struct ControlRoomBar: View {
-    @EnvironmentObject private var store: SessionStore
-    let project: Project
-
     var body: some View {
-        HStack(spacing: 12) {
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 12) {
-                    Text("CONTROL ROOM").font(.system(size: 10, weight: .bold, design: .monospaced))
-                        .tracking(1).foregroundStyle(AgenticiousStyle.violet)
-                    Spacer(minLength: 8)
-                    UsageBar()
-                }
-                UsageBar()
-            }
-            Spacer(minLength: 0)
-            ProviderStatusButton().buttonStyle(AgenticiousButtonStyle(isPrimary: false, isCompact: true)).labelStyle(.iconOnly)
-            Button("Summon agent", systemImage: "plus") { store.composer = Composer(project: project) }
-                .labelStyle(.titleAndIcon).keyboardShortcut("n")
-                .buttonStyle(AgenticiousButtonStyle()).fixedSize()
-                .help("Summon an agent · ⌘N")
+        ViewThatFits(in: .horizontal) {
+            content(showsTitle: true)
+            content(showsTitle: false)
+            content(showsTitle: false, stacksUsage: true)
         }
         .padding(.horizontal, 18).padding(.vertical, 12)
         .background(AgenticiousStyle.ink)
         .overlay(alignment: .bottom) { Rectangle().fill(AgenticiousStyle.violet.opacity(0.25)).frame(height: 1) }
+    }
+
+    private func content(showsTitle: Bool, stacksUsage: Bool = false) -> some View {
+        HStack(spacing: 12) {
+            if showsTitle {
+                Text("CONTROL ROOM").font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .tracking(1).foregroundStyle(AgenticiousStyle.violet)
+                Spacer(minLength: 8)
+            }
+            UsageBar(isStacked: stacksUsage)
+            Spacer(minLength: 0)
+            ProviderStatusButton().buttonStyle(AgenticiousButtonStyle(isPrimary: false, isCompact: true)).labelStyle(.iconOnly)
+        }
     }
 }
 
