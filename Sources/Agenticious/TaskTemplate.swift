@@ -66,14 +66,18 @@ struct TaskTemplate: Codable, Identifiable, Equatable {
     static let defaults: [TaskTemplate] = [
         custom,
         chat,
-        TaskTemplate(id: "implementTicket", name: "Implement", summary: "Turn a ticket into tested code and a draft pull request.",
-                     symbol: "hammer", fieldLabel: "Ticket", fieldPlaceholder: "Ticket ID or URL",
+        TaskTemplate(id: "implementTicket", name: "Implement", summary: "Turn a ticket or a mission into tested code and a draft pull request.",
+                     symbol: "hammer", fieldLabel: "Ticket or mission", fieldPlaceholder: "Ticket ID, URL, or what to implement",
                      titlePattern: "Implement {{input}}", prompt: """
-                     Implement ticket {{input}}.
-                     Read the ticket and its linked context, explore the project, and plan the change.
+                     Implement this:
+                     {{input}}
+
+                     The input is either a ticket (an ID or URL) or a mission describing what to implement.
+                     For a ticket, read it and its linked context. For a mission, treat its text as the requirements.
+                     Explore the project and plan the change.
                      Follow the project's conventions, implement the change, and run relevant tests.
-                     Commit on a feature branch, push, and open a draft pull request linked to the ticket.
-                     If the ticket or a required tool is unavailable, ask the human for help.
+                     Commit on a feature branch, push, and open a draft pull request, linked to the ticket if there is one.
+                     If the ticket, the intended behavior, or a required tool is unavailable, ask the human for help.
                      """),
         TaskTemplate(id: "reviewComments", name: "Resolve & merge", summary: "Address feedback, resolve conflicts, and get one or multiple PRs green and merged.",
                      symbol: "arrow.triangle.merge", fieldLabel: "Pull request(s)",
