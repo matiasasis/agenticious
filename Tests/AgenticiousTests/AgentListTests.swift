@@ -3,6 +3,43 @@ import XCTest
 
 final class AgentListTests: XCTestCase {
     @MainActor
+    func testWorkingCountsExcludeIdleStoppedAndArchivedAgents() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let url = folder.appendingPathComponent("test.sqlite")
+        let database = try SessionDatabase(url: url)
+        let waiting = AgentSession(task: "Waiting", agent: .claude, project: .none, directory: folder)
+        let archived = AgentSession(task: "Archived", agent: .codex, project: .none, directory: folder)
+        archived.isMarkedFinished = true
+        try database.save(waiting)
+        try database.save(archived)
+        let store = SessionStore(databaseURL: url)
+        let session = try XCTUnwrap(store.session(waiting.id))
+        let hidden = try XCTUnwrap(store.session(archived.id))
+        hidden.status = .working
+        hidden.isRunning = true
+
+        for status in [SessionStatus.waiting, .yourTurn, .needsYou("Approve"), .done(nil), .ended("Finished"), .exited(0), .interrupted] {
+            session.status = status
+            session.isRunning = true
+            XCTAssertEqual(store.visibleSessions.count, 1)
+            XCTAssertEqual(store.workingCount, 0)
+            XCTAssertEqual(store.attentionCount, status.needsAttention ? 1 : 0)
+        }
+        session.status = .working
+        XCTAssertEqual(store.workingCount, 1)
+        session.isRunning = false
+        XCTAssertEqual(store.workingCount, 0)
+        session.status = .starting
+        XCTAssertEqual(store.workingCount, 1)
+        session.isMarkedFinished = true
+        XCTAssertEqual(store.visibleSessions.count, 0)
+        XCTAssertEqual(store.workingCount, 0)
+        hidden.status = .needsYou("Archived")
+        XCTAssertEqual(store.attentionCount, 0)
+    }
+
+    @MainActor
     func testUnfinishedActiveTasksCannotBeMarkedFinished() {
         let session = AgentSession(task: "Work", agent: .claude, project: .none, directory: URL(fileURLWithPath: "/tmp"))
         session.chunks = [Chunk(id: 1, title: "Completed step", status: .done)]

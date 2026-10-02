@@ -296,34 +296,49 @@ extension ChunkStatus {
 
 struct UsageBar: View {
     @EnvironmentObject private var usage: UsageMonitor
+    var isStacked = false
 
     var body: some View {
-        HStack(spacing: 10) {
-            if let claude = usage.claudeReading {
-                vendor("Claude", claude.limits, source: "Read \(claude.takenAt.formatted(.relative(presentation: .named))) " +
-                    "from the status line of a Claude agent started here.")
-            } else if let tokens = usage.claudeTokensToday {
-                Text("Claude today: \(tokens.formatted(.number.notation(.compactName))) tok")
-                    .font(.caption)
-                    .help("Input + output + cache-write tokens since midnight, read from ~/.claude/projects. " +
-                        "Your session and weekly limits show up here once a Claude agent started from Agenticious replies.")
+        Group {
+            if isStacked {
+                VStack(alignment: .leading, spacing: 6) { vendors }
+            } else {
+                HStack(spacing: 10) { vendors }
             }
+        }
+        .foregroundStyle(.secondary)
+    }
 
-            if !usage.codexLimits.isEmpty {
-                vendor("Codex", usage.codexLimits.account, source: "Read from Codex's latest session logs.") {
-                    ForEach(usage.codexLimits.models, id: \.name) { model in
-                        Divider().frame(height: 22)
-                        Text(model.name)
-                            .font(.caption2.weight(.semibold))
-                            .help("\(model.name) has its own limit, separate from the rest of Codex.")
-                        ForEach(model.limits, id: \.windowMinutes) {
-                            LimitGauge(limit: $0, source: "Read from the latest Codex session that used \(model.name).")
-                        }
+    @ViewBuilder
+    private var vendors: some View {
+        if let claude = usage.claudeReading {
+            vendor("Claude", claude.limits, source: "Read \(claude.takenAt.formatted(.relative(presentation: .named))) " +
+                "from the status line of a Claude agent started here.")
+        } else if let tokens = usage.claudeTokensToday {
+            Text("Claude today: \(tokens.formatted(.number.notation(.compactName))) tok")
+                .font(.caption)
+                .help("Input + output + cache-write tokens since midnight, read from ~/.claude/projects. " +
+                    "Your session and weekly limits show up here once a Claude agent started from Agenticious replies.")
+        }
+
+        if !usage.codexLimits.isEmpty || usage.codexModelQuotas?.quotas.isEmpty == false {
+            vendor("Codex", usage.codexLimits.account, source: "Read from Codex's latest session logs.") {
+                ForEach(usage.codexModelQuotas?.quotas ?? []) { quota in
+                    Divider().frame(height: 22)
+                    CodexModelQuotaStatus(quota: quota, checkedAt: usage.codexModelQuotas?.checkedAt,
+                                          isStale: usage.codexModelQuotasStale)
+                }
+                ForEach(usage.codexLimits.models, id: \.name) { model in
+                    Divider().frame(height: 22)
+                    Text(model.name)
+                        .font(.caption2.weight(.semibold))
+                        .help("\(model.name) has its own limit, separate from the rest of Codex.")
+                    ForEach(model.limits, id: \.windowMinutes) {
+                        LimitGauge(limit: $0, source: "Read from the latest Codex session that used \(model.name).")
                     }
                 }
             }
         }
-        .foregroundStyle(.secondary)
     }
 
     private func vendor(_ name: String, _ limits: [UsageLimit], source: String,
@@ -338,6 +353,38 @@ struct UsageBar: View {
         .padding(.horizontal, 10).padding(.vertical, 8)
         .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(AgenticiousStyle.violet.opacity(0.25)))
+    }
+}
+
+struct CodexModelQuotaStatus: View {
+    let quota: CodexModelQuota
+    let checkedAt: Date?
+    let isStale: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(quota.name).font(.caption2.weight(.semibold))
+            Label(isStale ? "Last reported: \(quota.status)" : quota.status,
+                  systemImage: isStale ? "clock" : quota.available ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                .font(.system(size: 10))
+                .foregroundStyle(isStale ? Color.secondary : quota.available ? AgenticiousStyle.lime : .orange)
+            if !quota.available, let availableAt = quota.availableAt {
+                Text("Resets \(availableAt.formatted(.relative(presentation: .named)))")
+                    .font(.system(size: 10))
+            }
+        }
+        .fixedSize()
+        .help(helpText)
+    }
+
+    private var helpText: String {
+        var lines = ["Model-specific quota status. Codex reports availability rather than a percentage."]
+        if isStale { lines.append("The latest refresh failed; showing the last reported status.") }
+        if let checkedAt { lines.append("Checked \(checkedAt.formatted(.relative(presentation: .named))).") }
+        if let availableAt = quota.availableAt {
+            lines.append("Available again \(availableAt.formatted(date: .abbreviated, time: .shortened)).")
+        }
+        return lines.joined(separator: "\n")
     }
 }
 
@@ -456,46 +503,42 @@ private struct PullRequestFlowLayout: Layout {
 }
 
 struct ControlRoomBar: View {
-    @EnvironmentObject private var store: SessionStore
-    let project: Project
-
     var body: some View {
-        HStack(spacing: 12) {
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 12) {
-                    Text("CONTROL ROOM").font(.system(size: 10, weight: .bold, design: .monospaced))
-                        .tracking(1).foregroundStyle(AgenticiousStyle.violet)
-                    Spacer(minLength: 8)
-                    AgentCounters()
-                    UsageBar()
-                }
-                HStack(spacing: 10) {
-                    AgentCounters()
-                    UsageBar()
-                }
-                UsageBar()
-            }
-            Spacer(minLength: 0)
-            ProviderStatusButton().buttonStyle(AgenticiousButtonStyle(isPrimary: false, isCompact: true)).labelStyle(.iconOnly)
-            Button("Summon agent", systemImage: "plus") { store.composer = Composer(project: project) }
-                .labelStyle(.titleAndIcon).keyboardShortcut("n")
-                .buttonStyle(AgenticiousButtonStyle()).fixedSize()
-                .help("Summon an agent · ⌘N")
+        ViewThatFits(in: .horizontal) {
+            content(showsTitle: true)
+            content(showsTitle: false)
+            content(showsTitle: false, stacksUsage: true)
         }
         .padding(.horizontal, 18).padding(.vertical, 12)
         .background(AgenticiousStyle.ink)
         .overlay(alignment: .bottom) { Rectangle().fill(AgenticiousStyle.violet.opacity(0.25)).frame(height: 1) }
     }
+
+    private func content(showsTitle: Bool, stacksUsage: Bool = false) -> some View {
+        HStack(spacing: 12) {
+            if showsTitle {
+                Text("CONTROL ROOM").font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .tracking(1).foregroundStyle(AgenticiousStyle.violet)
+                Spacer(minLength: 8)
+            }
+            UsageBar(isStacked: stacksUsage)
+            Spacer(minLength: 0)
+            ProviderStatusButton().buttonStyle(AgenticiousButtonStyle(isPrimary: false, isCompact: true)).labelStyle(.iconOnly)
+        }
+    }
 }
 
-private struct AgentCounters: View {
+struct AgentCounters: View {
     @EnvironmentObject private var store: SessionStore
 
     var body: some View {
-        HStack(spacing: 10) {
-            DashboardMetric(title: "QUEUED", value: store.visibleSessions.count, color: AgenticiousStyle.violet)
-            DashboardMetric(title: "RUNNING", value: store.visibleSessions.filter(\.isRunning).count, color: AgenticiousStyle.lime)
+        HStack(spacing: 6) {
+            DashboardMetric(title: "AGENTS", value: store.visibleSessions.count, color: AgenticiousStyle.violet)
+                .help("Agents in the sidebar, excluding history")
+            DashboardMetric(title: "WORKING", value: store.workingCount, color: AgenticiousStyle.lime)
+                .help("Agents starting or actively working; idle and waiting agents are excluded")
             DashboardMetric(title: "NEEDS YOU", value: store.attentionCount, color: .orange)
+                .help("Agents blocked on your input or approval")
         }
     }
 }

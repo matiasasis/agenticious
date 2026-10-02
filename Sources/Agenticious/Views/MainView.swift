@@ -11,7 +11,7 @@ struct MainView: View {
                 .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 420)
         } detail: {
             detail
-                .safeAreaInset(edge: .top, spacing: 0) { ControlRoomBar(project: defaultProject) }
+                .safeAreaInset(edge: .top, spacing: 0) { ControlRoomBar() }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .background(AgenticiousStyle.ink)
         }
@@ -112,18 +112,21 @@ private struct Sidebar: View {
         }
         .background(AgenticiousStyle.ink)
         .safeAreaInset(edge: .top) {
-            HStack(spacing: 10) {
-                if let icon = Bundle.module.url(forResource: "AppIcon", withExtension: "png").flatMap(NSImage.init(contentsOf:)) {
-                    Image(nsImage: icon).resizable().interpolation(.high).scaledToFit().frame(width: 96, height: 96)
-                        .accessibilityHidden(true)
+            VStack(alignment: .trailing, spacing: 8) {
+                HStack(spacing: 10) {
+                    if let icon = Bundle.module.url(forResource: "AppIcon", withExtension: "png").flatMap(NSImage.init(contentsOf:)) {
+                        Image(nsImage: icon).resizable().interpolation(.high).scaledToFit().frame(width: 96, height: 96)
+                            .accessibilityHidden(true)
+                    }
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("AGENTICIOUS").font(.system(size: 17, weight: .black, design: .rounded))
+                        Text("A LITTLE CHAOS. A LOT DONE.")
+                            .font(.system(size: 8, weight: .bold, design: .monospaced))
+                            .tracking(1).foregroundStyle(AgenticiousStyle.lime)
+                    }
+                    Spacer(minLength: 0)
                 }
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("AGENTICIOUS").font(.system(size: 17, weight: .black, design: .rounded))
-                    Text("A LITTLE CHAOS. A LOT DONE.")
-                        .font(.system(size: 8, weight: .bold, design: .monospaced))
-                        .tracking(1).foregroundStyle(AgenticiousStyle.lime)
-                }
-                Spacer(minLength: 0)
+                AgentCounters()
             }
             .padding(16)
         }
