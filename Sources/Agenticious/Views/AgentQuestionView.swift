@@ -117,7 +117,7 @@ struct QuestionCard: View {
     private var isComplete: Bool { answers.values.allSatisfy { !$0.isEmpty } }
 }
 
-/// A plain reply to the agent, typed into its terminal prompt. Shown only while that's safe (see `canReplyInline`).
+/// Sending must wait for the provider's prompt; keystrokes during a tool or permission menu would be misinterpreted.
 struct ReplyComposer: View {
     @EnvironmentObject private var store: SessionStore
     @ObservedObject var session: AgentSession
@@ -129,11 +129,14 @@ struct ReplyComposer: View {
                 if case let .needsYou(reason) = session.status {
                     Label(reason, systemImage: "hand.raised.fill").font(.caption.weight(.semibold)).foregroundStyle(.orange).lineLimit(3)
                 }
-                SnippetEditor(text: $text, placeholder: "Reply to \(session.agent.displayName)…", minHeight: 40, maxHeight: 160)
+                SnippetEditor(text: $text, placeholder: session.isChat ? "Ask a follow-up or share your thoughts…" : "Reply to \(session.agent.displayName)…", minHeight: 40, maxHeight: 160)
+                if session.isChat && !session.canReplyInline {
+                    Text("You can send once the agent is ready for your reply.").font(.caption).foregroundStyle(.secondary)
+                }
             }
             Button("Send", systemImage: "paperplane.fill", action: send)
                 .buttonStyle(AgenticiousButtonStyle())
-                .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .disabled(!session.canReplyInline || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .keyboardShortcut(.return, modifiers: .command)
         }
         .padding(14)

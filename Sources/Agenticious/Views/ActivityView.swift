@@ -8,12 +8,19 @@ struct ActivityView: View {
     @State private var notice: String?
     @State private var loadedSession: UUID?
     @State private var followLatest = true
+    @State private var showResearch = false
+
+    private var visibleEntries: [ActivityEntry] {
+        session.isChat && !showResearch ? entries.filter { $0.kind != .tool } : entries
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Label("Live activity", systemImage: "waveform.path").font(.caption.weight(.semibold)).foregroundStyle(AgenticiousStyle.violet)
+                Label(session.isChat ? "Conversation" : "Live activity", systemImage: session.isChat ? "bubble.left.and.bubble.right" : "waveform.path")
+                    .font(.caption.weight(.semibold)).foregroundStyle(AgenticiousStyle.violet)
                 Spacer()
+                if session.isChat { Toggle("Research activity", isOn: $showResearch).toggleStyle(.checkbox).font(.caption) }
                 Toggle("Follow latest", isOn: $followLatest).toggleStyle(.checkbox).font(.caption)
                 Button("Respond in terminal", action: openTerminal).buttonStyle(AgenticiousButtonStyle(isPrimary: false, isCompact: true))
             }.padding(12)
@@ -30,14 +37,18 @@ struct ActivityView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 16) {
                         if let notice { Text(notice).font(.caption).foregroundStyle(.secondary) }
-                        ForEach(entries) { entry in ActivityCard(entry: entry, isRunning: session.isRunning) }
+                        if session.isChat {
+                            ActivityCard(entry: ActivityEntry(id: "opening-question", kind: .userMessage, title: "Your question",
+                                                             body: session.displayedTaskType.details(for: session.task)))
+                        }
+                        ForEach(visibleEntries) { entry in ActivityCard(entry: entry, isRunning: session.isRunning) }
                         Color.clear.frame(height: 1).id("latest")
                     }.padding(20)
                 }
                 .overlay {
                     if loadedSession != session.id {
                         BackgroundTaskLabel(task: "Loading activity…")
-                    } else if entries.isEmpty {
+                    } else if entries.isEmpty && !session.isChat {
                         ContentUnavailableView("No activity yet", systemImage: "text.bubble", description: Text("Messages and tool calls appear here when the provider writes them to this session’s log."))
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .allowsHitTesting(false)
@@ -45,7 +56,9 @@ struct ActivityView: View {
                 }
                 .onChange(of: entries) { _, _ in if followLatest { proxy.scrollTo("latest", anchor: .bottom) } }
             }
-            if session.canReplyInline { ReplyComposer(session: session) }
+            if session.canReplyInline || (session.isChat && session.isRunning && !session.isMarkedFinished && session.pendingQuestion == nil) {
+                ReplyComposer(session: session).id(session.id)
+            }
         }
         .background(AgenticiousStyle.ink)
         .task(id: "\(session.id)-\(session.isMarkedFinished)") {
@@ -61,12 +74,13 @@ struct ActivityView: View {
                 let id = session.id
                 let conversation = session.conversationID
                 let directory = session.directory.path
+                let chatPrompt = session.isChat ? session.prompt : nil
                 if previousID != conversation { cached = nil; stamp = nil; previousID = conversation }
                 let file = cached
                 let lastStamp = stamp
                 let result = await Task.detached(priority: .utility) {
                     ActivityTranscript.read(agent: agent, sessionID: id, conversationID: conversation, directory: directory,
-                                            cached: file, stamp: lastStamp)
+                                            cached: file, stamp: lastStamp, chatPrompt: chatPrompt)
                 }.value
                 guard !Task.isCancelled else { return }
                 cached = result.url
@@ -115,7 +129,7 @@ struct ActivityCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
-                Image(systemName: entry.kind == .message ? "text.bubble" : "terminal")
+                Image(systemName: entry.kind == .tool ? "terminal" : entry.kind == .userMessage ? "person.crop.circle" : "text.bubble")
                     .foregroundStyle(AgenticiousStyle.violet)
                 Text(entry.displayTitle).font(.callout.weight(.semibold))
                 Spacer()
@@ -124,7 +138,7 @@ struct ActivityCard: View {
             if let directory = entry.directory {
                 Label(directory, systemImage: "folder").font(.caption.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
             }
-            if entry.kind == .message {
+            if entry.kind != .tool {
                 ActivityMarkdown(text: entry.body)
             } else {
                 HStack(alignment: .top) {
@@ -153,7 +167,7 @@ struct ActivityCard: View {
             }
         }
         .padding(16).frame(maxWidth: .infinity, alignment: .leading)
-        .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 14))
+        .background(entry.kind == .userMessage ? AgenticiousStyle.violet.opacity(0.1) : AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 14))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(entry.state == .failed ? Color.orange.opacity(0.5) : AgenticiousStyle.violet.opacity(0.2)))
         .onAppear { expanded = entry.state == .failed }
         .onChange(of: entry.state) { _, state in if state == .failed { expanded = true } }

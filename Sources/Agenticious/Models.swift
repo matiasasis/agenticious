@@ -176,6 +176,8 @@ final class AgentSession: ObservableObject, Identifiable {
     }
 
     var displayedTaskType: TaskType { taskType ?? TaskType.legacy(title: task) }
+    var isChat: Bool { displayedTaskType.isChat }
+    var canEndChat: Bool { isChat && !isMarkedFinished && !isArchiving && backgroundTask == nil }
 
     var canMarkFinished: Bool {
         guard !isMarkedFinished, !isArchiving else { return false }
@@ -209,7 +211,7 @@ final class AgentSession: ObservableObject, Identifiable {
     var completedChunks: Int { chunks.filter { $0.status == .done }.count }
 
     var startupSteps: [Chunk] {
-        guard chunks.isEmpty, backgroundTask == nil, !isArchiving, !isMarkedFinished,
+        guard !isChat, chunks.isEmpty, backgroundTask == nil, !isArchiving, !isMarkedFinished,
               status == .starting || (status == .working && isRunning) else { return [] }
         return startupProgress.steps(for: agent, submitted: status == .working)
     }
