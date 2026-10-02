@@ -320,8 +320,12 @@ struct SessionMenu: View {
                 .disabled(session.isArchiving)
                 .help("Record that work was stopped or handed off. Archive to stop processes and clean up resources.")
         }
+        if session.canEnd {
+            Button("End agent", systemImage: "stop.fill") { store.end(session) }
+                .help("Mark the work as ended, stop the agent, and clean up its worktree. History is kept.")
+        }
         if session.canStop {
-            Button("Stop agent") { store.stop(session) }
+            Button("Pause agent") { store.pause(session) }
                 .disabled(session.isArchiving)
         } else if session.showsResumeAction {
             Button("Resume") { store.resume(session) }

@@ -15,6 +15,7 @@ final class AgentNotificationsTests: XCTestCase {
         XCTAssertNil(AgentAlert.transition(from: .working, to: .waiting))
         XCTAssertNil(AgentAlert.transition(from: .starting, to: .working))
         XCTAssertNil(AgentAlert.transition(from: .working, to: .exited(0)))
+        XCTAssertNil(AgentAlert.transition(from: .working, to: .paused))
         XCTAssertNil(AgentAlert.transition(from: .yourTurn, to: .needsYou("Reply")))
         XCTAssertNil(AgentAlert.transition(from: .needsYou("Approve"), to: .yourTurn))
         XCTAssertNil(AgentAlert.transition(from: .done(nil), to: .done("Updated summary")))

@@ -38,6 +38,8 @@ enum SessionStatus: Equatable {
     case done(String?)
     case ended(String)
     case exited(Int32?)
+    /// The human paused the agent. Its conversation and worktree stay, so Resume continues it.
+    case paused
     /// Agenticious quit while the agent was still going. Resuming reopens its conversation.
     case interrupted
 
@@ -51,6 +53,7 @@ enum SessionStatus: Equatable {
         case .done: "Done"
         case .ended: "Ended"
         case .exited: "Exited"
+        case .paused: "Paused"
         case .interrupted: "Interrupted"
         }
     }
@@ -73,7 +76,7 @@ enum SessionStatus: Equatable {
         case .needsYou: 0
         case .yourTurn: 1
         case .working, .starting, .waiting: 2
-        case .interrupted: 3
+        case .paused, .interrupted: 3
         case .done: 4
         case .ended: 5
         case .exited: 5
@@ -222,6 +225,15 @@ final class AgentSession: ObservableObject, Identifiable {
 
     /// A finished agent's process only idles; Archive stops it along with the cleanup.
     var canStop: Bool { isRunning && !status.isFinished }
+
+    /// Done or ended work only needs Archive.
+    var canEnd: Bool {
+        guard !isChat, !isMarkedFinished, !isArchiving, backgroundTask == nil else { return false }
+        switch status {
+        case .done, .ended: return false
+        default: return true
+        }
+    }
 
     var showsResumeAction: Bool {
         if case .done = status { return false }

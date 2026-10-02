@@ -132,7 +132,7 @@ struct SessionDatabase {
                 taskType: row.string("task_type")?.data(using: .utf8).flatMap { try? JSONDecoder().decode(TaskType.self, from: $0) }
             )
             let status = Self.decode(row.string("status"), detail: row.string("status_detail"))
-            session.status = status.isFinished ? status : .interrupted
+            session.status = status.isFinished || status == .paused ? status : .interrupted
             session.isMarkedFinished = row.bool("is_marked_finished")
             session.lastActivity = Date(timeIntervalSince1970: row.double("last_activity") ?? 0)
             session.worktreeRemoved = row.bool("worktree_removed")
@@ -183,6 +183,7 @@ struct SessionDatabase {
         case let .done(summary): ("done", summary)
         case let .ended(reason): ("ended", reason)
         case let .exited(code): ("exited", code.map(String.init))
+        case .paused: ("paused", nil)
         case .interrupted: ("interrupted", nil)
         }
     }
@@ -197,6 +198,7 @@ struct SessionDatabase {
         case "working": .working
         case "waiting": .waiting
         case "starting": .starting
+        case "paused": .paused
         default: .interrupted
         }
     }

@@ -97,11 +97,32 @@ final class AgentResumeTests: XCTestCase {
         }
         session.isRunning = false
         session.isMarkedFinished = false
-        for status in [SessionStatus.interrupted, .exited(nil), .ended("Stopped"), .yourTurn] {
+        for status in [SessionStatus.interrupted, .paused, .exited(nil), .ended("Stopped"), .yourTurn] {
             session.status = status
             XCTAssertTrue(session.showsResumeAction)
             XCTAssertTrue(session.canResume)
         }
+    }
+
+    @MainActor
+    func testEndIsOfferedOnlyForUnfinishedTasks() {
+        let session = AgentSession(task: "Work", agent: .claude, project: .none, directory: URL(fileURLWithPath: "/tmp"))
+        for status in [SessionStatus.working, .paused, .interrupted, .exited(1), .needsYou("Approve"), .yourTurn] {
+            session.status = status
+            XCTAssertTrue(session.canEnd)
+        }
+        for status in [SessionStatus.done(nil), .ended("Handed off")] {
+            session.status = status
+            XCTAssertFalse(session.canEnd)
+        }
+        session.status = .paused
+        session.isMarkedFinished = true
+        XCTAssertFalse(session.canEnd)
+        session.isMarkedFinished = false
+        session.isArchiving = true
+        XCTAssertFalse(session.canEnd)
+        XCTAssertFalse(AgentSession(task: "Chat", agent: .claude, project: .none, directory: URL(fileURLWithPath: "/tmp"),
+                                    taskType: TaskType(template: .chat, input: "Chat")).canEnd)
     }
 
     @MainActor
