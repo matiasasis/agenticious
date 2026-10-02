@@ -27,13 +27,25 @@ struct MainView: View {
 
     @ViewBuilder
     private var detail: some View {
-        if store.selection == .providers {
+        if store.selection == .history {
+            HistoryView()
+        } else if store.selection == .providers {
             ProvidersView()
         } else if [.settings, .skills, .preferences].contains(store.selection) {
             CustomizeView()
         } else if let session = store.selectedSession {
-            SessionDetailView(session: session)
-                .id(session.id)
+            VStack(spacing: 0) {
+                if session.isMarkedFinished {
+                    HStack {
+                        Button("Back to history", systemImage: "chevron.left") { store.selection = .history }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(AgenticiousStyle.lime)
+                        Spacer()
+                    }.padding(.horizontal, 24).padding(.vertical, 12)
+                }
+                SessionDetailView(session: session)
+                    .id(session.id)
+            }
         } else {
             OverviewView()
         }
@@ -72,25 +84,8 @@ private struct Sidebar: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                HStack(spacing: 6) {
-                    ForEach(AgentList.allCases) { list in
-                        Button { store.show(list) } label: {
-                            HStack(spacing: 6) {
-                                Text(list.title)
-                                Text("\(store.count(in: list))").monospacedDigit().opacity(0.7)
-                            }
-                            .font(.callout.weight(.semibold))
-                            .frame(maxWidth: .infinity).padding(.vertical, 10)
-                            .foregroundStyle(store.agentList == list ? AgenticiousStyle.lime : .secondary)
-                            .background(store.agentList == list ? AgenticiousStyle.lime.opacity(0.1) : .clear, in: RoundedRectangle(cornerRadius: 10))
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityAddTraits(store.agentList == list ? .isSelected : [])
-                    }
-                }
-                .padding(4).background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 14))
                 if store.visibleSessions.isEmpty {
-                    Text(store.agentList == .queue ? "Queue clear. Summon an agent to get started." : "Agents you mark as finished will appear here.")
+                    Text("Queue clear. Summon an agent to get started.")
                         .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 4)
                 }
                 HStack {
@@ -133,22 +128,37 @@ private struct Sidebar: View {
             .padding(16)
         }
         .safeAreaInset(edge: .bottom) {
-            Button { store.selection = .settings } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "slider.horizontal.3").font(.title3).foregroundStyle(AgenticiousStyle.violet)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Customize").font(.callout.weight(.semibold))
-                        Text("Task presets, skills & preferences").font(.caption).foregroundStyle(.secondary)
+            VStack(spacing: 8) {
+                Button { store.selection = .history } label: {
+                    HStack(spacing: 12) {
+                        Label("History", systemImage: "clock.arrow.circlepath")
+                        Spacer()
+                        Text("\(store.count(in: .finished))").monospacedDigit().foregroundStyle(.secondary)
                     }
-                    Spacer(minLength: 0)
-                    Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
+                    .font(.callout.weight(.semibold))
+                    .padding(14)
+                    .foregroundStyle(store.selection == .history ? AgenticiousStyle.lime : .primary)
+                    .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 12))
                 }
-                .padding(14)
-                .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(AgenticiousStyle.violet.opacity(0.25)))
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(store.selection == .history ? .isSelected : [])
+                Button { store.selection = .settings } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "slider.horizontal.3").font(.title3).foregroundStyle(AgenticiousStyle.violet)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Customize").font(.callout.weight(.semibold))
+                            Text("Task presets, skills & preferences").font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
+                    }
+                    .padding(14)
+                    .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 12))
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(AgenticiousStyle.violet.opacity(0.25)))
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain).padding(12)
-            .background(AgenticiousStyle.ink)
+            .padding(12).background(AgenticiousStyle.ink)
         }
     }
 
@@ -332,20 +342,12 @@ private struct OverviewView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
-                if store.agentList == .queue {
-                    ControlRoomHero(isEmpty: store.visibleSessions.isEmpty)
-                } else {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Finished agents").font(.system(size: 30, weight: .bold, design: .rounded))
-                        Text("Finished and archived agents. Open any agent to revisit its history.")
-                            .foregroundStyle(.secondary)
-                    }
-                }
+                ControlRoomHero(isEmpty: store.visibleSessions.isEmpty)
                 if let error = store.serverError {
                     Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red)
                 }
                 if store.visibleSessions.isEmpty {
-                    Label(store.agentList == .queue ? "No agents in your queue. Finished work is saved in the Finished tab." : "No finished agents yet.", systemImage: "sparkles")
+                    Label("No agents in your queue. Finished work is saved in History.", systemImage: "sparkles")
                         .foregroundStyle(.secondary)
                         .padding(.vertical, 8)
                 }

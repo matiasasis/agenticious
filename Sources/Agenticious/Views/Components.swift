@@ -472,18 +472,14 @@ struct ControlRoomBar: View {
     }
 }
 
-/// Queued, running and needs-you counts for the list being shown; the Finished list shows only its total.
 private struct AgentCounters: View {
     @EnvironmentObject private var store: SessionStore
 
     var body: some View {
         HStack(spacing: 10) {
-            DashboardMetric(title: store.agentList == .queue ? "QUEUED" : "FINISHED", value: store.visibleSessions.count,
-                            color: AgenticiousStyle.violet)
-            if store.agentList == .queue {
-                DashboardMetric(title: "RUNNING", value: store.visibleSessions.filter(\.isRunning).count, color: AgenticiousStyle.lime)
-                DashboardMetric(title: "NEEDS YOU", value: store.attentionCount, color: .orange)
-            }
+            DashboardMetric(title: "QUEUED", value: store.visibleSessions.count, color: AgenticiousStyle.violet)
+            DashboardMetric(title: "RUNNING", value: store.visibleSessions.filter(\.isRunning).count, color: AgenticiousStyle.lime)
+            DashboardMetric(title: "NEEDS YOU", value: store.attentionCount, color: .orange)
         }
     }
 }

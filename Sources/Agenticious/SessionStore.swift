@@ -4,6 +4,7 @@ import SwiftTerm
 
 enum Selection: Hashable {
     case overview
+    case history
     case settings
     case preferences
     case skills
@@ -11,11 +12,9 @@ enum Selection: Hashable {
     case session(UUID)
 }
 
-enum AgentList: String, CaseIterable, Identifiable {
+enum AgentList {
     case queue, finished
 
-    var id: Self { self }
-    var title: String { self == .queue ? "Queue" : "Finished" }
 
     func includes(isMarkedFinished: Bool) -> Bool {
         isMarkedFinished == (self == .finished)
@@ -54,12 +53,8 @@ final class SessionStore: ObservableObject {
     @Published private(set) var sessions: [AgentSession] = []
     @Published private(set) var favorites: [Project]
     @Published private(set) var serverError: String?
-    @Published var agentList: AgentList = .queue
-    @Published var selection: Selection? = .overview {
-        didSet {
-            if let selectedSession { agentList = selectedSession.isMarkedFinished ? .finished : .queue }
-        }
-    }
+    @Published var selection: Selection? = .overview
+    @Published var history = SessionHistory()
     @Published var composer: Composer?
     @Published var alert: String?
 
@@ -104,8 +99,8 @@ final class SessionStore: ObservableObject {
 
     var attentionCount: Int { sessions.filter { !$0.isMarkedFinished && $0.status.needsAttention }.count }
 
-    var visibleProjectGroups: [ProjectGroup] { agentList.groups(from: projectGroups) }
-    var visibleSessions: [AgentSession] { sessions.filter { agentList.includes(isMarkedFinished: $0.isMarkedFinished) } }
+    var visibleProjectGroups: [ProjectGroup] { AgentList.queue.groups(from: projectGroups) }
+    var visibleSessions: [AgentSession] { sessions.filter { AgentList.queue.includes(isMarkedFinished: $0.isMarkedFinished) } }
 
     func count(in list: AgentList) -> Int { sessions.filter { list.includes(isMarkedFinished: $0.isMarkedFinished) }.count }
 
@@ -177,8 +172,7 @@ final class SessionStore: ObservableObject {
     }
 
     func show(_ list: AgentList) {
-        agentList = list
-        selection = .overview
+        selection = list == .finished ? .history : .overview
     }
 
     func session(_ id: UUID) -> AgentSession? { sessions.first { $0.id == id } }
