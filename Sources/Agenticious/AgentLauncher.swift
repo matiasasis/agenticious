@@ -121,6 +121,8 @@ struct AgentLauncher {
                 "PostToolUse": [hookEntry(session, "PostToolUse", matcher: "*")],
                 "Notification": [hookEntry(session, "Notification")],
                 "Stop": [hookEntry(session, "Stop", passReplyToClaude: true)],
+                "SubagentStart": [hookEntry(session, "SubagentStart")],
+                "SubagentStop": [hookEntry(session, "SubagentStop")],
             ],
             // Reporting progress must never cost the human a permission prompt.
             "permissions": ["allow": ["mcp__agenticious"]],

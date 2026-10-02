@@ -8,6 +8,10 @@ enum EventInterpreter {
         if let conversation = payload["session_id"] as? String ?? payload["thread-id"] as? String {
             session.conversationID = conversation
         }
+        if let transcript = payload["transcript_path"] as? String {
+            session.transcriptURL = SubagentCatalog.conversationTranscript(from: transcript)
+        }
+        if isSubagent(payload) { trackSubagent(name, payload, in: session) }
         if case .ended = session.status, name != "UserPromptSubmit" {
             let tool = payload["tool"] as? String
             guard name == "mcp", tool == "set_plan" || tool == "set_pull_requests" else { return }
@@ -102,6 +106,37 @@ enum EventInterpreter {
     /// which may be asking the human or waiting on that subagent, except that a permission prompt was answered.
     private static func isSubagent(_ payload: [String: Any]) -> Bool {
         payload["agent_id"] != nil
+    }
+
+    private static func trackSubagent(_ name: String, _ payload: [String: Any], in session: AgentSession) {
+        guard let id = payload["agent_id"] as? String else { return }
+        let transcript = (payload["agent_transcript_path"] as? String).map { URL(fileURLWithPath: $0) }
+        session.updateSubagent(id, type: payload["agent_type"] as? String, transcript: transcript) { subagent in
+            switch name {
+            case "SubagentStop":
+                subagent.state = .done
+                subagent.detail = firstLine(of: payload["last_assistant_message"] as? String) ?? subagent.detail
+            case "PreToolUse":
+                subagent.state = .running
+                subagent.detail = activity(payload["tool_name"] as? String ?? "Tool", input: payload["tool_input"] as? [String: Any] ?? [:])
+            default:
+                subagent.state = .running
+            }
+        }
+    }
+
+    /// "Run command · bin/rspec spec/models", short enough for a sidebar line.
+    private static func activity(_ tool: String, input: [String: Any]) -> String {
+        let title = ActivityEntry(id: tool, kind: .tool, title: tool, body: "").displayTitle
+        let subject = (input["file_path"] as? String).map { URL(fileURLWithPath: $0).lastPathComponent }
+            ?? input["description"] as? String ?? input["command"] as? String ?? input["pattern"] as? String
+        return firstLine(of: subject).map { "\(title) · \($0)" } ?? title
+    }
+
+    private static func firstLine(of text: String?) -> String? {
+        text?.split(whereSeparator: \.isNewline).lazy
+            .map { $0.trimmingCharacters(in: .whitespaces).trimmingCharacters(in: CharacterSet(charactersIn: "#*")).trimmingCharacters(in: .whitespaces) }
+            .first { !$0.isEmpty }
     }
 
     private static func subagentProgressed(_ session: AgentSession) {
