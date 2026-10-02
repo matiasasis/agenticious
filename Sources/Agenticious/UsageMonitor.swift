@@ -20,6 +20,19 @@ struct UsageLimit: Codable, Equatable {
     }
 }
 
+/// Codex reports its account-wide limits and, separately, the limits of models with their own quota (such as Spark).
+struct CodexLimits: Equatable {
+    struct Model: Equatable {
+        let name: String
+        let limits: [UsageLimit]
+    }
+
+    var account: [UsageLimit] = []
+    var models: [Model] = []
+
+    var isEmpty: Bool { account.isEmpty && models.isEmpty }
+}
+
 struct ClaudeReading: Codable, Equatable {
     let limits: [UsageLimit]
     let takenAt: Date
@@ -32,7 +45,7 @@ struct ClaudeReading: Codable, Equatable {
 final class UsageMonitor: ObservableObject {
     private static let claudeReadingKey = "claudeRateLimits"
 
-    @Published private(set) var codexLimits: [UsageLimit] = []
+    @Published private(set) var codexLimits = CodexLimits()
     @Published private(set) var claudeReading: ClaudeReading?
     @Published private(set) var claudeTokensToday: Int?
     private(set) var lastChecked: Date?
@@ -74,9 +87,21 @@ enum UsageReader {
 
     // MARK: - Codex
 
-    /// The newest log can predate its first rate-limit line (a session that just started), so look a few back.
-    static func codexLimits(sessions: URL = home.appendingPathComponent(".codex/sessions")) -> [UsageLimit] {
-        recentCodexLogs(in: sessions).prefix(5).lazy.compactMap(codexLimits(in:)).first ?? []
+    private static let accountLimitID = "codex"
+
+    /// The newest log can predate its first rate-limit line (a session that just started), and a model's own limit only
+    /// shows up in sessions that used it, so look a few logs back and keep the newest reading of each limit.
+    static func codexLimits(sessions: URL = home.appendingPathComponent(".codex/sessions")) -> CodexLimits {
+        var readings: [CodexReading] = []
+        for log in recentCodexLogs(in: sessions).prefix(5) {
+            for reading in codexReadings(in: log) where !readings.contains(where: { $0.id == reading.id }) {
+                readings.append(reading)
+            }
+        }
+
+        return CodexLimits(account: readings.first { $0.id == accountLimitID }?.limits ?? [],
+                           models: readings.filter { $0.id != accountLimitID }
+                               .map { CodexLimits.Model(name: $0.name ?? $0.id, limits: $0.limits) })
     }
 
     /// Logs are filed under sessions/YYYY/MM/DD by start date, so only the newest few day folders are read instead of
@@ -99,19 +124,31 @@ enum UsageReader {
             .map(\.0)
     }
 
-    private static func codexLimits(in log: URL) -> [UsageLimit]? {
-        guard let content = try? String(contentsOf: log, encoding: .utf8) else { return nil }
+    private struct CodexReading {
+        let id: String
+        let name: String?
+        let limits: [UsageLimit]
+    }
 
+    /// The newest reading of each `limit_id` in the log. Older logs have no id; those lines are the account's limits.
+    private static func codexReadings(in log: URL) -> [CodexReading] {
+        guard let content = try? String(contentsOf: log, encoding: .utf8) else { return [] }
+
+        var readings: [CodexReading] = []
         for line in content.split(separator: "\n").reversed() where line.contains("\"rate_limits\":{") {
             guard let object = parse(line),
                   let payload = object["payload"] as? [String: Any],
-                  let limits = payload["rate_limits"] as? [String: Any] else { continue }
+                  let rateLimits = payload["rate_limits"] as? [String: Any] else { continue }
 
-            return ["primary", "secondary"]
-                .compactMap { limit(limits[$0], usedKey: "used_percent") }
+            let id = rateLimits["limit_id"] as? String ?? accountLimitID
+            guard !readings.contains(where: { $0.id == id }) else { continue }
+
+            let limits = ["primary", "secondary"]
+                .compactMap { limit(rateLimits[$0], usedKey: "used_percent") }
                 .sorted { $0.windowMinutes < $1.windowMinutes }
+            if !limits.isEmpty { readings.append(CodexReading(id: id, name: rateLimits["limit_name"] as? String, limits: limits)) }
         }
-        return nil
+        return readings
     }
 
     /// Both CLIs report `resets_at` in epoch seconds. Codex includes `window_minutes`; Claude's windows are fixed.
