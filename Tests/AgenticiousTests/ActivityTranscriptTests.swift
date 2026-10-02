@@ -73,4 +73,63 @@ final class ActivityTranscriptTests: XCTestCase {
         let saved = ActivityTranscript.read(agent: .codex, sessionID: UUID(), conversationID: "test", directory: "/tmp", cached: url)
         XCTAssertEqual(saved.entries.first?.body, "Saved")
     }
+
+    func testPollingTheSameURLPicksUpAppendedChatReplies() throws {
+        for agent in AgentKind.allCases {
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".jsonl")
+            defer { try? FileManager.default.removeItem(at: url) }
+            let question = "What is the project?"
+            let opening = agent == .claude
+                ? line(["message": ["role": "user", "content": question]])
+                : line(["type": "response_item", "payload": ["type": "message", "role": "user", "content": [["type": "input_text", "text": question]]]])
+            let reply = agent == .claude
+                ? line(["message": ["id": "reply", "role": "assistant", "content": [["type": "text", "text": "The project is Example."]]]])
+                : line(["type": "response_item", "payload": ["type": "message", "id": "reply", "role": "assistant", "content": [["type": "output_text", "text": "The project is Example."]]]])
+            try Data((opening + "\n").utf8).write(to: url)
+            let id = UUID()
+            let first = ActivityTranscript.read(agent: agent, sessionID: id, conversationID: "chat", directory: "/tmp",
+                                                cached: url, chatPrompt: question)
+            XCTAssertTrue(first.entries.isEmpty)
+            let unchanged = ActivityTranscript.read(agent: agent, sessionID: id, conversationID: "chat", directory: "/tmp",
+                                                    cached: first.url, stamp: first.stamp, chatPrompt: question)
+            XCTAssertTrue(unchanged.isUnchanged)
+            let handle = try FileHandle(forWritingTo: url)
+            try handle.seekToEnd()
+            try handle.write(contentsOf: Data((reply + "\n").utf8))
+            try handle.close()
+            let updated = ActivityTranscript.read(agent: agent, sessionID: id, conversationID: "chat", directory: "/tmp",
+                                                  cached: first.url, stamp: first.stamp, chatPrompt: question)
+            XCTAssertFalse(updated.isUnchanged)
+            XCTAssertEqual(updated.entries.map(\.body), ["The project is Example."])
+            let latest = ActivityTranscript.read(agent: agent, sessionID: id, conversationID: "chat", directory: "/tmp",
+                                                 cached: updated.url, stamp: updated.stamp, chatPrompt: question)
+            XCTAssertTrue(latest.isUnchanged)
+        }
+    }
+
+    func testPollingDetectsSameSizeRewritesAndMissingLogRecovery() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".jsonl")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let initial = line(["message": ["id": "reply", "role": "assistant", "content": [["type": "text", "text": "First"]]]])
+        let replacement = initial.replacingOccurrences(of: "First", with: "Later")
+        try Data(initial.utf8).write(to: url)
+        let id = UUID()
+        let first = ActivityTranscript.read(agent: .claude, sessionID: id, conversationID: "chat", directory: "/tmp", cached: url)
+        try Data(replacement.utf8).write(to: url)
+        try FileManager.default.setAttributes([.modificationDate: try XCTUnwrap(first.stamp?.modified).addingTimeInterval(10)], ofItemAtPath: url.path)
+        let updated = ActivityTranscript.read(agent: .claude, sessionID: id, conversationID: "chat", directory: "/tmp",
+                                              cached: first.url, stamp: first.stamp)
+        XCTAssertEqual(updated.stamp?.size, first.stamp?.size)
+        XCTAssertFalse(updated.isUnchanged)
+        XCTAssertEqual(updated.entries.first?.body, "Later")
+        try FileManager.default.removeItem(at: url)
+        let missing = ActivityTranscript.read(agent: .claude, sessionID: id, conversationID: "chat", directory: "/tmp",
+                                              cached: updated.url, stamp: updated.stamp)
+        XCTAssertFalse(missing.isUnchanged)
+        XCTAssertNotNil(missing.notice)
+        try Data(initial.utf8).write(to: url)
+        let recovered = ActivityTranscript.read(agent: .claude, sessionID: id, conversationID: "chat", directory: "/tmp",
+                                                cached: missing.url, stamp: missing.stamp)
+        XCTAssertEqual(recovered.entries.first?.body, "First")
+    }
 }

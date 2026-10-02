@@ -40,10 +40,11 @@ struct TranscriptStamp: Equatable {
     let modified: Date?
 
     init?(_ url: URL) {
-        guard let values = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey]),
-              let size = values.fileSize else { return nil }
+        // URL resource values can stay cached while the provider appends to the same log.
+        guard let values = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let size = values[.size] as? Int else { return nil }
         self.size = size
-        modified = values.contentModificationDate
+        modified = values[.modificationDate] as? Date
     }
 }
 
