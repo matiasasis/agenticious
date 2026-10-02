@@ -10,6 +10,8 @@ enum Selection: Hashable {
     case skills
     case providers
     case session(UUID)
+    /// A Claude subagent of an agent, by the agent's id and Claude's agent id.
+    case subagent(UUID, String)
 }
 
 enum AgentList {
@@ -435,6 +437,21 @@ final class SessionStore: ObservableObject {
         }
     }
 
+    /// Earlier runs' subagents come back from Claude's logs, so the sidebar still shows which ones were cut off.
+    private func loadSubagents(of session: AgentSession) {
+        guard let conversation = session.conversationID else { return }
+        let directory = session.directory.path
+        Task {
+            let found = await Task.detached(priority: .utility) { () -> (URL, [Subagent])? in
+                guard let transcript = SubagentCatalog.conversationTranscript(conversationID: conversation, directory: directory) else { return nil }
+                return (transcript, SubagentCatalog.discover(conversation: transcript))
+            }.value
+            guard let (transcript, subagents) = found, session.conversationID == conversation else { return }
+            if session.transcriptURL == nil { session.transcriptURL = transcript }
+            session.mergeSubagents(subagents)
+        }
+    }
+
     // MARK: - Database
 
     private func openDatabase(url: URL?) {
@@ -443,6 +460,7 @@ final class SessionStore: ObservableObject {
             sessions = try database.load()
             sessions.forEach(track)
             self.database = database
+            sessions.filter { $0.agent == .claude && !$0.isMarkedFinished }.forEach(loadSubagents)
         } catch {
             alert = "Agents won't be saved: couldn't open the database (\(error.localizedDescription))."
         }

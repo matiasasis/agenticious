@@ -49,14 +49,17 @@ struct TranscriptStamp: Equatable {
 }
 
 enum ActivityTranscript {
+    static var claudeProjects: URL {
+        let configuration = ProcessInfo.processInfo.environment["CLAUDE_CONFIG_DIR"]
+        return URL(fileURLWithPath: configuration ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude").path)
+            .appendingPathComponent("projects")
+    }
+
     /// With the `stamp` of the last read and an unchanged log, returns at once without reading it.
     static func read(agent: AgentKind, sessionID: UUID, conversationID: String?, directory: String, cached: URL?,
-                     stamp previous: TranscriptStamp? = nil, chatPrompt: String? = nil) -> TranscriptResult {
-        let environment = ProcessInfo.processInfo.environment
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        let root = agent == .claude
-            ? URL(fileURLWithPath: environment["CLAUDE_CONFIG_DIR"] ?? home.appendingPathComponent(".claude").path).appendingPathComponent("projects")
-            : URL(fileURLWithPath: environment["CODEX_HOME"] ?? home.appendingPathComponent(".codex").path).appendingPathComponent("sessions")
+                     stamp previous: TranscriptStamp? = nil, chatPrompt: String? = nil, isSubagent: Bool = false) -> TranscriptResult {
+        let codexHome = ProcessInfo.processInfo.environment["CODEX_HOME"] ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".codex").path
+        let root = agent == .claude ? claudeProjects : URL(fileURLWithPath: codexHome).appendingPathComponent("sessions")
         let url = cached ?? locate(root: root, agent: agent, sessionID: sessionID, conversationID: conversationID, directory: directory)
         guard let url else { return TranscriptResult(notice: "Waiting for this session’s activity log. The terminal remains available.") }
         let stamp = TranscriptStamp(url)
@@ -70,7 +73,7 @@ enum ActivityTranscript {
             let data = try handle.readToEnd() ?? Data()
             var lines = String(decoding: data, as: UTF8.self).components(separatedBy: "\n")
             if start > 0 { lines.removeFirst() }
-            let entries = parse(lines: lines, agent: agent, chatPrompt: chatPrompt).map { entry in
+            let entries = parse(lines: lines, agent: agent, chatPrompt: chatPrompt, isSubagent: isSubagent).map { entry in
                 var entry = entry
                 if entry.kind == .tool, entry.directory == nil { entry.directory = directory }
                 return entry
@@ -120,7 +123,8 @@ enum ActivityTranscript {
         return payload["id"] as? String
     }
 
-    static func parse(lines: [String], agent: AgentKind, chatPrompt: String? = nil) -> [ActivityEntry] {
+    /// A subagent's own log marks every line as a sidechain, which the agent's log uses for subagent lines to skip.
+    static func parse(lines: [String], agent: AgentKind, chatPrompt: String? = nil, isSubagent: Bool = false) -> [ActivityEntry] {
         var entries: [ActivityEntry] = []
         var positions: [String: Int] = [:]
         func append(_ entry: ActivityEntry) {
@@ -141,7 +145,7 @@ enum ActivityTranscript {
         for (index, line) in lines.enumerated() {
             guard let object = json(line) else { continue }
             if agent == .claude {
-                guard object["isSidechain"] as? Bool != true,
+                guard isSubagent || object["isSidechain"] as? Bool != true,
                       let message = object["message"] as? [String: Any] else { continue }
                 if message["role"] as? String == "user", object["isMeta"] as? Bool != true,
                    let entry = userMessage(id: object["uuid"] as? String ?? "user-\(index)",

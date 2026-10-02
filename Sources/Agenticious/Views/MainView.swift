@@ -33,6 +33,9 @@ struct MainView: View {
             ProvidersView()
         } else if [.settings, .skills, .preferences].contains(store.selection) {
             CustomizeView()
+        } else if case let .subagent(id, subagentID) = store.selection, let session = store.session(id) {
+            SubagentDetailView(session: session, subagentID: subagentID)
+                .id(store.selection)
         } else if let session = store.selectedSession {
             VStack(spacing: 0) {
                 if session.isMarkedFinished {
@@ -104,6 +107,7 @@ private struct Sidebar: View {
                             ForEach(group.sessions) { session in
                                 SessionRow(session: session, isSelected: store.selection == .session(session.id))
                                     .contextMenu { SessionMenu(session: session) }
+                                SubagentStack(session: session)
                             }
                         }
                     }

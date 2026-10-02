@@ -39,6 +39,7 @@ agent ──agenticious MCP───┘
 | Turn finished | `Stop` hook; background tasks or scheduled wakeups show as Waiting | `notify` (agent-turn-complete) |
 | Plan limits | `statusLine` command (`rate_limits`) | session logs |
 | Done | `finish` tool | `finish` tool |
+| Subagents | `SubagentStart` / `SubagentStop` hooks and tool hooks carrying `agent_id` | — |
 
 The built-in "skill" is `Sources/Agenticious/ChunkingPrompt.swift`. Claude gets it through `--append-system-prompt`. Codex gets it prepended to the task.
 
@@ -131,13 +132,17 @@ Agent details default to **Activity**, a structured view of provider messages an
 
 When Claude asks with its question tool, the question appears pinned at the top of Activity: each question with its options (single or multiple choice) and an **Other** field. **Send answers** returns them to Claude through a held `PreToolUse` hook, so Claude continues without showing its menu. **Answer in terminal instead** releases the hook and Claude's own menu appears. A held question waits up to a day before falling back to the terminal. When the agent finishes its turn or asks with `need_human`, a reply box at the bottom of Activity types your reply into its prompt. Permission and startup prompts are still answered in the terminal.
 
-Activity reads the session's local Claude or Codex JSONL log every two seconds while visible. Claude sessions are matched by conversation ID. Codex uses its reported conversation ID or a unique marker added to new Agenticious prompts, never just the workspace folder. Older Codex sessions without a known ID may need to finish a turn before activity becomes available. Subagent logs and private reasoning records are not displayed. Provider log formats may change; when a log is unavailable, use the terminal.
+Activity reads the session's local Claude or Codex JSONL log every two seconds while visible. Claude sessions are matched by conversation ID. Codex uses its reported conversation ID or a unique marker added to new Agenticious prompts, never just the workspace folder. Older Codex sessions without a known ID may need to finish a turn before activity becomes available. Private reasoning records are not displayed. Provider log formats may change; when a log is unavailable, use the terminal.
 
 The view reads up to the latest 4 MiB, shows at most 200 entries, and labels content truncated beyond 32 KiB per field. Activity history comes from the provider's log, so disabling or deleting those logs also removes that history from this view. No additional transcript copy is saved by Agenticious.
 
 The summon sheet remembers the last task preset and workspace, plus provider, model, and effort (model and effort separately per provider). Opening a workspace's **+** button still selects that workspace explicitly. Removed favorites are not restored as the default workspace. The larger sheet adapts to the available display size and keeps model selection beside the compact provider choices.
 
 Provider icons use monochrome template rendering. The Claude mark comes from the official Claude desktop app (`TrayIconTemplate@3x.png`); the OpenAI mark used for Codex comes from the official ChatGPT app (`webview/assets/openai-logo-regular-ceb75a1754fa.svg` in `app.asar`). Their trademarks belong to Anthropic and OpenAI.
+
+### Subagents
+
+When a Claude agent starts subagents with its Agent tool, each one appears as a small card nested under the agent in the sidebar, with its description, status, and what it is doing now. Running subagents stay in view; done, failed, and stopped ones fold into a summary line you can expand. Select one to read its own Activity from Claude's `subagents/agent-<id>.jsonl` log. Subagents run inside their agent's process, so they have no terminal or controls of their own: pausing or ending the agent stops them, and you talk to them through the agent. After Agenticious restarts, earlier subagents come back from Claude's logs, marked done or failed from the agent's log, or stopped if they were cut off.
 
 ### Ended tasks
 

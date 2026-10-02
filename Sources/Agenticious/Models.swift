@@ -138,6 +138,8 @@ final class AgentSession: ObservableObject, Identifiable {
     @Published var lastActivity = Date()
     @Published var worktreeRemoved = false
     @Published var isRunning = false
+    /// Claude subagents this agent started, oldest first. Hooks keep them live; earlier runs come from Claude's logs.
+    @Published var subagents: [Subagent] = []
 
     var planSource: PlanSource = .none
     /// Needs you because of a permission prompt, which a subagent can be the one waiting on.
@@ -146,6 +148,8 @@ final class AgentSession: ObservableObject, Identifiable {
     @Published var pendingQuestion: PendingQuestion?
     /// The CLI's own session id (Claude's session id, Codex's thread id), which is what `--resume` takes.
     var conversationID: String?
+    /// Claude's log of this conversation, from its hooks. Subagent logs sit next to it.
+    var transcriptURL: URL?
     var terminalView: LocalProcessTerminalView?
     var terminalBridge: TerminalBridge?
 
@@ -191,6 +195,7 @@ final class AgentSession: ObservableObject, Identifiable {
     func recordExit(_ code: Int32?) {
         releaseQuestion()
         isRunning = false
+        stopSubagents()
         switch status {
         case .done, .ended: break
         default: status = .exited(code)
