@@ -233,21 +233,23 @@ private struct SessionRow: View {
             }
             .buttonStyle(.plain)
             .accessibilityAddTraits(isSelected ? .isSelected : [])
-            if session.isMarkedFinished || session.canMarkFinished {
-                HStack {
+            if session.showsResumeAction || session.isMarkedFinished || session.canMarkFinished {
+                HStack(spacing: 8) {
                     Spacer(minLength: 0)
-                    Button {
-                        store.markFinished(session, finished: !session.isMarkedFinished)
-                    } label: {
-                        Label(session.archiveActionTitle, systemImage: session.archiveActionSymbol)
-                            .font(.system(size: 10, weight: .semibold))
-                            .padding(.horizontal, 8).padding(.vertical, 5)
-                            .foregroundStyle(AgenticiousStyle.lime)
-                            .background(AgenticiousStyle.lime.opacity(0.1), in: Capsule())
+                    if session.showsResumeAction {
+                        Button("Resume", systemImage: "play.fill") { store.resume(session) }
+                            .buttonStyle(PillButtonStyle(tint: AgenticiousStyle.lime))
+                            .disabled(!session.canResume)
+                            .help("Reopen this conversation and continue unfinished work.")
                     }
-                    .buttonStyle(.plain)
-                    .disabled(session.isArchiving)
-                    .help("Keep history and clean up resources. Worktrees with uncommitted changes are preserved.")
+                    if session.isMarkedFinished || session.canMarkFinished {
+                        Button(session.archiveActionTitle, systemImage: session.archiveActionSymbol) {
+                            store.markFinished(session, finished: !session.isMarkedFinished)
+                        }
+                        .buttonStyle(PillButtonStyle(tint: AgenticiousStyle.lime))
+                        .disabled(session.isArchiving)
+                        .help("Keep history and clean up resources. Worktrees with uncommitted changes are preserved.")
+                    }
                 }
             }
         }
@@ -321,7 +323,7 @@ struct SessionMenu: View {
         if session.canStop {
             Button("Stop agent") { store.stop(session) }
                 .disabled(session.isArchiving)
-        } else if !session.isRunning {
+        } else if session.showsResumeAction {
             Button("Resume") { store.resume(session) }
                 .disabled(!session.canResume)
         }

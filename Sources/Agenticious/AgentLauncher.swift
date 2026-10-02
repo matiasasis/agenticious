@@ -11,13 +11,15 @@ struct LaunchSpec {
 /// hooks/notify for "turn finished" and "needs permission", and the agenticious MCP server for the chunk plan.
 struct AgentLauncher {
     let port: UInt16
+    var supportDirectory: URL?
 
-    /// With `resuming`, the agent reopens its earlier conversation (`session.conversationID`) instead of getting the task.
-    /// `images` are the pasted image files the task's prompt points at.
+    /// Resume sends a continuation prompt for unfinished missions; chats reopen at the prompt.
     @MainActor
     func spec(for session: AgentSession, resuming: Bool = false, images: [URL] = []) throws -> LaunchSpec {
         var variables = baseEnvironment(for: session)
         variables["AD_CONVERSATION"] = session.conversationID
+        variables["AD_RESUME_PROMPT"] = resuming ? session.resumePrompt : nil
+        let resumePrompt = variables["AD_RESUME_PROMPT"] == nil ? "" : #" "$AD_RESUME_PROMPT""#
         let command: String
 
         switch session.agent {
@@ -28,7 +30,7 @@ struct AgentLauncher {
             variables["AD_SYSPROMPT"] = session.isChat ? ChunkingPrompt.chatText : ChunkingPrompt.text
             variables["AD_PROMPT"] = session.prompt
             // A fixed session id makes the conversation resumable even if the app quits before Claude reports anything.
-            let conversation = resuming ? #" --resume "$AD_CONVERSATION""# : #" --session-id "$AD_CONVERSATION" -- "$AD_PROMPT""#
+            let conversation = resuming ? #" --resume "$AD_CONVERSATION" --"# + resumePrompt : #" --session-id "$AD_CONVERSATION" -- "$AD_PROMPT""#
             command = #"exec claude --settings "$AD_SETTINGS" --mcp-config "$AD_MCP" --append-system-prompt "$AD_SYSPROMPT""#
                 + imageFlags(images, for: .claude, into: &variables) + modelFlags(for: session, into: &variables) + conversation
         case .codex:
@@ -37,7 +39,7 @@ struct AgentLauncher {
             variables["AD_NOTIFY"] = #"notify=['/bin/sh','-c','curl -s -m 2 -X POST --data-binary "$1" \#(hookURL(session, "codex-notify")) >/dev/null 2>&1','sh']"#
             variables["AD_PROMPT"] = "Agenticious session ID: \(session.id.uuidString)\n" + ChunkingPrompt.inlined(with: session.prompt, isChat: session.isChat)
             // Codex reports its thread id only when a turn completes. Without one, `codex resume` shows its picker for this folder.
-            let conversation = !resuming ? #" -- "$AD_PROMPT""# : session.conversationID == nil ? "" : #" -- "$AD_CONVERSATION""#
+            let conversation = !resuming ? #" -- "$AD_PROMPT""# : session.conversationID == nil ? "" : #" -- "$AD_CONVERSATION""# + resumePrompt
             command = "exec codex" + (resuming ? " resume" : "") + #" -c "$AD_MCP_CMD" -c "$AD_MCP_ENV" -c "$AD_NOTIFY""#
                 + imageFlags(images, for: .codex, into: &variables) + modelFlags(for: session, into: &variables) + conversation
         }
@@ -97,7 +99,7 @@ struct AgentLauncher {
     // MARK: - Claude Code
 
     private func writeClaudeFiles(for session: AgentSession) throws -> (settings: String, mcp: String) {
-        let directory = try Self.sessionDirectory(for: session.id)
+        let directory = try Self.sessionDirectory(for: session.id, supportDirectory: supportDirectory)
         let settingsURL = directory.appendingPathComponent("settings.json")
         let mcpURL = directory.appendingPathComponent("mcp.json")
 
@@ -162,8 +164,8 @@ struct AgentLauncher {
     }
 
     /// Per-session files (config, pasted images). Archiving the agent removes the folder.
-    static func sessionDirectory(for id: UUID) throws -> URL {
-        let url = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+    static func sessionDirectory(for id: UUID, supportDirectory: URL? = nil) throws -> URL {
+        let url = (supportDirectory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0])
             .appendingPathComponent("Agenticious/sessions/\(id.uuidString)")
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url

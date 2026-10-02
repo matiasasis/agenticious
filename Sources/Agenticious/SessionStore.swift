@@ -268,6 +268,7 @@ final class SessionStore: ObservableObject {
 
     /// Starts the agent again on its earlier conversation, in the same folder, still reporting to this session.
     func resume(_ session: AgentSession) {
+        guard session.showsResumeAction else { return }
         guard session.canResume else {
             alert = "Can't resume: \(session.worktreeRemoved ? "its worktree was deleted" : "\(session.directory.path) no longer exists")."
             return
@@ -275,9 +276,8 @@ final class SessionStore: ObservableObject {
 
         do {
             let spec = try AgentLauncher(port: port).spec(for: session, resuming: true)
+            session.prepareToResume()
             attachTerminal(to: session, running: spec)
-            session.status = .yourTurn
-            session.isMarkedFinished = false
             selection = .session(session.id)
         } catch {
             alert = "Couldn't resume the agent: \(error.localizedDescription)"
@@ -371,9 +371,14 @@ final class SessionStore: ObservableObject {
         var cached: URL?
         var stamp: TranscriptStamp?
         var previousID = session.conversationID
-        while session.isRunning, session.chunks.isEmpty, !session.status.isFinished,
+        while session.isRunning, !session.status.isFinished,
+              session.chunks.isEmpty || session.status == .starting || session.startupPrompt != nil,
               session.terminalView === terminal, self.session(session.id) != nil {
             updateStartupPrompt(of: session, terminal: terminal)
+            if !session.chunks.isEmpty {
+                do { try await Task.sleep(for: .seconds(2)) } catch { return }
+                continue
+            }
             let agent = session.agent
             let id = session.id
             let conversation = session.conversationID

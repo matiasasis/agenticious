@@ -17,13 +17,15 @@ struct SessionDetailView: View {
                 HStack(spacing: 12) {
                     AgentBadge(agent: session.agent, detail: session.modelSummary)
                     StatusPill(status: session.status)
+                        .fixedSize()
                     if !session.isChat, !session.chunks.isEmpty {
                         Text("\(session.completedChunks)/\(session.chunks.count) steps")
                             .foregroundStyle(.secondary)
+                            .fixedSize()
                     }
                     if session.isChat && !session.isMarkedFinished {
                         Button(session.isArchiving ? "Ending chat…" : "End chat", systemImage: "stop.circle") { store.endChat(session) }
-                            .buttonStyle(AgenticiousButtonStyle(isCompact: true))
+                            .buttonStyle(PillButtonStyle(tint: AgenticiousStyle.lime))
                             .disabled(!session.canEndChat)
                             .help("Stop the agent and save this conversation in Finished.")
                     } else {
@@ -38,13 +40,13 @@ struct SessionDetailView: View {
                             .disabled(session.isArchiving)
                             .help("Stop the process without archiving its history.")
                     }
-                    Spacer()
-                    if !session.isRunning {
+                    if session.showsResumeAction {
                         Button("Resume", systemImage: "play.fill") { store.resume(session) }
-                            .buttonStyle(AgenticiousButtonStyle())
+                            .buttonStyle(PillButtonStyle(tint: AgenticiousStyle.lime))
                             .disabled(!session.canResume)
-                            .help("Reopen this agent's conversation where it left off.")
+                            .help("Reopen this conversation and continue unfinished work.")
                     }
+                    Spacer()
                     if let worktree = session.worktree { BranchLabel(worktree: worktree, isRemoved: session.worktreeRemoved) }
                     Label(session.project.path ?? "No project", systemImage: session.project.symbol)
                         .font(.caption)
