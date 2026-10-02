@@ -13,7 +13,7 @@ struct AgentLauncher {
     let port: UInt16
     var supportDirectory: URL?
 
-    /// Resume sends a continuation prompt for unfinished missions; chats and completed tasks reopen at the prompt.
+    /// Resume sends a continuation prompt for unfinished missions; chats reopen at the prompt.
     @MainActor
     func spec(for session: AgentSession, resuming: Bool = false, images: [URL] = []) throws -> LaunchSpec {
         var variables = baseEnvironment(for: session)

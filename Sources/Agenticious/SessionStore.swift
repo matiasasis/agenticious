@@ -268,6 +268,7 @@ final class SessionStore: ObservableObject {
 
     /// Starts the agent again on its earlier conversation, in the same folder, still reporting to this session.
     func resume(_ session: AgentSession) {
+        guard session.showsResumeAction else { return }
         guard session.canResume else {
             alert = "Can't resume: \(session.worktreeRemoved ? "its worktree was deleted" : "\(session.directory.path) no longer exists")."
             return

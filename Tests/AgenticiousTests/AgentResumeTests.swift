@@ -84,6 +84,27 @@ final class AgentResumeTests: XCTestCase {
     }
 
     @MainActor
+    func testCompletedTasksDoNotOfferResume() {
+        let session = AgentSession(task: "Complete", agent: .claude, project: .none, directory: URL(fileURLWithPath: "/tmp"))
+        session.status = .done("Task complete")
+        for isRunning in [false, true] {
+            session.isRunning = isRunning
+            for archived in [false, true] {
+                session.isMarkedFinished = archived
+                XCTAssertFalse(session.showsResumeAction)
+                XCTAssertFalse(session.canResume)
+            }
+        }
+        session.isRunning = false
+        session.isMarkedFinished = false
+        for status in [SessionStatus.interrupted, .exited(nil), .ended("Stopped"), .yourTurn] {
+            session.status = status
+            XCTAssertTrue(session.showsResumeAction)
+            XCTAssertTrue(session.canResume)
+        }
+    }
+
+    @MainActor
     func testResumeIsUnavailableDuringLaunchCleanupOrAfterWorktreeRemoval() {
         let session = AgentSession(task: "Work", agent: .codex, project: .none, directory: URL(fileURLWithPath: "/tmp"))
         XCTAssertTrue(session.canResume)

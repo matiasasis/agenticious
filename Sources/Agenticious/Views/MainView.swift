@@ -233,10 +233,10 @@ private struct SessionRow: View {
             }
             .buttonStyle(.plain)
             .accessibilityAddTraits(isSelected ? .isSelected : [])
-            if !session.isRunning || session.isMarkedFinished || session.canMarkFinished {
+            if session.showsResumeAction || session.isMarkedFinished || session.canMarkFinished {
                 HStack(spacing: 8) {
                     Spacer(minLength: 0)
-                    if !session.isRunning {
+                    if session.showsResumeAction {
                         Button("Resume", systemImage: "play.fill") { store.resume(session) }
                             .buttonStyle(PillButtonStyle(tint: AgenticiousStyle.lime))
                             .disabled(!session.canResume)
@@ -323,7 +323,7 @@ struct SessionMenu: View {
         if session.canStop {
             Button("Stop agent") { store.stop(session) }
                 .disabled(session.isArchiving)
-        } else if !session.isRunning {
+        } else if session.showsResumeAction {
             Button("Resume") { store.resume(session) }
                 .disabled(!session.canResume)
         }

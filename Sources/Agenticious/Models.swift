@@ -223,9 +223,14 @@ final class AgentSession: ObservableObject, Identifiable {
     /// A finished agent's process only idles; Archive stops it along with the cleanup.
     var canStop: Bool { isRunning && !status.isFinished }
 
+    var showsResumeAction: Bool {
+        if case .done = status { return false }
+        return !isRunning
+    }
+
     /// Resuming reopens the conversation in the folder it ran in, so a deleted worktree can't come back.
     var canResume: Bool {
-        !isRunning && !isArchiving && backgroundTask == nil && !worktreeRemoved && FileManager.default.fileExists(atPath: directory.path)
+        showsResumeAction && !isArchiving && backgroundTask == nil && !worktreeRemoved && FileManager.default.fileExists(atPath: directory.path)
     }
 
     var resumePrompt: String? {

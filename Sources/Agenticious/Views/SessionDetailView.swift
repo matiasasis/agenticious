@@ -40,7 +40,7 @@ struct SessionDetailView: View {
                             .disabled(session.isArchiving)
                             .help("Stop the process without archiving its history.")
                     }
-                    if !session.isRunning {
+                    if session.showsResumeAction {
                         Button("Resume", systemImage: "play.fill") { store.resume(session) }
                             .buttonStyle(PillButtonStyle(tint: AgenticiousStyle.lime))
                             .disabled(!session.canResume)
