@@ -101,7 +101,7 @@ final class TaskConfigurationTests: XCTestCase {
         store.recordUse(of: fixCI)
         store.recordUse(of: review)
         store.recordUse(of: .custom)
-        XCTAssertEqual(store.offeredPresets.map(\.id), ["custom", "fixCI", "reviewPR", "implementTicket", "reviewComments"])
+        XCTAssertEqual(store.offeredPresets.map(\.id), ["custom", "fixCI", "reviewPR", "chat", "implementTicket", "reviewComments"])
     }
 
     @MainActor
@@ -119,7 +119,7 @@ final class TaskConfigurationTests: XCTestCase {
 
         let reloaded = TaskPresetStore(url: url, defaults: defaults)
         XCTAssertEqual(reloaded.order, .arranged)
-        XCTAssertEqual(reloaded.offeredPresets.map(\.id), ["reviewComments", "implementTicket", "reviewPR", "fixCI", "custom"])
+        XCTAssertEqual(reloaded.offeredPresets.map(\.id), ["reviewComments", "chat", "implementTicket", "reviewPR", "fixCI", "custom"])
     }
 
     @MainActor
@@ -130,7 +130,7 @@ final class TaskConfigurationTests: XCTestCase {
         try store.move(id: "reviewPR", to: store.presets.count)
         try store.move(id: "dropped text", to: 0)
 
-        XCTAssertEqual(store.presets.map(\.id), ["fixCI", "custom", "implementTicket", "reviewComments", "reviewPR"])
+        XCTAssertEqual(store.presets.map(\.id), ["fixCI", "custom", "chat", "implementTicket", "reviewComments", "reviewPR"])
     }
 
     @MainActor
@@ -194,6 +194,18 @@ final class TaskConfigurationTests: XCTestCase {
                 XCTAssertEqual(task.title, "\(title) \(input)")
             }
         }
+    }
+
+    func testImplementPresetAcceptsATicketOrAMission() throws {
+        let preset = try XCTUnwrap(TaskTemplate.defaults.first { $0.id == "implementTicket" })
+        for input in ["SK-123", "https://example.atlassian.net/browse/SK-123", "Add a dark mode toggle to the settings screen"] {
+            let task = try TaskPrompt(template: preset, input: input, notes: "", skillPaths: [])
+            XCTAssertEqual(task.title, "Implement \(input)")
+            XCTAssertTrue(task.instructions.contains(input))
+            XCTAssertFalse(task.instructions.contains("{{input}}"))
+            XCTAssertFalse(task.instructions.contains("Implement ticket"))
+        }
+        XCTAssertThrowsError(try TaskPrompt(template: preset, input: " ", notes: "", skillPaths: []))
     }
 
     func testInputIsRetainedWhenPromptHasNoPlaceholder() throws {

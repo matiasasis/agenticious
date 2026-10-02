@@ -1,7 +1,7 @@
 import Foundation
 
 struct ActivityEntry: Identifiable, Equatable {
-    enum Kind: String { case message, tool }
+    enum Kind: String { case message, userMessage, tool }
     enum State: String { case running, completed, failed, unknown }
     let id: String
     let kind: Kind
@@ -50,7 +50,7 @@ struct TranscriptStamp: Equatable {
 enum ActivityTranscript {
     /// With the `stamp` of the last read and an unchanged log, returns at once without reading it.
     static func read(agent: AgentKind, sessionID: UUID, conversationID: String?, directory: String, cached: URL?,
-                     stamp previous: TranscriptStamp? = nil) -> TranscriptResult {
+                     stamp previous: TranscriptStamp? = nil, chatPrompt: String? = nil) -> TranscriptResult {
         let environment = ProcessInfo.processInfo.environment
         let home = FileManager.default.homeDirectoryForCurrentUser
         let root = agent == .claude
@@ -69,7 +69,7 @@ enum ActivityTranscript {
             let data = try handle.readToEnd() ?? Data()
             var lines = String(decoding: data, as: UTF8.self).components(separatedBy: "\n")
             if start > 0 { lines.removeFirst() }
-            let entries = parse(lines: lines, agent: agent).map { entry in
+            let entries = parse(lines: lines, agent: agent, chatPrompt: chatPrompt).map { entry in
                 var entry = entry
                 if entry.kind == .tool, entry.directory == nil { entry.directory = directory }
                 return entry
@@ -119,7 +119,7 @@ enum ActivityTranscript {
         return payload["id"] as? String
     }
 
-    static func parse(lines: [String], agent: AgentKind) -> [ActivityEntry] {
+    static func parse(lines: [String], agent: AgentKind, chatPrompt: String? = nil) -> [ActivityEntry] {
         var entries: [ActivityEntry] = []
         var positions: [String: Int] = [:]
         func append(_ entry: ActivityEntry) {
@@ -141,8 +141,13 @@ enum ActivityTranscript {
             guard let object = json(line) else { continue }
             if agent == .claude {
                 guard object["isSidechain"] as? Bool != true,
-                      let message = object["message"] as? [String: Any],
-                      let content = message["content"] as? [[String: Any]] else { continue }
+                      let message = object["message"] as? [String: Any] else { continue }
+                if message["role"] as? String == "user", object["isMeta"] as? Bool != true,
+                   let entry = userMessage(id: object["uuid"] as? String ?? "user-\(index)",
+                                           content: message["content"], chatPrompt: chatPrompt) {
+                    append(entry)
+                }
+                guard let content = message["content"] as? [[String: Any]] else { continue }
                 for (blockIndex, block) in content.enumerated() {
                     switch block["type"] as? String {
                     case "text" where message["role"] as? String == "assistant":
@@ -159,6 +164,9 @@ enum ActivityTranscript {
             } else {
                 guard object["type"] as? String == "response_item", let item = object["payload"] as? [String: Any] else { continue }
                 switch item["type"] as? String {
+                case "message" where item["role"] as? String == "user":
+                    if let entry = userMessage(id: item["id"] as? String ?? "user-\(index)",
+                                               content: item["content"], chatPrompt: chatPrompt) { append(entry) }
                 case "message" where item["role"] as? String == "assistant":
                     append(ActivityEntry(id: item["id"] as? String ?? "line-\(index)", kind: .message, title: "Codex", body: bounded(text(item["content"]))))
                 case "function_call", "custom_tool_call":
@@ -178,6 +186,16 @@ enum ActivityTranscript {
             }
         }
         return entries
+    }
+
+    private static func userMessage(id: String, content: Any?, chatPrompt: String?) -> ActivityEntry? {
+        guard let chatPrompt else { return nil }
+        let body = text(content).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !body.isEmpty, chatPrompt.isEmpty || !body.contains(chatPrompt),
+              !body.hasPrefix("Agenticious session ID:"),
+              !body.hasPrefix("# AGENTS.md instructions"), !body.hasPrefix("<environment_context>"),
+              !body.hasPrefix("<system-reminder>"), !body.hasPrefix("<task-notification>") else { return nil }
+        return ActivityEntry(id: id, kind: .userMessage, title: "You", body: bounded(body))
     }
 
     private static func tool(id: String, name: String, input: [String: Any], directory: String?) -> ActivityEntry {

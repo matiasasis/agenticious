@@ -192,7 +192,7 @@ struct NewTaskSheet: View {
             if !repository.isReady(for: project.path) {
                 ProgressView("Checking workspace…").controlSize(.small).font(.caption)
             }
-            if isGitProject {
+            if isGitProject && !template.isChat {
                 Toggle(isOn: $useWorktree) {
                     HStack(spacing: 10) {
                         Image(systemName: "arrow.triangle.branch")
@@ -331,7 +331,7 @@ struct NewTaskSheet: View {
             Button("Cancel", role: .cancel) { dismiss() }
                 .keyboardShortcut(.cancelAction)
                 .buttonStyle(AgenticiousButtonStyle(isPrimary: false))
-            Button("Start agent", systemImage: "sparkles", action: start)
+            Button(template.isChat ? "Start chat" : "Start agent", systemImage: template.isChat ? "bubble.left.and.bubble.right" : "sparkles", action: start)
                 .keyboardShortcut(.return, modifiers: .command)
                 .buttonStyle(AgenticiousButtonStyle())
                 .disabled(!canStart)
@@ -420,7 +420,7 @@ struct NewTaskSheet: View {
                 model: selectedModel.isDefault ? nil : selectedModel,
                 effort: selectedEffort.isEmpty ? nil : selectedEffort,
                 project: project,
-                isolated: isGitProject && useWorktree,
+                isolated: isGitProject && useWorktree && !template.isChat,
                 taskType: TaskType(template: template, input: taskInput, notes: notes),
                 images: images
             )

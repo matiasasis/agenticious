@@ -48,7 +48,7 @@ enum EventInterpreter {
     /// send it back once to report, so the step boxes don't stay empty or grey after it has answered.
     static func stopHookReply(_ payload: [String: Any], for session: AgentSession) -> [String: Any]? {
         let alreadyNudged = payload["stop_hook_active"] as? Bool ?? false
-        guard !alreadyNudged, !session.status.isFinished, !session.status.needsAttention,
+        guard !session.isChat, !alreadyNudged, !session.status.isFinished, !session.status.needsAttention,
               endedReason(payload) == nil,
               !hasBackgroundWork(payload), let reason = stopNudge(for: session) else { return nil }
 
@@ -165,7 +165,7 @@ enum EventInterpreter {
         if hasBackgroundWork {
             session.status = .waiting
         } else {
-            session.status = session.allChunksDone ? .done(nil) : .yourTurn
+            session.status = session.allChunksDone && !session.isChat ? .done(nil) : .yourTurn
         }
     }
 
@@ -215,6 +215,11 @@ enum EventInterpreter {
     }
 
     private static func finish(_ arguments: [String: Any], in session: AgentSession) {
+        if session.isChat {
+            session.recordPullRequests(in: arguments["summary"] as? String ?? "")
+            session.status = .yourTurn
+            return
+        }
         for index in session.chunks.indices where session.chunks[index].status != .done {
             session.chunks[index].status = .done
         }

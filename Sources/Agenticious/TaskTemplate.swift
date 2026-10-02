@@ -13,6 +13,7 @@ struct TaskTemplate: Codable, Identifiable, Equatable {
     var skillPaths: [String] = []
 
     var isCustom: Bool { id == "custom" }
+    var isChat: Bool { id == "chat" }
     var shortName: String { name }
     var validationMessage: String? {
         if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "Give this preset a name." }
@@ -48,16 +49,35 @@ struct TaskTemplate: Codable, Identifiable, Equatable {
     }
 
     static let custom = TaskTemplate(id: "custom", name: "Custom task", summary: "Give your agent a mission in your own words.")
+    static let chat = TaskTemplate(
+        id: "chat", name: "Chat", summary: "Research a question or think something through together.",
+        symbol: "bubble.left.and.bubble.right", fieldLabel: "Question or topic",
+        fieldPlaceholder: "What would you like to explore?", titlePattern: "Chat: {{input}}",
+        prompt: """
+        Research or discuss this question with the human:
+        {{input}}
+
+        Lead with a direct answer, then explain the evidence, open questions, and useful next steps.
+        Read referenced sources and link to evidence. Distinguish verified facts from assumptions.
+        Ask a focused clarification when needed and make space for follow-up questions.
+        This is a conversation: do not implement changes, post reviews, or merge PRs unless explicitly asked.
+        """
+    )
     static let defaults: [TaskTemplate] = [
         custom,
-        TaskTemplate(id: "implementTicket", name: "Implement", summary: "Turn a ticket into tested code and a draft pull request.",
-                     symbol: "hammer", fieldLabel: "Ticket", fieldPlaceholder: "Ticket ID or URL",
+        chat,
+        TaskTemplate(id: "implementTicket", name: "Implement", summary: "Turn a ticket or a mission into tested code and a draft pull request.",
+                     symbol: "hammer", fieldLabel: "Ticket or mission", fieldPlaceholder: "Ticket ID, URL, or what to implement",
                      titlePattern: "Implement {{input}}", prompt: """
-                     Implement ticket {{input}}.
-                     Read the ticket and its linked context, explore the project, and plan the change.
+                     Implement this:
+                     {{input}}
+
+                     The input is either a ticket (an ID or URL) or a mission describing what to implement.
+                     For a ticket, read it and its linked context. For a mission, treat its text as the requirements.
+                     Explore the project and plan the change.
                      Follow the project's conventions, implement the change, and run relevant tests.
-                     Commit on a feature branch, push, and open a draft pull request linked to the ticket.
-                     If the ticket or a required tool is unavailable, ask the human for help.
+                     Commit on a feature branch, push, and open a draft pull request, linked to the ticket if there is one.
+                     If the ticket, the intended behavior, or a required tool is unavailable, ask the human for help.
                      """),
         TaskTemplate(id: "reviewComments", name: "Resolve & merge", summary: "Address feedback, resolve conflicts, and get one or multiple PRs green and merged.",
                      symbol: "arrow.triangle.merge", fieldLabel: "Pull request(s)",
@@ -167,10 +187,14 @@ struct TaskType: Codable, Equatable {
     let name: String
     let symbol: String
     let details: String?
+    let templateID: String?
+
+    var isChat: Bool { templateID == "chat" }
 
     init(template: TaskTemplate, input: String? = nil, notes: String = "") {
         name = template.name
         symbol = template.symbol
+        templateID = template.id
         details = input.map {
             [$0, notes].map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .filter { !$0.isEmpty }.joined(separator: "\n")
