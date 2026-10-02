@@ -106,7 +106,7 @@ extension SessionStatus {
         case .done: .green
         case .ended: .gray
         case .exited: .secondary
-        case .interrupted: .brown
+        case .paused, .interrupted: .brown
         }
     }
 }

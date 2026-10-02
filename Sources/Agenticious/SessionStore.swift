@@ -172,6 +172,14 @@ final class SessionStore: ObservableObject {
         updateBadge()
     }
 
+    /// Marks the work as ended by the human, then stops the agent and cleans up like Archive.
+    func end(_ session: AgentSession) {
+        guard session.canEnd else { return }
+        session.status = .ended("Ended by you.")
+        save(session)
+        archive(session)
+    }
+
     func show(_ list: AgentList) {
         selection = list == .finished ? .history : .overview
     }
@@ -292,18 +300,20 @@ final class SessionStore: ObservableObject {
         return LaunchOptions.current
     }
 
-    func stop(_ session: AgentSession) {
+    /// Stops the process but keeps the conversation and worktree, so Resume continues the work.
+    func pause(_ session: AgentSession) {
         guard session.isRunning, !session.isArchiving else { return }
         session.terminalView?.terminate()
         // SwiftTerm cancels its exit monitor when explicitly terminated.
         session.recordExit(nil)
+        if case .exited = session.status { session.status = .paused }
         save(session)
         updateBadge()
     }
 
     func remove(_ session: AgentSession) {
         guard !session.isArchiving else { return }
-        stop(session)
+        pause(session)
         if selection == .session(session.id) { selection = .overview }
         subscriptions[session.id] = nil
         sessions.removeAll { $0.id == session.id }

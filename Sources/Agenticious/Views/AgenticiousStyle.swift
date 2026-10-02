@@ -5,6 +5,7 @@ enum AgenticiousStyle {
     static let panel = Color(red: 0.10, green: 0.08, blue: 0.15)
     static let lime = Color(red: 0.72, green: 0.95, blue: 0.38)
     static let violet = Color(red: 0.76, green: 0.49, blue: 0.96)
+    static let coral = Color(red: 0.98, green: 0.56, blue: 0.50)
 }
 
 struct ControlRoomHero: View {

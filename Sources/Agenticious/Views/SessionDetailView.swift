@@ -35,10 +35,15 @@ struct SessionDetailView: View {
                             .help(session.isArchiving ? "Archiving…" : "Stop the agent, clean up its worktree, and archive its history.")
                     }
                     if session.canStop && !session.isChat {
-                        Button("Stop agent", systemImage: "stop.fill") { store.stop(session) }
-                            .buttonStyle(PillButtonStyle(tint: .red))
+                        Button("Pause", systemImage: "pause.fill") { store.pause(session) }
+                            .buttonStyle(PillButtonStyle(tint: AgenticiousStyle.coral))
                             .disabled(session.isArchiving)
-                            .help("Stop the process without archiving its history.")
+                            .help("Stop the process but keep its conversation and worktree. Resume continues where it left off.")
+                    }
+                    if session.canEnd {
+                        Button("End agent", systemImage: "stop.fill") { store.end(session) }
+                            .buttonStyle(PillButtonStyle(tint: .red))
+                            .help("Mark the work as ended, stop the agent, and clean up its worktree. History is kept.")
                     }
                     if session.showsResumeAction {
                         Button("Resume", systemImage: "play.fill") { store.resume(session) }
@@ -145,6 +150,9 @@ struct SessionDetailView: View {
         case let .exited(code):
             Banner(title: "Exited", text: "The agent process ended (code \(code.map(String.init) ?? "?")).",
                    systemImage: "stop.circle", color: .secondary)
+        case .paused:
+            Banner(title: "Paused", text: "You paused this agent. Resume to continue where it left off, or End agent to clean up.",
+                   systemImage: "pause.circle", color: .brown)
         case .interrupted:
             Banner(title: "Interrupted", text: session.isMarkedFinished
                    ? "This agent was interrupted. Resume to continue where it left off."
