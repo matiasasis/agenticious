@@ -228,6 +228,20 @@ final class AgentSession: ObservableObject, Identifiable {
         !isRunning && !isArchiving && backgroundTask == nil && !worktreeRemoved && FileManager.default.fileExists(atPath: directory.path)
     }
 
+    var resumePrompt: String? {
+        guard !isChat, conversationID != nil else { return nil }
+        if case .done = status { return nil }
+        return "Continue the unfinished task from where you left off. Review the conversation and current progress, then proceed with the remaining work."
+    }
+
+    func prepareToResume() {
+        status = resumePrompt == nil ? .yourTurn : .starting
+        isMarkedFinished = false
+        isAwaitingPermission = false
+        releaseQuestion()
+        startupProgress = StartupProgress()
+    }
+
     var hasOpenChunks: Bool { chunks.contains { $0.status != .done } }
 
     var currentChunk: Chunk? {
