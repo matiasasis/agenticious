@@ -38,14 +38,15 @@ struct ClaudeReading: Codable, Equatable {
     let takenAt: Date
 }
 
-/// Best-effort usage readout. Neither vendor exposes a quota API, so this reads what the CLIs hand out locally:
-/// Codex writes its rate-limit percentages into session logs, and Claude Code passes its session and weekly
-/// usage to the status line of agents started here. Until one has run, Claude falls back to today's token count.
+/// Codex percentages come from local logs; model availability comes from its live usage endpoint.
+/// Claude reports limits through its status line, falling back to today's token count.
 @MainActor
 final class UsageMonitor: ObservableObject {
     private static let claudeReadingKey = "claudeRateLimits"
 
     @Published private(set) var codexLimits = CodexLimits()
+    @Published private(set) var codexModelQuotas: CodexModelQuotaReading?
+    @Published private(set) var codexModelQuotasStale = false
     @Published private(set) var claudeReading: ClaudeReading?
     @Published private(set) var claudeTokensToday: Int?
     private(set) var lastChecked: Date?
@@ -66,7 +67,14 @@ final class UsageMonitor: ObservableObject {
                 self.codexLimits = codex
                 self.claudeTokensToday = claude
             }
+            let modelQuotas = await CodexModelQuotaReader.read()
+            await MainActor.run { self.recordCodexModelQuotas(modelQuotas) }
         }
+    }
+
+    func recordCodexModelQuotas(_ reading: CodexModelQuotaReading?) {
+        if let reading { codexModelQuotas = reading }
+        codexModelQuotasStale = reading == nil
     }
 
     /// `rate_limits` from Claude Code's status line input: `five_hour` and `seven_day`, each `used_percentage` + `resets_at`.

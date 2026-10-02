@@ -298,32 +298,43 @@ struct UsageBar: View {
     @EnvironmentObject private var usage: UsageMonitor
 
     var body: some View {
-        HStack(spacing: 10) {
-            if let claude = usage.claudeReading {
-                vendor("Claude", claude.limits, source: "Read \(claude.takenAt.formatted(.relative(presentation: .named))) " +
-                    "from the status line of a Claude agent started here.")
-            } else if let tokens = usage.claudeTokensToday {
-                Text("Claude today: \(tokens.formatted(.number.notation(.compactName))) tok")
-                    .font(.caption)
-                    .help("Input + output + cache-write tokens since midnight, read from ~/.claude/projects. " +
-                        "Your session and weekly limits show up here once a Claude agent started from Agenticious replies.")
-            }
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 10) { vendors }
+            VStack(alignment: .leading, spacing: 6) { vendors }
+        }
+        .foregroundStyle(.secondary)
+    }
 
-            if !usage.codexLimits.isEmpty {
-                vendor("Codex", usage.codexLimits.account, source: "Read from Codex's latest session logs.") {
-                    ForEach(usage.codexLimits.models, id: \.name) { model in
-                        Divider().frame(height: 22)
-                        Text(model.name)
-                            .font(.caption2.weight(.semibold))
-                            .help("\(model.name) has its own limit, separate from the rest of Codex.")
-                        ForEach(model.limits, id: \.windowMinutes) {
-                            LimitGauge(limit: $0, source: "Read from the latest Codex session that used \(model.name).")
-                        }
+    @ViewBuilder
+    private var vendors: some View {
+        if let claude = usage.claudeReading {
+            vendor("Claude", claude.limits, source: "Read \(claude.takenAt.formatted(.relative(presentation: .named))) " +
+                "from the status line of a Claude agent started here.")
+        } else if let tokens = usage.claudeTokensToday {
+            Text("Claude today: \(tokens.formatted(.number.notation(.compactName))) tok")
+                .font(.caption)
+                .help("Input + output + cache-write tokens since midnight, read from ~/.claude/projects. " +
+                    "Your session and weekly limits show up here once a Claude agent started from Agenticious replies.")
+        }
+
+        if !usage.codexLimits.isEmpty || usage.codexModelQuotas?.quotas.isEmpty == false {
+            vendor("Codex", usage.codexLimits.account, source: "Read from Codex's latest session logs.") {
+                ForEach(usage.codexModelQuotas?.quotas ?? []) { quota in
+                    Divider().frame(height: 22)
+                    CodexModelQuotaStatus(quota: quota, checkedAt: usage.codexModelQuotas?.checkedAt,
+                                          isStale: usage.codexModelQuotasStale)
+                }
+                ForEach(usage.codexLimits.models, id: \.name) { model in
+                    Divider().frame(height: 22)
+                    Text(model.name)
+                        .font(.caption2.weight(.semibold))
+                        .help("\(model.name) has its own limit, separate from the rest of Codex.")
+                    ForEach(model.limits, id: \.windowMinutes) {
+                        LimitGauge(limit: $0, source: "Read from the latest Codex session that used \(model.name).")
                     }
                 }
             }
         }
-        .foregroundStyle(.secondary)
     }
 
     private func vendor(_ name: String, _ limits: [UsageLimit], source: String,
@@ -338,6 +349,38 @@ struct UsageBar: View {
         .padding(.horizontal, 10).padding(.vertical, 8)
         .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(AgenticiousStyle.violet.opacity(0.25)))
+    }
+}
+
+struct CodexModelQuotaStatus: View {
+    let quota: CodexModelQuota
+    let checkedAt: Date?
+    let isStale: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(quota.name).font(.caption2.weight(.semibold))
+            Label(isStale ? "Last reported: \(quota.status)" : quota.status,
+                  systemImage: isStale ? "clock" : quota.available ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                .font(.system(size: 10))
+                .foregroundStyle(isStale ? Color.secondary : quota.available ? AgenticiousStyle.lime : .orange)
+            if !quota.available, let availableAt = quota.availableAt {
+                Text("Resets \(availableAt.formatted(.relative(presentation: .named)))")
+                    .font(.system(size: 10))
+            }
+        }
+        .fixedSize()
+        .help(helpText)
+    }
+
+    private var helpText: String {
+        var lines = ["Model-specific quota status. Codex reports availability rather than a percentage."]
+        if isStale { lines.append("The latest refresh failed; showing the last reported status.") }
+        if let checkedAt { lines.append("Checked \(checkedAt.formatted(.relative(presentation: .named))).") }
+        if let availableAt = quota.availableAt {
+            lines.append("Available again \(availableAt.formatted(date: .abbreviated, time: .shortened)).")
+        }
+        return lines.joined(separator: "\n")
     }
 }
 
