@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ChunkGridLayout: Layout {
-    static let cardHeight: CGFloat = 56
+    static let cardHeight: CGFloat = 72
     private let minimumWidth: CGFloat = 180
     private let spacing: CGFloat = 8
 

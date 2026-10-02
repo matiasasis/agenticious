@@ -7,7 +7,7 @@ final class ChunkGridLayoutTests: XCTestCase {
     func testFiveStepsFillOneWideRow() {
         let frames = layout.frames(count: 5, width: 1100)
         XCTAssertEqual(frames.count, 5)
-        XCTAssertTrue(frames.allSatisfy { $0.minY == 0 && $0.height == 56 })
+        XCTAssertTrue(frames.allSatisfy { $0.minY == 0 && $0.height == 72 })
         XCTAssertEqual(frames.last!.maxX, 1100, accuracy: 0.001)
     }
 
@@ -25,10 +25,10 @@ final class ChunkGridLayoutTests: XCTestCase {
 
     func testNarrowWidthsPreserveOrderAndFillEveryRow() {
         let frames = layout.frames(count: 5, width: 368)
-        XCTAssertEqual(frames.map(\.minY), [0, 0, 64, 64, 128])
+        XCTAssertEqual(frames.map(\.minY), [0, 0, 80, 80, 160])
         XCTAssertEqual(frames.last!.width, 368)
         let singleColumn = layout.frames(count: 5, width: 160)
-        XCTAssertEqual(singleColumn.map(\.minY), [0, 64, 128, 192, 256])
+        XCTAssertEqual(singleColumn.map(\.minY), [0, 80, 160, 240, 320])
         XCTAssertTrue(singleColumn.allSatisfy { $0.width == 160 })
     }
 
