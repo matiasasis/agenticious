@@ -310,17 +310,29 @@ struct UsageBar: View {
             }
 
             if !usage.codexLimits.isEmpty {
-                vendor("Codex", usage.codexLimits, source: "Read from Codex's latest session log.")
+                vendor("Codex", usage.codexLimits.account, source: "Read from Codex's latest session logs.") {
+                    ForEach(usage.codexLimits.models, id: \.name) { model in
+                        Divider().frame(height: 22)
+                        Text(model.name)
+                            .font(.caption2.weight(.semibold))
+                            .help("\(model.name) has its own limit, separate from the rest of Codex.")
+                        ForEach(model.limits, id: \.windowMinutes) {
+                            LimitGauge(limit: $0, source: "Read from the latest Codex session that used \(model.name).")
+                        }
+                    }
+                }
             }
         }
         .foregroundStyle(.secondary)
     }
 
-    private func vendor(_ name: String, _ limits: [UsageLimit], source: String) -> some View {
+    private func vendor(_ name: String, _ limits: [UsageLimit], source: String,
+                        @ViewBuilder extra: () -> some View = { EmptyView() }) -> some View {
         HStack(spacing: 8) {
             Text(name)
                 .font(.caption.weight(.semibold))
             ForEach(limits, id: \.windowMinutes) { LimitGauge(limit: $0, source: source) }
+            extra()
         }
         .fixedSize(horizontal: true, vertical: false)
         .padding(.horizontal, 10).padding(.vertical, 8)

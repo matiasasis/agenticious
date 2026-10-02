@@ -66,6 +66,32 @@ final class BackgroundRefreshTests: XCTestCase {
 
         XCTAssertEqual(UsageReader.recentCodexLogs(in: root).map { $0.deletingPathExtension().lastPathComponent },
                        ["still-running", "today", "older"])
-        XCTAssertEqual(UsageReader.codexLimits(sessions: root).first?.usedPercent, 50)
+        XCTAssertEqual(UsageReader.codexLimits(sessions: root).account.first?.usedPercent, 50)
+    }
+
+    func testCodexModelLimitsAreReadApartFromTheAccountLimits() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        func log(_ name: String, _ lines: [String], modified: TimeInterval) throws {
+            let folder = root.appendingPathComponent("2026/10/02")
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let file = folder.appendingPathComponent(name + ".jsonl")
+            try lines.joined(separator: "\n").write(to: file, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSinceNow: modified)], ofItemAtPath: file.path)
+        }
+        func line(_ id: String, _ name: String?, used: Double) -> String {
+            let limitName = name.map { #""\#($0)""# } ?? "null"
+            return #"{"payload":{"rate_limits":{"limit_id":"\#(id)","limit_name":\#(limitName),"#
+                + #""primary":{"used_percent":\#(used),"window_minutes":10080},"secondary":null}}}"#
+        }
+        try log("spark-session", [line("codex", nil, used: 40), line("codex_bengalfox", "GPT-5.3-Codex-Spark", used: 12)],
+                modified: -300)
+        let empty = #"{"payload":{"rate_limits":{"limit_id":"premium","limit_name":null,"primary":null,"secondary":null}}}"#
+        try log("latest", [line("codex", nil, used: 70), empty], modified: -10)
+
+        let limits = UsageReader.codexLimits(sessions: root)
+        XCTAssertEqual(limits.account.map(\.usedPercent), [70])
+        XCTAssertEqual(limits.models.map(\.name), ["GPT-5.3-Codex-Spark"])
+        XCTAssertEqual(limits.models.first?.limits.map(\.usedPercent), [12])
     }
 }
