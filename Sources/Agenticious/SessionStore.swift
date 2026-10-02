@@ -98,6 +98,7 @@ final class SessionStore: ObservableObject {
     }
 
     var attentionCount: Int { sessions.filter { !$0.isMarkedFinished && $0.status.needsAttention }.count }
+    var workingCount: Int { visibleSessions.filter(\.isWorking).count }
 
     var visibleProjectGroups: [ProjectGroup] { AgentList.queue.groups(from: projectGroups) }
     var visibleSessions: [AgentSession] { sessions.filter { AgentList.queue.includes(isMarkedFinished: $0.isMarkedFinished) } }

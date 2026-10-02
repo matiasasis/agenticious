@@ -210,6 +210,8 @@ final class AgentSession: ObservableObject, Identifiable {
 
     var completedChunks: Int { chunks.filter { $0.status == .done }.count }
 
+    var isWorking: Bool { status == .starting || (status == .working && isRunning) }
+
     var startupSteps: [Chunk] {
         guard !isChat, chunks.isEmpty, backgroundTask == nil, !isArchiving, !isMarkedFinished,
               status == .starting || (status == .working && isRunning) else { return [] }

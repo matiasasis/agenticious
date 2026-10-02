@@ -35,25 +35,24 @@ struct ControlRoomHero: View {
     }
 }
 
-/// A count in the top bar, boxed like the usage limits beside it.
 struct DashboardMetric: View {
     let title: String
     let value: Int
     let color: Color
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
             Text("\(value)")
-                .font(.system(size: 17, weight: .bold, design: .rounded))
+                .font(.system(size: 15, weight: .bold, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(color)
             Text(title)
-                .font(.system(size: 9, weight: .bold, design: .monospaced))
-                .tracking(1)
+                .font(.system(size: 8, weight: .bold, design: .monospaced))
+                .tracking(0.5)
                 .foregroundStyle(.secondary)
         }
         .fixedSize()
-        .padding(.horizontal, 10).padding(.vertical, 8)
+        .padding(.horizontal, 7).padding(.vertical, 7)
         .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(color.opacity(0.25)))
         .accessibilityElement(children: .ignore)

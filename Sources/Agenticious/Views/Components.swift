@@ -509,11 +509,6 @@ struct ControlRoomBar: View {
                     Text("CONTROL ROOM").font(.system(size: 10, weight: .bold, design: .monospaced))
                         .tracking(1).foregroundStyle(AgenticiousStyle.violet)
                     Spacer(minLength: 8)
-                    AgentCounters()
-                    UsageBar()
-                }
-                HStack(spacing: 10) {
-                    AgentCounters()
                     UsageBar()
                 }
                 UsageBar()
@@ -531,14 +526,17 @@ struct ControlRoomBar: View {
     }
 }
 
-private struct AgentCounters: View {
+struct AgentCounters: View {
     @EnvironmentObject private var store: SessionStore
 
     var body: some View {
-        HStack(spacing: 10) {
-            DashboardMetric(title: "QUEUED", value: store.visibleSessions.count, color: AgenticiousStyle.violet)
-            DashboardMetric(title: "RUNNING", value: store.visibleSessions.filter(\.isRunning).count, color: AgenticiousStyle.lime)
+        HStack(spacing: 6) {
+            DashboardMetric(title: "AGENTS", value: store.visibleSessions.count, color: AgenticiousStyle.violet)
+                .help("Agents in the sidebar, excluding history")
+            DashboardMetric(title: "WORKING", value: store.workingCount, color: AgenticiousStyle.lime)
+                .help("Agents starting or actively working; idle and waiting agents are excluded")
             DashboardMetric(title: "NEEDS YOU", value: store.attentionCount, color: .orange)
+                .help("Agents blocked on your input or approval")
         }
     }
 }
