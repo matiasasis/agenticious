@@ -4,22 +4,16 @@ struct AgentBadge: View {
     let agent: AgentKind
     var detail: String?
 
-    /// One colour for every provider, kept out of the status palette; the logo and name tell them apart.
-    private static let tint = Color.blue
-
+    /// Plain text with no colour of its own, kept out of the status palette; the large logo tells providers apart.
     var body: some View {
-        HStack(spacing: 5) {
-            ProviderIcon(agent: agent, size: 11)
+        HStack(spacing: 6) {
+            ProviderIcon(agent: agent, size: 16)
             Text(agent.displayName).font(.caption.weight(.semibold))
             if let detail {
-                Text(detail).font(.caption2).opacity(0.75)
+                Text(detail).font(.caption).foregroundStyle(.secondary)
             }
         }
         .lineLimit(1)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 3)
-        .background(Self.tint.opacity(0.15), in: Capsule())
-        .foregroundStyle(Self.tint)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel([agent.displayName, detail].compactMap { $0 }.joined(separator: ", "))
     }
