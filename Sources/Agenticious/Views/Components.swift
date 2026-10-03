@@ -7,7 +7,7 @@ struct AgentBadge: View {
     /// Neutral, so it stays out of the status palette; the logo and name tell providers apart.
     var body: some View {
         HStack(spacing: 5) {
-            ProviderIcon(agent: agent, size: 13)
+            ProviderIcon(agent: agent, size: 12)
             Text(agent.displayName).font(.caption.weight(.semibold))
             if let detail {
                 Text(detail).font(.caption2).foregroundStyle(.secondary)
