@@ -75,6 +75,23 @@ final class ChatTaskTests: XCTestCase {
     }
 
     @MainActor
+    func testReplyingIndicatorShowsOnlyWhileTheAgentHasTheTurn() {
+        let chat = session()
+        XCTAssertTrue(chat.isWorking)
+        chat.isRunning = true
+        EventInterpreter.apply("UserPromptSubmit", [:], to: chat)
+        XCTAssertTrue(chat.isWorking)
+        EventInterpreter.apply("Stop", [:], to: chat)
+        XCTAssertFalse(chat.isWorking)
+        EventInterpreter.apply("UserPromptSubmit", [:], to: chat)
+        EventInterpreter.apply("mcp", ["tool": "need_human", "args": ["reason": "Which repository?"]], to: chat)
+        XCTAssertFalse(chat.isWorking)
+        EventInterpreter.apply("UserPromptSubmit", [:], to: chat)
+        chat.recordExit(nil)
+        XCTAssertFalse(chat.isWorking)
+    }
+
+    @MainActor
     func testEndChatEligibilityProtectsInFlightCleanup() {
         let chat = session()
         XCTAssertTrue(chat.canEndChat)

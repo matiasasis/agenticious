@@ -43,6 +43,7 @@ struct ActivityView: View {
                                          agent: session.agent)
                         }
                         ForEach(visibleEntries) { entry in ActivityCard(entry: entry, agent: session.agent, isRunning: session.isRunning) }
+                        if session.isWorking && loadedSession == session.id { ReplyingIndicator(agent: session.agent) }
                         Color.clear.frame(height: 1).id("latest")
                     }.padding(20)
                 }
@@ -56,6 +57,7 @@ struct ActivityView: View {
                     }
                 }
                 .onChange(of: entries) { _, _ in if followLatest { proxy.scrollTo("latest", anchor: .bottom) } }
+                .onChange(of: session.isWorking) { _, _ in if followLatest { proxy.scrollTo("latest", anchor: .bottom) } }
             }
             if session.canReplyInline || (session.isChat && session.isRunning && !session.isMarkedFinished && session.pendingQuestion == nil) {
                 ReplyComposer(session: session).id(session.id)
@@ -203,6 +205,24 @@ struct ActivityCard: View {
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(border))
         .onAppear { expanded = entry.state == .failed }
         .onChange(of: entry.state) { _, state in if state == .failed { expanded = true } }
+    }
+}
+
+/// Stands in for the agent's next reply while it thinks, writes or runs tools.
+private struct ReplyingIndicator: View {
+    let agent: AgentKind
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ProviderIcon(agent: agent, size: 14).foregroundStyle(AgenticiousStyle.lime)
+            ProgressView().controlSize(.small)
+            Text("Whiskering…").font(.callout.italic()).foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 16).padding(.vertical, 12)
+        .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(AgenticiousStyle.lime.opacity(0.3)))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(agent.displayName) is working")
     }
 }
 
