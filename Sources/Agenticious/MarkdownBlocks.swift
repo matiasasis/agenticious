@@ -66,14 +66,13 @@ enum MarkdownBlocks {
                 index += 1
             } else if index + 1 < lines.count, let alignments = delimiterRow(lines[index + 1]), cells(line).count == alignments.count {
                 flushParagraph()
-                var rows: [[String]] = []
                 index += 2
-                while index < lines.count, lines[index].contains("|"), !lines[index].trimmingCharacters(in: .whitespaces).isEmpty {
-                    let row = cells(lines[index])
-                    rows.append(Array((row + Array(repeating: "", count: alignments.count)).prefix(alignments.count)))
-                    index += 1
-                }
-                blocks.append(.table(MarkdownTable(header: cells(line), alignments: alignments, rows: rows)))
+                blocks.append(.table(MarkdownTable(header: cells(line), alignments: alignments, rows: tableRows(lines, from: &index, columns: alignments.count))))
+            } else if let alignments = delimiterRow(line), index + 1 < lines.count, lines[index + 1].contains("|") {
+                // A table whose header row was left out, as when part of one is pasted.
+                flushParagraph()
+                index += 1
+                blocks.append(.table(MarkdownTable(header: [], alignments: alignments, rows: tableRows(lines, from: &index, columns: alignments.count))))
             } else if isDiagram(line) {
                 flushParagraph()
                 var diagram: [String] = []
@@ -135,6 +134,15 @@ enum MarkdownBlocks {
         let indent = match.1.replacingOccurrences(of: "\t", with: "    ").count
         let marker = match.2.first?.isNumber == true ? String(match.2.dropLast()) + "." : "•"
         return MarkdownListItem(depth: indent / 2, marker: marker, text: String(match.3))
+    }
+
+    private static func tableRows(_ lines: [String], from index: inout Int, columns: Int) -> [[String]] {
+        var rows: [[String]] = []
+        while index < lines.count, lines[index].contains("|"), !lines[index].trimmingCharacters(in: .whitespaces).isEmpty {
+            rows.append(Array((cells(lines[index]) + Array(repeating: "", count: columns)).prefix(columns)))
+            index += 1
+        }
+        return rows
     }
 
     private static func delimiterRow(_ line: String) -> [MarkdownTable.Alignment]? {

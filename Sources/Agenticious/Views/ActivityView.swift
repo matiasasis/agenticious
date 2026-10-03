@@ -287,15 +287,17 @@ private struct MarkdownTableView: View {
 
     var body: some View {
         Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
-            GridRow {
-                ForEach(Array(table.header.enumerated()), id: \.offset) { column, cell in
-                    self.cell(cell).fontWeight(.semibold).gridColumnAlignment(alignment(column))
+            if !table.header.isEmpty {
+                GridRow {
+                    ForEach(Array(table.header.enumerated()), id: \.offset) { _, cell in self.cell(cell, weight: .semibold) }
                 }
             }
-            ForEach(Array(table.rows.enumerated()), id: \.offset) { _, row in
-                Divider().gridCellUnsizedAxes(.horizontal)
+            ForEach(Array(table.rows.enumerated()), id: \.offset) { index, row in
+                if index > 0 || !table.header.isEmpty { Divider().gridCellUnsizedAxes(.horizontal) }
                 GridRow {
-                    ForEach(Array(row.enumerated()), id: \.offset) { _, cell in self.cell(cell) }
+                    ForEach(Array(row.enumerated()), id: \.offset) { column, cell in
+                        self.cell(cell).gridColumnAlignment(alignment(column))
+                    }
                 }
             }
         }
@@ -304,8 +306,9 @@ private struct MarkdownTableView: View {
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.primary.opacity(0.08)))
     }
 
-    private func cell(_ text: String) -> Text {
-        Text(inlineMarkdown(text)).font(.system(size: 13))
+    /// Wraps long cells onto more lines instead of truncating them.
+    private func cell(_ text: String, weight: Font.Weight = .regular) -> some View {
+        Text(inlineMarkdown(text)).font(.system(size: 13, weight: weight)).fixedSize(horizontal: false, vertical: true)
     }
 
     private func alignment(_ column: Int) -> HorizontalAlignment {

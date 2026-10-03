@@ -30,6 +30,16 @@ final class MarkdownBlocksTests: XCTestCase {
         ])
     }
 
+    func testTableWithoutHeaderRow() {
+        let text = "|---|---|:-:|\n| Pause | stopped | yes |\n| End agent | removed (like Archive) | no |\nAfter"
+        XCTAssertEqual(MarkdownBlocks.parse(text), [
+            .table(MarkdownTable(header: [], alignments: [.leading, .leading, .center],
+                                 rows: [["Pause", "stopped", "yes"], ["End agent", "removed (like Archive)", "no"]])),
+            .paragraph("After"),
+        ])
+        XCTAssertEqual(MarkdownBlocks.parse("---|---"), [.paragraph("---|---")])
+    }
+
     func testPipesWithoutDelimiterRowStayText() {
         XCTAssertEqual(MarkdownBlocks.parse("a | b\nc | d"), [.paragraph("a | b\nc | d")])
     }
