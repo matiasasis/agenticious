@@ -140,6 +140,8 @@ final class AgentSession: ObservableObject, Identifiable {
     @Published var isRunning = false
     /// Claude subagents this agent started, oldest first. Hooks keep them live; earlier runs come from Claude's logs.
     @Published var subagents: [Subagent] = []
+    /// Commands the agent registered to undo what it made outside its worktree. Ones that ran cleanly are dropped.
+    @Published var cleanupTasks: [CleanupTask] = []
 
     var planSource: PlanSource = .none
     /// Needs you because of a permission prompt, which a subagent can be the one waiting on.

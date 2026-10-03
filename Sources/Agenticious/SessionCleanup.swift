@@ -4,12 +4,16 @@ import Darwin
 struct CleanupResult {
     var processesStopped = false
     var worktreeRemoved = false
+    /// Commands of cleanup tasks that ran cleanly, so a retry skips them.
+    var completedCleanup: [String] = []
     var warnings: [String] = []
 }
 
 enum SessionCleanup {
-    /// `progress` hears each step as it starts, for the card to show.
+    /// `progress` hears each step as it starts, for the card to show. Cleanup `tasks` run in `directory` once the agent
+    /// has stopped and before its worktree is removed, so they can still use the worktree's own scripts.
     static func run(id: UUID, processID: Int32?, worktree: Worktree?, sharedWorktree: Bool,
+                    tasks: [CleanupTask] = [], directory: URL? = nil, environment: [String: String] = [:],
                     supportDirectory: URL? = nil, progress: (String) -> Void = { _ in }) -> CleanupResult {
         var result = CleanupResult()
         progress("Stopping the agent…")
@@ -19,6 +23,15 @@ enum SessionCleanup {
         } catch {
             result.warnings.append("Couldn't stop all agent processes. Cleanup was halted; retry archive: \(error.localizedDescription)")
             return result
+        }
+        let folder = [directory, worktree.map { URL(fileURLWithPath: $0.path) }].compactMap { $0 }
+            .first { FileManager.default.fileExists(atPath: $0.path) } ?? FileManager.default.homeDirectoryForCurrentUser
+        for task in tasks {
+            progress("Cleaning up: \(task.title)…")
+            switch CleanupRunner.run(task, in: folder, environment: environment) {
+            case .succeeded: result.completedCleanup.append(task.command)
+            case let .failed(reason): result.warnings.append("Cleanup task “\(task.title)” failed (\(reason)). It runs again on retry.")
+            }
         }
         if let worktree {
             if sharedWorktree {

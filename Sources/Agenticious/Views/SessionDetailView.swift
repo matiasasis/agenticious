@@ -63,6 +63,7 @@ struct SessionDetailView: View {
                 if !session.pullRequests.isEmpty {
                     PullRequestLinks(references: session.pullRequests).id(session.id)
                 }
+                CleanupTaskList(session: session)
 
                 if !session.isChat, !session.startupSteps.isEmpty {
                     StartupProgressView(steps: session.startupSteps)

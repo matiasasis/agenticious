@@ -127,6 +127,15 @@ final class SessionStore: ObservableObject {
         let id = session.id
         let processID = session.terminalView?.process.running == true ? session.terminalView?.process.shellPid : nil
         let worktree = session.worktreeRemoved ? nil : session.worktree
+        let tasks = session.cleanupTasks + WorkspaceCleanup.tasks(for: session.project)
+        let directory = session.directory
+        let environment = [
+            "AGENTICIOUS_SESSION": id.uuidString,
+            "AGENTICIOUS_DIRECTORY": session.directory.path,
+            "AGENTICIOUS_PROJECT": session.project.path ?? "",
+            "AGENTICIOUS_WORKTREE": worktree?.path ?? "",
+            "AGENTICIOUS_BRANCH": worktree?.branch ?? "",
+        ]
         let sharedWorktree = worktree.map { tree in
             sessions.contains {
                 $0.id != id && (!$0.isMarkedFinished || $0.isRunning)
@@ -135,12 +144,14 @@ final class SessionStore: ObservableObject {
         } ?? false
         Task {
             let result = await Task.detached {
-                SessionCleanup.run(id: id, processID: processID, worktree: worktree, sharedWorktree: sharedWorktree) { step in
+                SessionCleanup.run(id: id, processID: processID, worktree: worktree, sharedWorktree: sharedWorktree,
+                                   tasks: tasks, directory: directory, environment: environment) { step in
                     Task { @MainActor in
                         if let session = self.session(id), session.isArchiving { session.backgroundTask = step }
                     }
                 }
             }.value
+            session.cleanupTasks.removeAll { result.completedCleanup.contains($0.command) }
             if result.processesStopped {
                 if session.terminalView?.process.running == true { session.terminalView?.terminate() }
                 session.terminalView?.removeFromSuperview()

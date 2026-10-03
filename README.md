@@ -39,6 +39,7 @@ agent ──agenticious MCP───┘
 | Turn finished | `Stop` hook; background tasks or scheduled wakeups show as Waiting | `notify` (agent-turn-complete) |
 | Plan limits | `statusLine` command (`rate_limits`) | session logs |
 | Done | `finish` tool | `finish` tool |
+| Cleanup on end | `add_cleanup` tool | `add_cleanup` tool |
 | Subagents | `SubagentStart` / `SubagentStop` hooks and tool hooks carrying `agent_id` | — |
 
 The built-in "skill" is `Sources/Agenticious/ChunkingPrompt.swift`. Claude gets it through `--append-system-prompt`. Codex gets it prepended to the task.
@@ -143,6 +144,18 @@ Provider icons use monochrome template rendering. The Claude mark comes from the
 ### Subagents
 
 When a Claude agent starts subagents with its Agent tool, each one appears as a small card nested under the agent in the sidebar, with its description, status, and what it is doing now. Running subagents stay in view; done, failed, and stopped ones fold into a summary line you can expand. Select one to read its own Activity from Claude's `subagents/agent-<id>.jsonl` log. Subagents run inside their agent's process, so they have no terminal or controls of their own: pausing or ending the agent stops them, and you talk to them through the agent. After Agenticious restarts, earlier subagents come back from Claude's logs, marked done or failed from the agent's log, or stopped if they were cut off.
+
+### Cleanup tasks
+
+Agents often make things outside their worktree's files: a test database, another git worktree, a dev server, a Docker container. The built-in prompt asks them to register a command that removes each one with the `add_cleanup` tool as soon as they create it. The agent's page lists these under **cleanup tasks run when this agent ends**, where you can drop any you don't want.
+
+For commands every agent in a workspace needs, right-click the workspace in the sidebar and choose **Cleanup commands…**. Enter one per line; lines starting with `#` are skipped. For example:
+
+```sh
+bin/spring stop
+```
+
+Both kinds run whenever the agent is archived: **End agent**, **Mark as finished**, **End chat**, and **Archive**. They run after the agent's processes are stopped and before its worktree is removed, in a login shell in its working directory, with `AGENTICIOUS_WORKTREE`, `AGENTICIOUS_BRANCH`, `AGENTICIOUS_DIRECTORY`, `AGENTICIOUS_PROJECT`, and `AGENTICIOUS_SESSION` set. Each command gets two minutes. A failed command is reported and kept, so **Retry archive cleanup** runs it again; workspace commands run on every attempt, so make them safe to repeat.
 
 ### Ended tasks
 

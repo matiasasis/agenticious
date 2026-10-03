@@ -51,6 +51,18 @@ let tools: [[String: Any]] = [
         ],
     ],
     [
+        "name": "add_cleanup",
+        "description": "Register a shell command that removes something you made outside your worktree's files that must not outlive this task: a test database, another git worktree, a background server, a Docker container. Agenticious runs it when the task is ended or archived, in your working directory, before deleting your worktree. Make it safe to run twice. Registering the same command again replaces it.",
+        "inputSchema": [
+            "type": "object",
+            "properties": [
+                "command": ["type": "string", "minLength": 1, "description": "A zsh command, e.g. `dropdb --if-exists app_test_sk_123`"],
+                "title": ["type": "string", "description": "6 words or fewer, e.g. \"Drop SK-123 test database\""],
+            ],
+            "required": ["command", "title"],
+        ],
+    ],
+    [
         "name": "need_human",
         "description": "Flag that you're blocked on the human. Pass a one-line question, then ask it in the terminal.",
         "inputSchema": [

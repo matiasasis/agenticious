@@ -24,6 +24,10 @@ enum ChunkingPrompt {
     For new implementation work, call it immediately after creating the PR. Report every PR in a stack. \
     If this tool is unavailable in an older session, include the full URL in an `update_chunk` note or `finish` summary.
 
+    7. When you create something outside your worktree's files that should not outlive this task, such as a test database, \
+    another git worktree, a background server, or a Docker container, call `add_cleanup` right away with a command that removes it. \
+    Agenticious runs those commands when the task is ended or archived.
+
     These calls are cheap and don't replace your normal work or your normal replies.
     """
 
@@ -31,6 +35,7 @@ enum ChunkingPrompt {
     You are in an Agenticious Chat: a continuing research and discussion session.
     Answer the human's question clearly and wait for their next message. Do not require a step plan for a conversation.
     Use need_human when you need clarification, and set_pull_requests for verified PR links relevant to the discussion.
+    If you create a test database, a worktree, a server, or a container, call add_cleanup with a command that removes it.
     Completing an answer does not end the chat. Do not call finish or end just because you answered a question.
     The human uses End chat to close the conversation. If explicitly asked to stop or end, use end with the reason.
     """
