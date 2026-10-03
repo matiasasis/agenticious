@@ -126,14 +126,44 @@ struct ActivityCard: View {
         }
     }
 
+    private var icon: String {
+        switch entry.kind {
+        case .tool: "terminal"
+        case .userMessage: "person.crop.circle.fill"
+        case .message: "sparkles"
+        }
+    }
+
+    private var accent: Color { entry.kind == .message ? AgenticiousStyle.lime : AgenticiousStyle.violet }
+
+    private var fill: Color { entry.kind == .userMessage ? AgenticiousStyle.violet.opacity(0.2) : AgenticiousStyle.panel }
+
+    private var border: Color {
+        if entry.state == .failed { return .orange.opacity(0.5) }
+        switch entry.kind {
+        case .tool: return AgenticiousStyle.violet.opacity(0.2)
+        case .userMessage: return AgenticiousStyle.violet.opacity(0.55)
+        case .message: return AgenticiousStyle.lime.opacity(0.3)
+        }
+    }
+
     var body: some View {
+        if entry.kind == .userMessage {
+            TrailingBubbleLayout(maxWidth: 620, leadingInset: 80) { card }
+        } else {
+            card
+        }
+    }
+
+    private var card: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
-                Image(systemName: entry.kind == .tool ? "terminal" : entry.kind == .userMessage ? "person.crop.circle" : "text.bubble")
-                    .foregroundStyle(AgenticiousStyle.violet)
-                Text(entry.displayTitle).font(.callout.weight(.semibold))
-                Spacer()
-                if entry.kind == .tool { Text(stateLabel).font(.caption.weight(.semibold)).foregroundStyle(color) }
+                Image(systemName: icon).foregroundStyle(accent)
+                Text(entry.displayTitle).font(.callout.weight(.semibold)).foregroundStyle(entry.kind == .message ? accent : .primary)
+                if entry.kind == .tool {
+                    Spacer()
+                    Text(stateLabel).font(.caption.weight(.semibold)).foregroundStyle(color)
+                }
             }
             if let directory = entry.directory {
                 Label(directory, systemImage: "folder").font(.caption.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
@@ -166,11 +196,32 @@ struct ActivityCard: View {
                 }
             }
         }
-        .padding(16).frame(maxWidth: .infinity, alignment: .leading)
-        .background(entry.kind == .userMessage ? AgenticiousStyle.violet.opacity(0.1) : AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 14))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(entry.state == .failed ? Color.orange.opacity(0.5) : AgenticiousStyle.violet.opacity(0.2)))
+        .padding(16).frame(maxWidth: entry.kind == .userMessage ? nil : .infinity, alignment: .leading)
+        .background(fill, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(border))
         .onAppear { expanded = entry.state == .failed }
         .onChange(of: entry.state) { _, state in if state == .failed { expanded = true } }
+    }
+}
+
+/// Pins a bubble to the trailing edge, only as wide as its content and at most `maxWidth`.
+private struct TrailingBubbleLayout: Layout {
+    let maxWidth: CGFloat
+    let leadingInset: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let bubble = bubbleSize(subviews, width: proposal.width)
+        return CGSize(width: proposal.width ?? bubble.width + leadingInset, height: bubble.height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let bubble = bubbleSize(subviews, width: bounds.width)
+        subviews.first?.place(at: CGPoint(x: bounds.maxX, y: bounds.minY), anchor: .topTrailing, proposal: ProposedViewSize(bubble))
+    }
+
+    private func bubbleSize(_ subviews: Subviews, width: CGFloat?) -> CGSize {
+        let available = width.map { min($0 - leadingInset, maxWidth) } ?? maxWidth
+        return subviews.first?.sizeThatFits(ProposedViewSize(width: max(available, 0), height: nil)) ?? .zero
     }
 }
 

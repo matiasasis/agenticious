@@ -45,11 +45,8 @@ struct LinkedMarkdownText: NSViewRepresentable {
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: LinkTextView, context: Context) -> CGSize? {
-        guard let width = proposal.width, width > 0,
-              let container = nsView.textContainer, let layout = nsView.layoutManager else { return nil }
-        container.containerSize = NSSize(width: width, height: .greatestFiniteMagnitude)
-        layout.ensureLayout(for: container)
-        return CGSize(width: width, height: max(17, ceil(layout.usedRect(for: container).height)))
+        guard let width = proposal.width, width > 0 else { return nil }
+        return nsView.fittingSize(width: width)
     }
 
     static func attributedText(_ text: String) -> NSAttributedString {
@@ -74,6 +71,21 @@ struct LinkedMarkdownText: NSViewRepresentable {
 }
 
 final class LinkTextView: NSTextView {
+    /// As wide as the longest laid-out line, so short text doesn't stretch to `width`. Lays out a copy because
+    /// the view's own container tracks its frame, which SwiftUI hasn't sized yet on the first pass.
+    func fittingSize(width: CGFloat) -> CGSize? {
+        guard let text = textStorage else { return nil }
+        let container = NSTextContainer(size: NSSize(width: width, height: .greatestFiniteMagnitude))
+        container.lineFragmentPadding = textContainer?.lineFragmentPadding ?? 0
+        let layout = NSLayoutManager()
+        layout.addTextContainer(container)
+        let storage = NSTextStorage(attributedString: text)
+        storage.addLayoutManager(layout)
+        layout.ensureLayout(for: container)
+        let used = layout.usedRect(for: container)
+        return CGSize(width: min(width, ceil(used.width)), height: max(17, ceil(used.height)))
+    }
+
     override func resetCursorRects() {
         super.resetCursorRects()
         for rect in linkRects() { addVisibleLinkCursor(for: rect) }
