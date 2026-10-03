@@ -43,6 +43,7 @@ final class PullRequestTests: XCTestCase {
             try legacy.execute("ALTER TABLE sessions DROP COLUMN pull_requests")
             try legacy.execute("ALTER TABLE sessions DROP COLUMN is_marked_finished")
             try legacy.execute("ALTER TABLE sessions DROP COLUMN task_type")
+            try legacy.execute("ALTER TABLE sessions DROP COLUMN cleanup_tasks")
             legacy.schemaVersion = 1
         }
         let migrated = try SessionDatabase(url: url)

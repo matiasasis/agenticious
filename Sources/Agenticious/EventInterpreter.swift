@@ -14,7 +14,7 @@ enum EventInterpreter {
         if isSubagent(payload) { trackSubagent(name, payload, in: session) }
         if case .ended = session.status, name != "UserPromptSubmit" {
             let tool = payload["tool"] as? String
-            guard name == "mcp", tool == "set_plan" || tool == "set_pull_requests" else { return }
+            guard name == "mcp", ["set_plan", "set_pull_requests", "add_cleanup"].contains(tool) else { return }
         }
         if (name == "Stop" || name == "codex-notify"), let reason = endedReason(payload) {
             end(reason, in: session)
@@ -212,6 +212,8 @@ enum EventInterpreter {
         switch payload["tool"] as? String {
         case "set_pull_requests":
             session.recordPullRequests(in: (arguments["urls"] as? [String] ?? []).joined(separator: "\n"))
+        case "add_cleanup":
+            session.addCleanup(CleanupTask(command: arguments["command"] as? String ?? "", title: arguments["title"] as? String))
         case "set_plan": setPlan(arguments, in: session)
         case "update_chunk": updateChunk(arguments, in: session)
         case "need_human":

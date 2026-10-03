@@ -66,6 +66,10 @@ struct SessionDatabase {
             try database.execute("ALTER TABLE sessions ADD COLUMN task_type TEXT")
             database.schemaVersion = 4
         }
+        if database.schemaVersion < 5 {
+            try database.execute("ALTER TABLE sessions ADD COLUMN cleanup_tasks TEXT NOT NULL DEFAULT '[]'")
+            database.schemaVersion = 5
+        }
     }
 
     // MARK: - Writing
@@ -79,8 +83,9 @@ struct SessionDatabase {
                 INSERT OR REPLACE INTO sessions (
                     id, task, prompt, agent, project_path, directory, started_at, last_activity,
                     worktree_root, worktree_path, worktree_branch, worktree_removed,
-                    model_id, model_name, effort, status, status_detail, plan_source, conversation_id, pull_requests, is_marked_finished, task_type
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    model_id, model_name, effort, status, status_detail, plan_source, conversation_id, pull_requests, is_marked_finished, task_type,
+                    cleanup_tasks
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 session.id.uuidString, session.task, session.prompt, session.agent.rawValue, session.project.path,
                 session.directory.path, session.startedAt.timeIntervalSince1970, session.lastActivity.timeIntervalSince1970,
@@ -89,7 +94,8 @@ struct SessionDatabase {
                 Self.encode(session.planSource), session.conversationID,
                 String(decoding: try JSONEncoder().encode(session.pullRequests.map { $0.url.absoluteString }), as: UTF8.self),
                 session.isMarkedFinished,
-                try session.taskType.map { String(decoding: try JSONEncoder().encode($0), as: UTF8.self) }
+                try session.taskType.map { String(decoding: try JSONEncoder().encode($0), as: UTF8.self) },
+                String(decoding: try JSONEncoder().encode(session.cleanupTasks), as: UTF8.self)
             )
             try database.execute("DELETE FROM chunks WHERE session_id = ?", session.id.uuidString)
             for chunk in session.chunks {
@@ -138,6 +144,10 @@ struct SessionDatabase {
             session.worktreeRemoved = row.bool("worktree_removed")
             session.planSource = Self.decodePlanSource(row.string("plan_source"))
             session.conversationID = row.string("conversation_id")
+            if let data = row.string("cleanup_tasks")?.data(using: .utf8),
+               let tasks = try? JSONDecoder().decode([CleanupTask].self, from: data) {
+                session.cleanupTasks = tasks
+            }
             if let data = row.string("pull_requests")?.data(using: .utf8),
                let urls = try? JSONDecoder().decode([String].self, from: data) {
                 session.recordPullRequests(in: urls.joined(separator: "\n"))

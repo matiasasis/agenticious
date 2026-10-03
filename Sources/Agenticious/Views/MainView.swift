@@ -179,6 +179,7 @@ private struct ProjectHeader: View {
     let group: ProjectGroup
     let isCollapsed: Bool
     let toggle: () -> Void
+    @State private var editsCleanup = false
 
     var body: some View {
         HStack(spacing: 6) {
@@ -219,7 +220,11 @@ private struct ProjectHeader: View {
             } else if let path = group.project.path {
                 Button("Add to favorites") { _ = store.addFavorite(URL(fileURLWithPath: path)) }
             }
+            if group.project.path != nil {
+                Button("Cleanup commands…") { editsCleanup = true }
+            }
         }
+        .sheet(isPresented: $editsCleanup) { WorkspaceCleanupSheet(project: group.project) }
     }
 }
 
