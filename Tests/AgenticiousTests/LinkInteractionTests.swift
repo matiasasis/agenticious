@@ -69,6 +69,21 @@ final class LinkInteractionTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testFittingSizeHugsShortTextAndWrapsLongTextAtTheGivenWidth() async {
+        let view = LinkTextView(frame: NSRect(x: 0, y: 0, width: 400, height: 100))
+        view.textContainerInset = .zero
+        view.textContainer?.lineFragmentPadding = 0
+        view.textStorage?.setAttributedString(LinkedMarkdownText.attributedText("Go ahead."))
+        let short = view.fittingSize(width: 400)!
+        view.textStorage?.setAttributedString(LinkedMarkdownText.attributedText(String(repeating: "A long reply that wraps. ", count: 20)))
+        let long = view.fittingSize(width: 400)!
+        XCTAssertLessThan(short.width, 100)
+        XCTAssertGreaterThan(long.width, 300)
+        XCTAssertLessThanOrEqual(long.width, 400)
+        XCTAssertGreaterThan(long.height, short.height)
+    }
+
 }
 
 

@@ -149,10 +149,7 @@ struct ActivityCard: View {
 
     var body: some View {
         if entry.kind == .userMessage {
-            HStack(spacing: 0) {
-                Spacer(minLength: 80)
-                card.frame(maxWidth: 620)
-            }
+            TrailingBubbleLayout(maxWidth: 620, leadingInset: 80) { card }
         } else {
             card
         }
@@ -163,8 +160,10 @@ struct ActivityCard: View {
             HStack(spacing: 8) {
                 Image(systemName: icon).foregroundStyle(accent)
                 Text(entry.displayTitle).font(.callout.weight(.semibold)).foregroundStyle(entry.kind == .message ? accent : .primary)
-                Spacer()
-                if entry.kind == .tool { Text(stateLabel).font(.caption.weight(.semibold)).foregroundStyle(color) }
+                if entry.kind == .tool {
+                    Spacer()
+                    Text(stateLabel).font(.caption.weight(.semibold)).foregroundStyle(color)
+                }
             }
             if let directory = entry.directory {
                 Label(directory, systemImage: "folder").font(.caption.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
@@ -197,11 +196,32 @@ struct ActivityCard: View {
                 }
             }
         }
-        .padding(16).frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16).frame(maxWidth: entry.kind == .userMessage ? nil : .infinity, alignment: .leading)
         .background(fill, in: RoundedRectangle(cornerRadius: 14))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(border))
         .onAppear { expanded = entry.state == .failed }
         .onChange(of: entry.state) { _, state in if state == .failed { expanded = true } }
+    }
+}
+
+/// Pins a bubble to the trailing edge, only as wide as its content and at most `maxWidth`.
+private struct TrailingBubbleLayout: Layout {
+    let maxWidth: CGFloat
+    let leadingInset: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let bubble = bubbleSize(subviews, width: proposal.width)
+        return CGSize(width: proposal.width ?? bubble.width + leadingInset, height: bubble.height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let bubble = bubbleSize(subviews, width: bounds.width)
+        subviews.first?.place(at: CGPoint(x: bounds.maxX, y: bounds.minY), anchor: .topTrailing, proposal: ProposedViewSize(bubble))
+    }
+
+    private func bubbleSize(_ subviews: Subviews, width: CGFloat?) -> CGSize {
+        let available = width.map { min($0 - leadingInset, maxWidth) } ?? maxWidth
+        return subviews.first?.sizeThatFits(ProposedViewSize(width: max(available, 0), height: nil)) ?? .zero
     }
 }
 
