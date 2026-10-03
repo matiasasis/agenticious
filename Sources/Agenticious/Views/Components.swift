@@ -19,18 +19,6 @@ struct AgentBadge: View {
     }
 }
 
-/// "Opus · High" for a card whose tile already shows the provider. Empty when both are left at the CLI default.
-struct ModelSummary: View {
-    @ObservedObject var session: AgentSession
-
-    var body: some View {
-        Text(session.modelSummary ?? "")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
-    }
-}
-
 /// The provider's monochrome mark, tinted by the surrounding foreground style.
 struct ProviderIcon: View {
     let agent: AgentKind
@@ -555,30 +543,16 @@ struct TaskHeading: View {
     let type: TaskType
     let task: String
     var size = Size.regular
-    /// Leads with the provider's logo instead of the task type, which then moves beside the title. Cards use it so providers stand out.
-    var agent: AgentKind?
 
     var body: some View {
         let details = type.details(for: task)
         HStack(alignment: .top, spacing: spacing) {
-            if let agent {
-                ProviderTile(agent: agent, size: size)
-            } else {
-                TaskTypeIcon(type: type, size: size)
-            }
+            TaskTypeIcon(type: type, size: size)
             VStack(alignment: .leading, spacing: size == .large ? 6 : 4) {
-                HStack(alignment: .firstTextBaseline, spacing: 5) {
-                    if agent != nil {
-                        Image(systemName: TaskTypeIcon.symbol(for: type))
-                            .font(symbolFont)
-                            .foregroundStyle(AgenticiousStyle.violet)
-                            .accessibilityHidden(true)
-                    }
-                    Text(type.name)
-                        .font(titleFont)
-                        .foregroundStyle(.primary)
-                        .lineLimit(2)
-                }
+                Text(type.name)
+                    .font(titleFont)
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
                 if !details.isEmpty {
                     Text(details)
                         .font(detailsFont)
@@ -608,14 +582,6 @@ struct TaskHeading: View {
         }
     }
 
-    private var symbolFont: Font {
-        switch size {
-        case .compact: .system(size: 11, weight: .semibold)
-        case .regular: .system(size: 14, weight: .semibold)
-        case .large: .system(size: 20, weight: .bold)
-        }
-    }
-
     private var detailsFont: Font {
         switch size {
         case .compact: .system(size: 11)
@@ -631,34 +597,13 @@ struct TaskTypeIcon: View {
 
     var body: some View {
         let isLarge = size == .large
-        Image(systemName: Self.symbol(for: type))
+        Image(systemName: NSImage(systemSymbolName: type.symbol, accessibilityDescription: nil) == nil ? "sparkles" : type.symbol)
             .font(.system(size: isLarge ? 20 : 13, weight: .semibold))
             .foregroundStyle(AgenticiousStyle.violet)
             .frame(width: isLarge ? 40 : 26, height: isLarge ? 40 : 26)
             .background(AgenticiousStyle.violet.opacity(0.12), in: RoundedRectangle(cornerRadius: isLarge ? 10 : 7))
             .help(type.name)
             .accessibilityLabel(type.name)
-    }
-
-    static func symbol(for type: TaskType) -> String {
-        NSImage(systemSymbolName: type.symbol, accessibilityDescription: nil) == nil ? "sparkles" : type.symbol
-    }
-}
-
-/// The provider's logo in the card's leading tile, the first thing to scan for in a column of agents.
-struct ProviderTile: View {
-    let agent: AgentKind
-    var size = TaskHeading.Size.regular
-
-    var body: some View {
-        let side: CGFloat = size == .compact ? 30 : 34
-        ProviderIcon(agent: agent, size: size == .compact ? 18 : 20)
-            .foregroundStyle(.primary)
-            .frame(width: side, height: side)
-            .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
-            .help(agent.displayName)
-            .accessibilityElement()
-            .accessibilityLabel(agent.displayName)
     }
 }
 
