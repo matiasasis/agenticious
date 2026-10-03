@@ -126,12 +126,43 @@ struct ActivityCard: View {
         }
     }
 
+    private var icon: String {
+        switch entry.kind {
+        case .tool: "terminal"
+        case .userMessage: "person.crop.circle.fill"
+        case .message: "sparkles"
+        }
+    }
+
+    private var accent: Color { entry.kind == .message ? AgenticiousStyle.lime : AgenticiousStyle.violet }
+
+    private var fill: Color { entry.kind == .userMessage ? AgenticiousStyle.violet.opacity(0.2) : AgenticiousStyle.panel }
+
+    private var border: Color {
+        if entry.state == .failed { return .orange.opacity(0.5) }
+        switch entry.kind {
+        case .tool: return AgenticiousStyle.violet.opacity(0.2)
+        case .userMessage: return AgenticiousStyle.violet.opacity(0.55)
+        case .message: return AgenticiousStyle.lime.opacity(0.3)
+        }
+    }
+
     var body: some View {
+        if entry.kind == .userMessage {
+            HStack(spacing: 0) {
+                Spacer(minLength: 80)
+                card.frame(maxWidth: 620)
+            }
+        } else {
+            card
+        }
+    }
+
+    private var card: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
-                Image(systemName: entry.kind == .tool ? "terminal" : entry.kind == .userMessage ? "person.crop.circle" : "text.bubble")
-                    .foregroundStyle(AgenticiousStyle.violet)
-                Text(entry.displayTitle).font(.callout.weight(.semibold))
+                Image(systemName: icon).foregroundStyle(accent)
+                Text(entry.displayTitle).font(.callout.weight(.semibold)).foregroundStyle(entry.kind == .message ? accent : .primary)
                 Spacer()
                 if entry.kind == .tool { Text(stateLabel).font(.caption.weight(.semibold)).foregroundStyle(color) }
             }
@@ -167,8 +198,8 @@ struct ActivityCard: View {
             }
         }
         .padding(16).frame(maxWidth: .infinity, alignment: .leading)
-        .background(entry.kind == .userMessage ? AgenticiousStyle.violet.opacity(0.1) : AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 14))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(entry.state == .failed ? Color.orange.opacity(0.5) : AgenticiousStyle.violet.opacity(0.2)))
+        .background(fill, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(border))
         .onAppear { expanded = entry.state == .failed }
         .onChange(of: entry.state) { _, state in if state == .failed { expanded = true } }
     }
