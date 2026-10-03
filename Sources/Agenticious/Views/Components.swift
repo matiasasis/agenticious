@@ -519,10 +519,9 @@ struct ControlRoomBar: View {
             if showsTitle {
                 Text("CONTROL ROOM").font(.system(size: 10, weight: .bold, design: .monospaced))
                     .tracking(1).foregroundStyle(AgenticiousStyle.violet)
-                Spacer(minLength: 8)
             }
+            Spacer(minLength: showsTitle ? 8 : 0)
             UsageBar(isStacked: stacksUsage)
-            Spacer(minLength: 0)
             ProviderStatusButton().buttonStyle(AgenticiousButtonStyle(isPrimary: false, isCompact: true)).labelStyle(.iconOnly)
         }
     }
@@ -540,6 +539,7 @@ struct AgentCounters: View {
             DashboardMetric(title: "NEEDS YOU", value: store.attentionCount, color: .orange)
                 .help("Agents blocked on your input or approval")
         }
+        .frame(maxWidth: .infinity)
     }
 }
 
