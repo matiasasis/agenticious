@@ -39,9 +39,10 @@ struct ActivityView: View {
                         if let notice { Text(notice).font(.caption).foregroundStyle(.secondary) }
                         if session.isChat {
                             ActivityCard(entry: ActivityEntry(id: "opening-question", kind: .userMessage, title: "Your question",
-                                                             body: session.displayedTaskType.details(for: session.task)))
+                                                             body: session.displayedTaskType.details(for: session.task)),
+                                         agent: session.agent)
                         }
-                        ForEach(visibleEntries) { entry in ActivityCard(entry: entry, isRunning: session.isRunning) }
+                        ForEach(visibleEntries) { entry in ActivityCard(entry: entry, agent: session.agent, isRunning: session.isRunning) }
                         Color.clear.frame(height: 1).id("latest")
                     }.padding(20)
                 }
@@ -104,6 +105,7 @@ struct ActivityView: View {
 
 struct ActivityCard: View {
     let entry: ActivityEntry
+    let agent: AgentKind
     var isRunning = false
     @State private var expanded = false
     @State private var expandedInput = false
@@ -126,11 +128,11 @@ struct ActivityCard: View {
         }
     }
 
-    private var icon: String {
+    @ViewBuilder private var icon: some View {
         switch entry.kind {
-        case .tool: "terminal"
-        case .userMessage: "person.crop.circle.fill"
-        case .message: "sparkles"
+        case .tool: Image(systemName: "terminal")
+        case .userMessage: Image(systemName: "person.crop.circle.fill")
+        case .message: ProviderIcon(agent: agent, size: 14)
         }
     }
 
@@ -158,7 +160,7 @@ struct ActivityCard: View {
     private var card: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
-                Image(systemName: icon).foregroundStyle(accent)
+                icon.foregroundStyle(accent)
                 Text(entry.displayTitle).font(.callout.weight(.semibold)).foregroundStyle(entry.kind == .message ? accent : .primary)
                 if entry.kind == .tool {
                     Spacer()
@@ -230,16 +232,94 @@ private struct ActivityMarkdown: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            ForEach(Array(text.components(separatedBy: "```").enumerated()), id: \.offset) { index, block in
-                if index.isMultiple(of: 2) {
-                    LinkedMarkdownText(text: block)
-                } else {
-                    Text(block.components(separatedBy: "\n").dropFirst().joined(separator: "\n"))
-                        .font(.system(size: 12, design: .monospaced)).textSelection(.enabled)
+            ForEach(Array(MarkdownBlocks.parse(text).enumerated()), id: \.offset) { _, block in
+                switch block {
+                case let .paragraph(text):
+                    LinkedMarkdownText(text: text)
+                case let .heading(level, text):
+                    Text(inlineMarkdown(text)).font(headingFont(level)).textSelection(.enabled)
+                        .padding(.top, level <= 2 ? 6 : 2)
+                case let .list(items):
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                            HStack(alignment: .top, spacing: 6) {
+                                Text(item.marker).font(.system(size: 13).monospacedDigit()).foregroundStyle(.secondary)
+                                LinkedMarkdownText(text: item.text)
+                            }.padding(.leading, CGFloat(min(item.depth, 6)) * 16)
+                        }
+                    }
+                case let .quote(text):
+                    HStack(alignment: .top, spacing: 10) {
+                        RoundedRectangle(cornerRadius: 1.5).fill(AgenticiousStyle.violet.opacity(0.6)).frame(width: 3)
+                        LinkedMarkdownText(text: text)
+                    }.fixedSize(horizontal: false, vertical: true)
+                case let .table(table):
+                    MarkdownTableView(table: table)
+                case let .code(code):
+                    Text(code).font(.system(size: 12, design: .monospaced)).textSelection(.enabled)
                         .padding(12).frame(maxWidth: .infinity, alignment: .leading)
                         .background(AgenticiousStyle.ink, in: RoundedRectangle(cornerRadius: 10))
+                case let .diagram(diagram):
+                    ScrollView(.horizontal) {
+                        // Menlo's box-drawing glyphs fill the line, so borders join up; SF Mono's leave gaps.
+                        Text(diagram).font(.custom("Menlo", size: 12)).textSelection(.enabled)
+                            .fixedSize().padding(.vertical, 2)
+                    }
+                case .rule:
+                    Divider()
                 }
             }
         }
     }
+
+    private func headingFont(_ level: Int) -> Font {
+        switch level {
+        case 1: .system(size: 20, weight: .bold)
+        case 2: .system(size: 17, weight: .semibold)
+        case 3: .system(size: 15, weight: .semibold)
+        default: .system(size: 13, weight: .semibold)
+        }
+    }
+}
+
+private struct MarkdownTableView: View {
+    let table: MarkdownTable
+
+    var body: some View {
+        Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
+            GridRow {
+                ForEach(Array(table.header.enumerated()), id: \.offset) { column, cell in
+                    self.cell(cell).fontWeight(.semibold).gridColumnAlignment(alignment(column))
+                }
+            }
+            ForEach(Array(table.rows.enumerated()), id: \.offset) { _, row in
+                Divider().gridCellUnsizedAxes(.horizontal)
+                GridRow {
+                    ForEach(Array(row.enumerated()), id: \.offset) { _, cell in self.cell(cell) }
+                }
+            }
+        }
+        .padding(12)
+        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.primary.opacity(0.08)))
+    }
+
+    private func cell(_ text: String) -> Text {
+        Text(inlineMarkdown(text)).font(.system(size: 13))
+    }
+
+    private func alignment(_ column: Int) -> HorizontalAlignment {
+        switch table.alignments[column] {
+        case .leading: .leading
+        case .center: .center
+        case .trailing: .trailing
+        }
+    }
+}
+
+/// Inline Markdown for SwiftUI `Text`, with links in the app's violet.
+private func inlineMarkdown(_ text: String) -> AttributedString {
+    var parsed = (try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(text)
+    for run in parsed.runs where run.link != nil { parsed[run.range].foregroundColor = AgenticiousStyle.violet }
+    return parsed
 }
