@@ -271,7 +271,7 @@ private struct SessionRow: View {
     private var details: some View {
         VStack(alignment: .leading, spacing: 9) {
             header
-            TaskHeading(type: session.displayedTaskType, task: session.task, size: .compact)
+            TaskHeading(type: session.displayedTaskType, task: session.task, size: .compact, agent: session.agent)
             if !session.startupSteps.isEmpty {
                 StartupProgressView(steps: session.startupSteps, isCompact: true)
             }
@@ -292,7 +292,7 @@ private struct SessionRow: View {
     }
 
     private var header: some View {
-        let badge = AgentBadge(agent: session.agent, detail: session.modelSummary)
+        let badge = ModelSummary(session: session)
         let status = HStack(spacing: 6) {
             StatusDot(status: session.status)
             Text(session.status.label).foregroundStyle(session.status.color)
@@ -419,7 +419,7 @@ struct SessionCard: View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 12) {
                 header
-                TaskHeading(type: session.displayedTaskType, task: session.task)
+                TaskHeading(type: session.displayedTaskType, task: session.task, agent: session.agent)
                 if !session.startupSteps.isEmpty {
                     StartupProgressView(steps: session.startupSteps)
                 } else if !session.isChat, session.startupPrompt == nil {
@@ -448,7 +448,7 @@ struct SessionCard: View {
         VStack(alignment: .leading, spacing: 12) {
             header
             HStack(alignment: .top, spacing: 10) {
-                TaskTypeIcon(type: session.displayedTaskType)
+                ProviderTile(agent: session.agent)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(" ").font(titleFont).lineLimit(2, reservesSpace: true)
                     Text(" ").font(.callout).lineLimit(3, reservesSpace: true)
@@ -466,7 +466,7 @@ struct SessionCard: View {
 
     private var header: some View {
         HStack {
-            AgentBadge(agent: session.agent, detail: session.modelSummary)
+            ModelSummary(session: session)
             Spacer()
             StatusPill(status: session.status)
         }
