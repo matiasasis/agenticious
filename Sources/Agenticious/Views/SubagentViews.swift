@@ -152,7 +152,7 @@ struct SubagentDetailView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 16) {
                     if let notice { Text(notice).font(.caption).foregroundStyle(.secondary) }
-                    ForEach(entries) { ActivityCard(entry: $0, isRunning: isRunning) }
+                    ForEach(entries) { ActivityCard(entry: $0, agent: session.agent, isRunning: isRunning) }
                     Color.clear.frame(height: 1).id("latest")
                 }.padding(20)
             }
