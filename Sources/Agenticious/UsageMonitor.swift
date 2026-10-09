@@ -10,6 +10,11 @@ struct UsageLimit: Codable, Equatable {
     /// A reading from before the window reset is stale: the window has started over.
     var currentPercent: Double { hasReset ? 0 : usedPercent }
 
+    func reportedUsedPercent(at date: Date) -> Double? {
+        guard usedPercent.isFinite, resetsAt.map({ $0 > date }) ?? true else { return nil }
+        return min(max(usedPercent, 0), 100)
+    }
+
     var windowLabel: String {
         switch windowMinutes {
         case 10080: "Week"
@@ -49,7 +54,8 @@ final class UsageMonitor: ObservableObject {
     @Published private(set) var codexModelQuotasStale = false
     @Published private(set) var claudeReading: ClaudeReading?
     @Published private(set) var claudeTokensToday: Int?
-    private(set) var lastChecked: Date?
+    @Published private(set) var lastChecked: Date?
+    @Published private(set) var isRefreshing = false
 
     init() {
         claudeReading = UserDefaults.standard.data(forKey: Self.claudeReadingKey)
@@ -58,7 +64,8 @@ final class UsageMonitor: ObservableObject {
 
     /// Today's tokens only stand in for Claude's limits, so they aren't read once a status line has reported them.
     func refresh() {
-        lastChecked = Date()
+        guard !isRefreshing else { return }
+        isRefreshing = true
         let needsTokenEstimate = claudeReading == nil
         Task.detached(priority: .utility) {
             let codex = UsageReader.codexLimits()
@@ -68,7 +75,11 @@ final class UsageMonitor: ObservableObject {
                 self.claudeTokensToday = claude
             }
             let modelQuotas = await CodexModelQuotaReader.read()
-            await MainActor.run { self.recordCodexModelQuotas(modelQuotas) }
+            await MainActor.run {
+                self.recordCodexModelQuotas(modelQuotas)
+                self.lastChecked = Date()
+                self.isRefreshing = false
+            }
         }
     }
 

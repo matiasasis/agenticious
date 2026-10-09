@@ -490,20 +490,6 @@ struct SessionCard: View {
 
 // MARK: - Menu bar
 
-struct MenuBarContent: View {
-    @Environment(\.openWindow) private var openWindow
-
-    var body: some View {
-        Button("Open Agenticious", action: showMainWindow)
-        Button("Quit Agenticious") { NSApp.terminate(nil) }
-    }
-
-    private func showMainWindow() {
-        openWindow(id: "main")
-        NSApp.activate(ignoringOtherApps: true)
-    }
-}
-
 enum FolderPicker {
     static func choose(startingAt path: String? = nil) -> URL? {
         let panel = NSOpenPanel()
