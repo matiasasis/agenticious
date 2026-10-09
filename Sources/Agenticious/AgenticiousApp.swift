@@ -58,6 +58,7 @@ struct AgenticiousApp: App {
 
         MenuBarExtra {
             MenuBarContent()
+                .environmentObject(store.usage)
         } label: {
             HStack(spacing: 4) {
                 Image(nsImage: AgenticiousMenuIcon.image)
@@ -66,6 +67,7 @@ struct AgenticiousApp: App {
             .modifier(NotificationNavigation(store: store, notifications: store.notifications))
             .accessibilityLabel("Agenticious, \(store.attentionCount) agents need attention")
         }
+        .menuBarExtraStyle(.window)
     }
 }
 

@@ -1,6 +1,10 @@
 import SwiftUI
 
 enum AgenticiousStyle {
+    static func usageColor(usedPercent: Double) -> Color {
+        usedPercent >= 90 ? .red : usedPercent >= 70 ? .orange : lime
+    }
+
     static let ink = Color(red: 0.055, green: 0.045, blue: 0.09)
     static let panel = Color(red: 0.10, green: 0.08, blue: 0.15)
     static let lime = Color(red: 0.72, green: 0.95, blue: 0.38)

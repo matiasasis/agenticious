@@ -385,6 +385,24 @@ struct CodexModelQuotaStatus: View {
     }
 }
 
+struct UsageProgressBar: View {
+    let usedPercent: Double
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.primary.opacity(0.12))
+                Capsule().fill(AgenticiousStyle.usageColor(usedPercent: usedPercent))
+                    .frame(width: geometry.size.width * min(max(usedPercent, 0), 100) / 100)
+            }
+        }
+        .frame(height: 6)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Usage")
+        .accessibilityValue("\(Int(usedPercent.rounded())) percent used")
+    }
+}
+
 private struct LimitGauge: View {
     let limit: UsageLimit
     let source: String
@@ -396,8 +414,7 @@ private struct LimitGauge: View {
             Text("\(limit.windowLabel) \(Int(percent.rounded()))%")
                 .font(.system(size: 10))
                 .monospacedDigit().lineLimit(1)
-            ProgressView(value: min(percent, 100), total: 100)
-                .tint(percent >= 90 ? .red : percent >= 70 ? .orange : AgenticiousStyle.lime)
+            UsageProgressBar(usedPercent: percent)
                 .frame(width: 62)
         }
         .help([resetText, source].compactMap { $0 }.joined(separator: "\n"))
