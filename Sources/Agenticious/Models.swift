@@ -268,6 +268,16 @@ final class AgentSession: ObservableObject, Identifiable {
 
     var hasOpenChunks: Bool { chunks.contains { $0.status != .done } }
 
+    var dashboardDetail: String {
+        if let backgroundTask { return backgroundTask }
+        switch status {
+        case .needsYou(let reason), .ended(let reason): return reason
+        case .done(let summary): return summary ?? "Task complete"
+        case .exited(let code): return code.map { "Process exited with code \($0)" } ?? "Process exited"
+        default: return currentChunk?.title ?? status.label
+        }
+    }
+
     var currentChunk: Chunk? {
         chunks.first { $0.status == .inProgress || $0.status == .blocked } ?? chunks.first { $0.status == .pending }
     }

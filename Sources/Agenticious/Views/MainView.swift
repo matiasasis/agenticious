@@ -3,6 +3,7 @@ import SwiftUI
 
 /// One window: projects and their agents on the left; the selected agent (with its live terminal) or an overview on the right.
 struct MainView: View {
+    @Environment(\.openWindow) private var openWindow
     @EnvironmentObject private var store: SessionStore
 
     var body: some View {
@@ -62,6 +63,7 @@ struct MainView: View {
     private func launchFromCommandLine() {
         guard let options = store.takeCommandLineOptions() else { return }
         if let template = options.newAgentTemplate { store.composer = Composer(project: defaultProject, template: store.presets.preset(id: template)) }
+        if options.showDashboard { openWindow(id: "dashboard") }
         if options.showSettings { store.selection = .settings }
         if options.showPreferences { store.selection = .preferences }
         if options.showSkills { store.selection = .skills }

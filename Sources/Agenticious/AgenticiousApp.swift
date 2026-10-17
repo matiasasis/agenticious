@@ -46,6 +46,7 @@ struct AgenticiousApp: App {
         .defaultSize(width: 1400, height: 880)
         .windowStyle(.hiddenTitleBar)
         .commands {
+            DashboardCommands()
             CommandGroup(replacing: .newItem) {
                 Button("Summon agent") { store.composer = Composer(project: store.composerProject) }
                     .keyboardShortcut("n")
@@ -55,6 +56,16 @@ struct AgenticiousApp: App {
                     .keyboardShortcut(",")
             }
         }
+
+        Window("Agenticious Dashboard", id: "dashboard") {
+            CompanionDashboardView()
+                .environmentObject(store)
+                .environmentObject(store.usage)
+                .environmentObject(store.presets)
+                .frame(minWidth: 1200, minHeight: 600)
+        }
+        .defaultSize(width: 1600, height: 650)
+        .windowStyle(.hiddenTitleBar)
 
         MenuBarExtra {
             MenuBarContent()
@@ -96,6 +107,17 @@ private struct NotificationNavigation: ViewModifier {
                 NSApp.activate(ignoringOtherApps: true)
                 notifications.requestedSession = nil
             }
+        }
+    }
+}
+
+private struct DashboardCommands: Commands {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some Commands {
+        CommandGroup(after: .windowArrangement) {
+            Button("Open dashboard") { openWindow(id: "dashboard") }
+                .keyboardShortcut("d", modifiers: [.command, .shift])
         }
     }
 }

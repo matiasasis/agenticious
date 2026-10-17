@@ -44,6 +44,8 @@ final class BackgroundRefreshTests: XCTestCase {
             .init(check: .providers, lastChecked: { now.addingTimeInterval(-60) }, run: { ran.append(.providers) }),
             .init(check: .usage, lastChecked: { now.addingTimeInterval(-600) }, run: { ran.append(.usage) }),
         ], defaults: defaults)
+        refresh.setAppActive(true)
+        ran = []
         refresh.runDueChecks(now: now)
         XCTAssertEqual(ran, [.usage])
     }

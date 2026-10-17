@@ -111,7 +111,7 @@ private struct RefreshPreferencesView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
-            Text("Checks only run while Agenticious is the app in front. When you come back to it, anything older than its interval refreshes right away; switching back and forth in between doesn't trigger extra checks.")
+            Text("Provider checks run while Agenticious is the app in front. Usage also refreshes while the companion dashboard is visible. When you come back to it, anything older than its interval refreshes right away; switching back and forth in between doesn't trigger extra checks.")
                 .font(.callout).foregroundStyle(.secondary)
             Button("Use recommended for all", systemImage: "wand.and.stars") {
                 providers = BackgroundCheck.providers.recommended

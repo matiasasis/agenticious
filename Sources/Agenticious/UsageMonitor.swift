@@ -48,6 +48,7 @@ struct ClaudeReading: Codable, Equatable {
 @MainActor
 final class UsageMonitor: ObservableObject {
     private static let claudeReadingKey = "claudeRateLimits"
+    private let defaults: UserDefaults
 
     @Published private(set) var codexLimits = CodexLimits()
     @Published private(set) var codexModelQuotas: CodexModelQuotaReading?
@@ -57,8 +58,9 @@ final class UsageMonitor: ObservableObject {
     @Published private(set) var lastChecked: Date?
     @Published private(set) var isRefreshing = false
 
-    init() {
-        claudeReading = UserDefaults.standard.data(forKey: Self.claudeReadingKey)
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        claudeReading = defaults.data(forKey: Self.claudeReadingKey)
             .flatMap { try? JSONDecoder().decode(ClaudeReading.self, from: $0) }
     }
 
@@ -97,7 +99,7 @@ final class UsageMonitor: ObservableObject {
 
         let reading = ClaudeReading(limits: limits, takenAt: Date())
         claudeReading = reading
-        UserDefaults.standard.set(try? JSONEncoder().encode(reading), forKey: Self.claudeReadingKey)
+        defaults.set(try? JSONEncoder().encode(reading), forKey: Self.claudeReadingKey)
     }
 }
 

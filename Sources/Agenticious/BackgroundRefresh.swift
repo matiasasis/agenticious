@@ -1,6 +1,6 @@
 import AppKit
 
-/// A check that repeats while Agenticious is the active app, at an interval chosen in Preferences.
+/// Intervals for provider checks and usage readings.
 enum BackgroundCheck: String, CaseIterable, Identifiable {
     case providers
     case usage
@@ -68,8 +68,7 @@ enum BackgroundCheck: String, CaseIterable, Identifiable {
     }
 }
 
-/// Runs background checks only while Agenticious is the active app. Coming back runs anything older than its
-/// interval right away; switching back and forth in between doesn't.
+/// A visible companion dashboard keeps usage checks running while another app has focus.
 @MainActor
 final class BackgroundRefresh {
     struct Job {
@@ -81,6 +80,8 @@ final class BackgroundRefresh {
     private let jobs: [Job]
     private let defaults: UserDefaults
     private var timer: Timer?
+    private(set) var isAppActive = false
+    private(set) var isDashboardVisible = false
     private var observers: [NSObjectProtocol] = []
 
     init(jobs: [Job], defaults: UserDefaults = .standard) {
@@ -89,32 +90,38 @@ final class BackgroundRefresh {
         let center = NotificationCenter.default
         observers = [
             center.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
-                Task { @MainActor in self?.resume() }
+                Task { @MainActor in self?.setAppActive(true) }
             },
             center.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
-                Task { @MainActor in self?.pause() }
+                Task { @MainActor in self?.setAppActive(false) }
             },
         ]
-        if NSApp?.isActive == true { resume() }
+        setAppActive(NSApp?.isActive == true)
     }
 
     func runDueChecks(now: Date = Date()) {
-        for job in jobs where job.check.isDue(lastChecked: job.lastChecked(), now: now, defaults: defaults) {
+        for job in jobs where (isAppActive || (isDashboardVisible && job.check == .usage)) && job.check.isDue(lastChecked: job.lastChecked(), now: now, defaults: defaults) {
             job.run()
         }
     }
 
-    /// Ticks well below the shortest interval, so a newly picked interval applies within half a minute.
-    private func resume() {
-        runDueChecks()
+    func setAppActive(_ active: Bool) {
+        isAppActive = active
+        updateTimer()
+    }
+
+    func setDashboardVisible(_ visible: Bool) {
+        isDashboardVisible = visible
+        updateTimer()
+    }
+
+    private func updateTimer() {
         timer?.invalidate()
+        timer = nil
+        guard isAppActive || isDashboardVisible else { return }
+        runDueChecks()
         timer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.runDueChecks() }
         }
-    }
-
-    private func pause() {
-        timer?.invalidate()
-        timer = nil
     }
 }

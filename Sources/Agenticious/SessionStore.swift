@@ -74,11 +74,11 @@ final class SessionStore: ObservableObject {
     private var snapshotter: WindowSnapshotter?
     private var commandLineOptionsPending = true
 
-    init(databaseURL: URL? = nil) {
+    init(databaseURL: URL? = nil, listensForEvents: Bool = true) {
         port = ProcessInfo.processInfo.environment["AGENTICIOUS_PORT"].flatMap(UInt16.init) ?? Self.defaultPort
         favorites = (UserDefaults.standard.stringArray(forKey: Self.favoritesKey) ?? []).map(Project.init(path:))
         openDatabase(url: databaseURL)
-        startServer()
+        if listensForEvents { startServer() }
         snapshotter = LaunchOptions.current.snapshotDirectory.map(WindowSnapshotter.init)
         notifications.perform = { [weak self] action, id, text in self?.perform(action, on: id, text: text) }
         let (usage, diagnostics) = (usage, diagnostics)
@@ -86,6 +86,10 @@ final class SessionStore: ObservableObject {
             .init(check: .providers, lastChecked: { diagnostics.lastChecked }, run: { Task { await diagnostics.refresh() } }),
             .init(check: .usage, lastChecked: { usage.lastChecked }, run: usage.refresh),
         ])
+    }
+
+    func setDashboardVisible(_ visible: Bool) {
+        backgroundRefresh?.setDashboardVisible(visible)
     }
 
     // MARK: - Reading
@@ -104,6 +108,14 @@ final class SessionStore: ObservableObject {
 
     var visibleProjectGroups: [ProjectGroup] { AgentList.queue.groups(from: projectGroups) }
     var visibleSessions: [AgentSession] { sessions.filter { AgentList.queue.includes(isMarkedFinished: $0.isMarkedFinished) } }
+
+    var dashboardSessions: [AgentSession] {
+        visibleSessions.sorted {
+            if $0.status.sortRank != $1.status.sortRank { return $0.status.sortRank < $1.status.sortRank }
+            if $0.lastActivity != $1.lastActivity { return $0.lastActivity > $1.lastActivity }
+            return $0.id.uuidString < $1.id.uuidString
+        }
+    }
 
     func count(in list: AgentList) -> Int { sessions.filter { list.includes(isMarkedFinished: $0.isMarkedFinished) }.count }
 

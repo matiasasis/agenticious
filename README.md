@@ -7,7 +7,7 @@ A native macOS dashboard for running many coding agents (Claude Code and Codex) 
 - **"Needs you" floats to the top** with the reason. You also get a dock badge, a sound and a menu-bar counter.
 - **The real terminal** is one click away. Each agent runs in an embedded terminal (SwiftTerm) that keeps running when you close its window.
 - **Usage**: session and weekly limits for both. Codex's come from its session logs. Claude's come from the status line
-  of agents started here (until one has replied, you see an estimate of today's tokens instead). Usage and provider
+  of agents started here (until one has replied, you see an estimate of today's tokens instead). Usage checks also run while the companion dashboard is visible; provider
   checks only run while Agenticious is the active app, at intervals set in **Customize → Preferences → Background refresh**.
 
 ## Run
@@ -164,3 +164,15 @@ Agents report **Ended** with the `end` tool when you cancel work, ask them to st
 ## Chat tasks
 
 Choose **Chat** when summoning an agent to research a question or talk through an idea. Chat uses the selected workspace for context without creating a worktree, and does not require a step plan. The conversation shows your question, the agent's replies, and follow-up messages; **Research activity** reveals tool calls when you want the supporting detail. Replies support formatting, code blocks, and clickable source links. Answers leave the chat open for your next message. **End chat** stops the agent and saves the conversation in **History**, without marking unfinished research steps complete.
+
+## Companion dashboard
+
+Open **Window → Open dashboard** (`⇧⌘D`) or **Dashboard** in the menu-bar panel for a separate window designed for a 2560×720 display. The dashboard shares the main app's live agent queue, attention indicators, step progress, and provider limits. Tapping an agent opens its conversation in the main window.
+
+CPU history, estimated used RAM and memory pressure, and free space on your home volume update every two seconds while the dashboard is visible. CPU is averaged across all cores; RAM excludes reclaimable file-backed and purgeable pages. Disk space is actual available capacity rather than an estimate including purgeable storage. Unavailable readings are labeled. Usage keeps its configured refresh interval while the dashboard is visible, even when another app has focus; provider diagnostics still require Agenticious to be active. Minimizing, covering, or closing the dashboard pauses its system sampling.
+
+Choose a workspace and pin task presets with **Customize**. Large shortcut buttons open the existing task form in the main window, with that workspace and preset selected. Provider/model/effort keep the form's existing remembered choices. A deleted workspace falls back to **No project**; removed presets disappear from the shortcut strip.
+
+The dashboard remembers its window frame, initially targets an attached XENEON display when available, and returns to an attached screen if that display is disconnected. Use **Fit display** after moving it to another screen, or the native full-screen control. Its layout adapts to smaller desktop windows (minimum 1200×600); wide windows show providers side by side.
+
+For visual inspection, launch with `--dashboard --snapshot-dir /tmp/agenticious-shots`. Dashboard tests can also render isolated fixture screenshots with `DASHBOARD_SNAPSHOT_DIR=/tmp/agenticious-dashboard-shots`.

@@ -24,8 +24,8 @@ struct MenuBarContent: View {
             ScrollView {
                 TimelineView(.periodic(from: .now, by: 30)) { context in
                     VStack(spacing: 12) {
-                        provider(.codex, at: context.date)
-                        provider(.claude, at: context.date)
+                        ProviderUsageCard(agent: .codex, date: context.date)
+                        ProviderUsageCard(agent: .claude, date: context.date)
                     }.padding(.horizontal, 18).padding(.bottom, 14)
                 }
             }
@@ -39,6 +39,11 @@ struct MenuBarContent: View {
                     openWindow(id: "main")
                     NSApp.activate(ignoringOtherApps: true)
                 }.keyboardShortcut("o")
+                Button("Dashboard") {
+                    dismiss()
+                    openWindow(id: "dashboard")
+                    NSApp.activate(ignoringOtherApps: true)
+                }
                 Spacer()
                 Button("Quit") { NSApp.terminate(nil) }.keyboardShortcut("q")
             }.padding(14)
@@ -49,7 +54,14 @@ struct MenuBarContent: View {
         .onAppear { usage.refresh() }
     }
 
-    private func provider(_ agent: AgentKind, at date: Date) -> some View {
+}
+
+struct ProviderUsageCard: View {
+    @EnvironmentObject private var usage: UsageMonitor
+    let agent: AgentKind
+    let date: Date
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 ProviderIcon(agent: agent, size: 20)
