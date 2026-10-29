@@ -6,7 +6,7 @@ struct TaskPrompt {
 
     init(template: TaskTemplate, input: String, notes: String, skillPaths: [String]) throws {
         let input = input.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !template.isFieldRequired || !input.isEmpty else { throw ConfigurationError("Add the task input before starting.") }
+        guard !input.isEmpty else { throw ConfigurationError("Add the task input before starting.") }
         title = template.title(for: input)
         var prompt = template.instructions(for: input, notes: notes)
         let paths = Array(Set(skillPaths)).sorted()

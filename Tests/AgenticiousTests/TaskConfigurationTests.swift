@@ -89,6 +89,33 @@ final class TaskConfigurationTests: XCTestCase {
     }
 
     @MainActor
+    func testConfigIsSeededOnceAndSavedPresetsRemainAuthoritative() throws {
+        let url = directory.appendingPathComponent("presets.json")
+        let store = TaskPresetStore(url: url)
+        XCTAssertEqual(try JSONDecoder().decode([TaskTemplate].self, from: Data(contentsOf: url)), store.presets)
+        var saved = store.presets.filter { !$0.isChat }
+        let reviewIndex = try XCTUnwrap(saved.firstIndex { $0.id == "reviewPR" })
+        saved[reviewIndex].prompt = "My configured review: {{input}}"
+        try JSONEncoder().encode(saved).write(to: url)
+        let reloaded = TaskPresetStore(url: url)
+        XCTAssertEqual(reloaded.presets, saved)
+        XCTAssertEqual(reloaded.preset(id: "reviewPR").instructions(for: "123"), "My configured review: 123")
+    }
+
+    func testLegacyFieldConfigurationIsIgnoredAndNotSaved() throws {
+        var data = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(TaskTemplate.custom)) as? [String: Any])
+        data["fieldLabel"] = "Old label"
+        data["fieldPlaceholder"] = "Old hint"
+        data["isFieldRequired"] = false
+        let preset = try JSONDecoder().decode(TaskTemplate.self, from: JSONSerialization.data(withJSONObject: data))
+        XCTAssertThrowsError(try TaskPrompt(template: preset, input: "", notes: "", skillPaths: []))
+        let encoded = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(preset)) as? [String: Any])
+        XCTAssertNil(encoded["fieldLabel"])
+        XCTAssertNil(encoded["fieldPlaceholder"])
+        XCTAssertNil(encoded["isFieldRequired"])
+    }
+
+    @MainActor
     func testPresetsAreOfferedByUseWithTheCustomTaskFirst() throws {
         let domain = "TaskConfigurationTests.\(UUID())"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: domain))
@@ -179,7 +206,7 @@ final class TaskConfigurationTests: XCTestCase {
         XCTAssertThrowsError(try TaskPrompt(template: .custom, input: " ", notes: "", skillPaths: []))
         XCTAssertThrowsError(try TaskPrompt(template: .custom, input: "Work", notes: "", skillPaths: [directory.appendingPathComponent("missing/SKILL.md").path]))
         let optional = try XCTUnwrap(TaskTemplate.defaults.first { $0.id == "fixCI" })
-        XCTAssertEqual(try TaskPrompt(template: optional, input: "", notes: "", skillPaths: []).title, "Fix CI")
+        XCTAssertThrowsError(try TaskPrompt(template: optional, input: "", notes: "", skillPaths: []))
     }
 
     func testPRPresetsPreserveSingleMultipleAndSourceInputs() throws {

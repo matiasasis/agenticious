@@ -13,12 +13,15 @@ final class TaskPresetStore: ObservableObject {
     init(url: URL = TaskPresetStore.defaultURL, defaults: UserDefaults = .standard) {
         self.url = url
         self.defaults = defaults
-        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            do { try persist(presets) }
+            catch { loadError = "Could not save presets: \(error.localizedDescription)" }
+            return
+        }
         do {
             let saved = try JSONDecoder().decode([TaskTemplate].self, from: Data(contentsOf: url))
             try validate(saved)
             presets = saved
-            if !presets.contains(where: \.isChat) { presets.insert(.chat, at: min(1, presets.count)) }
         } catch {
             loadError = "Could not load presets: \(error.localizedDescription). Your saved file has been preserved."
         }

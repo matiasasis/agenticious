@@ -11,7 +11,7 @@ let package = Package(
         .executableTarget(
             name: "Agenticious",
             dependencies: [.product(name: "SwiftTerm", package: "SwiftTerm")],
-            resources: [.copy("Resources/AppIcon.png"), .copy("Resources/BundleIcon.png"), .copy("Resources/ClaudeIcon.png"), .copy("Resources/CodexIcon.svg"), .copy("Resources/Summon.wav")]
+            resources: [.copy("Resources/task-presets.json"), .copy("Resources/AppIcon.png"), .copy("Resources/BundleIcon.png"), .copy("Resources/ClaudeIcon.png"), .copy("Resources/CodexIcon.svg"), .copy("Resources/Summon.wav")]
         ),
         .executableTarget(name: "agenticious-mcp"),
         .testTarget(name: "AgenticiousTests", dependencies: ["Agenticious"]),
