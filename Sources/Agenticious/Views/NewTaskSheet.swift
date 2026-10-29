@@ -23,8 +23,6 @@ struct NewTaskSheet: View {
     @State private var showingModels = false
     @State private var skillPaths: [String] = []
     @State private var task = ""
-    @State private var templateValue = ""
-    @State private var notes = ""
     @State private var launchError: String?
     @State private var images: [PastedImage] = []
     @State private var pasteMonitor: Any?
@@ -106,32 +104,13 @@ struct NewTaskSheet: View {
         .background(AgenticiousStyle.panel)
     }
 
-    @ViewBuilder
     private var missionFields: some View {
-        if template.isCustom {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("The mission").font(.headline)
-                editor($task, minHeight: 100, focusOnAppear: true)
-                    .accessibilityLabel("Task")
-                Text("Describe the outcome. Your agent will break it into steps. Type ``` for a code snippet.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-        } else {
-            VStack(alignment: .leading, spacing: 12) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(template.fieldLabel).font(.headline)
-                    SnippetEditor(text: $templateValue, placeholder: template.fieldPlaceholder,
-                                  font: .preferredFont(forTextStyle: .title3), minHeight: 44, maxHeight: 200, focusOnAppear: true)
-                        .id(template.id)
-                        .accessibilityLabel(template.fieldLabel)
-                    Text("Title: \(template.title(for: trimmedValue.isEmpty && template.isFieldRequired ? "…" : trimmedValue))")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                Text("Notes (optional)").font(.headline)
-                editor($notes, minHeight: 90)
-                    .accessibilityLabel("Notes (optional)")
-                Text("Type ``` for a code snippet.").font(.caption).foregroundStyle(.secondary)
-            }
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Task input").font(.headline)
+            editor($task, minHeight: 100, focusOnAppear: true)
+                .accessibilityLabel("Task input")
+            Text("Describe the task and any context. Type ``` for a code snippet.")
+                .font(.caption).foregroundStyle(.secondary)
         }
     }
 
@@ -346,14 +325,10 @@ struct NewTaskSheet: View {
         SnippetEditor(text: text, minHeight: minHeight, focusOnAppear: focusOnAppear)
     }
 
-    private var trimmedValue: String { templateValue.trimmingCharacters(in: .whitespacesAndNewlines) }
-
     private var canStart: Bool {
         repository.isReady(for: project.path) &&
-            (!template.isFieldRequired || !taskInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            !task.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
-
-    private var taskInput: String { template.isCustom ? task : templateValue }
 
     /// Favorites, "No project", and the preset project in case it isn't a favorite.
     private var projectChoices: [Project] {
@@ -412,7 +387,7 @@ struct NewTaskSheet: View {
     private func start() {
         guard canStart else { return }
         do {
-            let prompt = try TaskPrompt(template: template, input: taskInput, notes: notes, skillPaths: skillPaths)
+            let prompt = try TaskPrompt(template: template, input: task, notes: "", skillPaths: skillPaths)
             try store.launch(
                 task: prompt.title,
                 prompt: prompt.instructions,
@@ -421,7 +396,7 @@ struct NewTaskSheet: View {
                 effort: selectedEffort.isEmpty ? nil : selectedEffort,
                 project: project,
                 isolated: isGitProject && useWorktree && !template.isChat,
-                taskType: TaskType(template: template, input: taskInput, notes: notes),
+                taskType: TaskType(template: template, input: task, notes: ""),
                 images: images
             )
             presets.recordUse(of: template)

@@ -73,12 +73,14 @@ uncommitted changes, and the branch is always kept.
 ## Task presets and skills
 
 Open **Customize → Task presets** at the bottom of the sidebar (or press `⌘,`) to create, edit, or delete task presets. Each preset has a name,
-description, input hint, title, prompt, and optional skills. Use `{{input}}` in the title or prompt for the task's
-input. Notes and selected skill references are appended automatically. The Custom task is editable and always
+description, title, prompt, and optional skills. Use `{{input}}` in the title or prompt for the task's
+input. Every task uses one required text area for the request and context. Selected skill references are appended automatically. The Custom task is editable and always
 remains available. Changes affect new tasks; existing conversations keep their original prompts.
 
 Presets are saved per user in `~/Library/Application Support/Agenticious/task-presets.json`. A damaged saved
-file is preserved and reported instead of silently overwritten. The included presets are generic starting points,
+file is preserved and reported instead of silently overwritten. On first launch, the bundled `task-presets.json`
+seeds this file; after that, the saved config supplies the presets without merging built-in definitions. Old field
+labels, hints, and required flags are ignored. The included presets are generic starting points,
 so customize their prompts and skill choices for your workflow.
 
 **Customize → Skills** browses `SKILL.md` files from personal `.agents/skills`, `.codex/skills` (respecting `CODEX_HOME`),

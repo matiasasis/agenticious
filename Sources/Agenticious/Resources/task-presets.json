@@ -1,0 +1,56 @@
+[
+  {
+    "id": "custom",
+    "name": "Custom task",
+    "summary": "Give your agent a mission in your own words.",
+    "symbol": "sparkles",
+    "titlePattern": "{{input}}",
+    "prompt": "{{input}}",
+    "skillPaths": []
+  },
+  {
+    "id": "chat",
+    "skillPaths": [],
+    "prompt": "Research or discuss this question with the human:\n{{input}}\n\nLead with a direct answer, then explain the evidence, open questions, and useful next steps.\nRead referenced sources and link to evidence. Distinguish verified facts from assumptions.\nAsk a focused clarification when needed and make space for follow-up questions.\nThis is a conversation: do not implement changes, post reviews, or merge PRs unless explicitly asked.",
+    "name": "Chat",
+    "summary": "Research a question or think something through together.",
+    "symbol": "bubble.left.and.bubble.right",
+    "titlePattern": "Chat: {{input}}"
+  },
+  {
+    "id": "implementTicket",
+    "skillPaths": [],
+    "prompt": "Implement this:\n{{input}}\n\nThe input is either a ticket (an ID or URL) or a mission describing what to implement.\nFor a ticket, read it and its linked context. For a mission, treat its text as the requirements.\nExplore the project and plan the change.\nFollow the project's conventions, implement the change, and run relevant tests.\nCommit on a feature branch, push, and open a draft pull request, linked to the ticket if there is one.\nIf the ticket, the intended behavior, or a required tool is unavailable, ask the human for help.",
+    "name": "Implement",
+    "summary": "Turn a ticket or a mission into tested code and a draft pull request.",
+    "symbol": "hammer",
+    "titlePattern": "Implement {{input}}"
+  },
+  {
+    "id": "reviewComments",
+    "skillPaths": [],
+    "prompt": "Resolve review feedback and merge every pull request identified by this input:\n{{input}}\n\nAccept a single PR, a list of PR numbers or URLs, or a source link containing PR references.\nFor a source link, read its complete content and all comments/replies, including paginated results.\nCollect every PR explicitly linked there; deduplicate by repository and PR number, and list the\nresulting scope before making changes. Do not expand scope to unrelated linked discussions.\nResolve bare PR numbers against the selected project. If the repository or scope is ambiguous,\nor the source cannot be read completely, ask the human instead of guessing or silently omitting PRs.\nCheck each PR's current state. Report already-merged PRs separately; closed-unmerged PRs are blockers.\nIdentify stacked PR dependencies and process them in dependency order, rechecking each target branch after merges.\n\nFor each open PR, follow the project's review conventions. Implement applicable feedback,\ntest and push fixes, and reply to each review thread. Explain feedback that cannot be applied.\nResolve merge conflicts with the target branch, preserving the intended changes on both sides.\nTest the resolution and push it before checking CI again.\nInspect failing CI logs. For failures confirmed to be flaky, rerun the failed tests or CI jobs\nand watch the rerun. If the same failure keeps recurring, investigate and fix it rather than\nblindly retrying. Fix genuine regressions without skipping or weakening tests.\nVerify required CI checks are green on the latest commit and required approvals are satisfied,\nthen merge with the repository's normal method. Do not bypass required checks or approvals.\nAsk the human when intended behavior is unclear or a blocker cannot be resolved; continue independent PRs.\nTrack every PR through completion and report its clickable URL, final state, and any blockers.\nOnly report the whole task complete after verifying that every PR in scope is merged.\n\nWhen the source is a Slack message, resolve its parent thread even if the URL targets a reply.\nRead the parent and every reply, including all pages and PR links in attachments. Keep each\nPR's source message identifiers, including duplicate references. After verifying a PR is merged\non GitHub, including already-merged PRs, add :merged: to every reply referencing it. If a reply\nlists multiple PRs, add the reaction only when all PRs in that message are verified merged.\nReread the complete thread and reconcile newly posted PRs before marking the parent message.\nAdd :merged: to the parent only when at least one PR was found and every PR in the thread is\nverified merged. Never mark a message complete while any PR in its scope is open, blocked,\nclosed without merging, or has an unknown state. Preserve existing reactions and skip your\nreaction if already present. Use the Slack reaction name merged and read back each update\nto verify it succeeded. Report inaccessible messages, missing emoji, or failed reactions with\nthe affected message links separately from merge results. Do not substitute another emoji or\npost a new Slack message. If the source cannot be read completely, do not mark the thread complete.",
+    "name": "Resolve & merge",
+    "summary": "Address feedback, resolve conflicts, and get one or multiple PRs green and merged.",
+    "symbol": "arrow.triangle.merge",
+    "titlePattern": "Resolve & merge: {{input}}"
+  },
+  {
+    "id": "reviewPR",
+    "skillPaths": [],
+    "prompt": "Review every pull request identified by this input:\n{{input}}\n\nAccept a single PR, a list of PR numbers or URLs, or a source link containing PR references.\nFor a source link, read its complete content and all comments/replies, including paginated results.\nCollect every PR explicitly linked there; deduplicate by repository and PR number, and list the\nresulting scope before reviewing. Do not expand scope to unrelated linked discussions.\nResolve bare PR numbers against the selected project. If the repository or scope is ambiguous,\nor the source cannot be read completely, ask the human instead of guessing or silently omitting PRs.\nCheck each PR's current state. Report closed or already-merged PRs separately; only review them\nif the human explicitly requests a historical review. Review stacked PRs in dependency order,\ncomparing each PR against its own target branch so shared changes are not reported repeatedly.\n\nSignal review work as soon as it starts, before reading the full diff or posting findings.\nFor a Slack source, resolve the parent thread even if the input targets a reply, and immediately\nadd :eyes: to the parent when starting work on that thread. Read all replies and pages, retain\neach PR's source message identifiers, and add :eyes: to each message referencing a PR when\nstarting that PR's review. Do not mark all queued PR messages in advance. A message containing\nmultiple PRs gets :eyes: when review of its first PR starts; this signals work started, not completion.\nFor each PR, add the eyes reaction to its GitHub description when starting its review, including\nwhen the input is a direct PR number or URL. Use the reaction name eyes in Slack and GitHub APIs.\nPreserve existing reactions and skip adding your own if already present. Read back each reaction\nto verify it was saved. If a reaction fails or access is unavailable, report the affected message\nor PR link separately and continue any review work that remains accessible. Do not claim the\nreaction succeeded without verification. Do not post new Slack messages or remove other reactions.\n\nFor each open PR, follow the project's review conventions. Read the description, linked context,\nexisting review threads, and the full current diff. Check correctness, maintainability, test coverage,\nand CI results. Verify findings against the latest head before posting and avoid duplicating existing feedback.\nPost actionable comments or code suggestions on the relevant PR. The intended final outcome for\neach reviewable PR is an APPROVE review, not a comment-only review. This preset authorizes approval\nwithout asking for separate confirmation. Use COMMENT for interim findings; never submit Request Changes.\nBefore approving, recheck the latest head, relevant CI results, and any fixes to reported issues.\nSubmit APPROVE once no unresolved blocking findings remain, including when the initial review is clean.\nIf fixes are needed, report the findings and re-review when fixes are available; do not approve known\nblocking issues or wait indefinitely for the author. If approval is not possible, including self-review,\nmissing permissions, unresolved blockers, or a changed head that has not been reviewed, report the\nspecific blocker and leave that PR pending. Do not claim the review is complete without approval.\nAvoid duplicate approvals when your existing approval already covers the current head. Verify the\nsubmitted approval and include its clickable review link in the final per-PR report.\nDo not implement fixes, commit, push, or merge the author's branch as part of this review.\nIf a PR cannot be reviewed, record the blocker and continue with independent PRs.\nFinish with a per-PR report containing clickable PR and posted-review links, findings, and any blockers.\nDo not claim the whole batch was reviewed while any PR in scope remains unreviewed or blocked.\n\nPost review comments, findings, and summaries only on the relevant GitHub PR.\nDo not add any comments to Jira tickets, including progress updates, review summaries, or PR links.\nYou may read Jira tickets for context. This restriction overrides general instructions to comment\non tickets or synchronize ticket progress during PR reviews.",
+    "name": "Review PR",
+    "summary": "Review one or multiple PRs and post actionable feedback on each.",
+    "symbol": "text.magnifyingglass",
+    "titlePattern": "Review PRs: {{input}}"
+  },
+  {
+    "id": "fixCI",
+    "skillPaths": [],
+    "prompt": "Fix failing CI for {{input}} (use the current branch if no target is supplied).\nRead the failing logs, reproduce the failures where possible, and fix the root cause.\nDo not skip or weaken tests to get green. Ask the human about unrelated failures.\nRun relevant checks, commit and push the fix, and watch CI until it passes.",
+    "name": "Fix CI",
+    "summary": "Investigate failing checks, fix the cause, and get CI green.",
+    "symbol": "wrench.and.screwdriver",
+    "titlePattern": "Fix CI {{input}}"
+  }
+]

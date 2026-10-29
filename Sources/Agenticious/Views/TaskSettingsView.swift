@@ -160,7 +160,7 @@ private struct PresetEditorSheet: View {
             VStack(alignment: .leading, spacing: 5) {
                 Text(isNew ? "Shape a task preset" : "Edit preset")
                     .font(.system(size: 26, weight: .bold, design: .rounded))
-                Text("Icon, form, prompt and skills. All yours.")
+                Text("Icon, prompt and skills. All yours.")
                     .font(.callout).foregroundStyle(.secondary)
             }
             Spacer()
@@ -198,59 +198,16 @@ private struct PresetEditorSheet: View {
     }
 
     private var summonForm: some View {
-        card("Summon form", symbol: "rectangle.and.pencil.and.ellipsis",
-             caption: draft.isCustom ? "The custom task always asks for the mission in your own words."
-                                     : "What the Summon sheet asks for when you pick this preset.") {
-            HStack(alignment: .top, spacing: 18) {
-                VStack(alignment: .leading, spacing: 12) {
-                    if !draft.isCustom {
-                        field("FIELD LABEL") { TextField("Task input", text: $draft.fieldLabel) }
-                        field("HINT") { TextField("Shown inside the empty field", text: $draft.fieldPlaceholder) }
-                        Toggle(isOn: $draft.isFieldRequired) {
-                            HStack(spacing: 10) {
-                                Image(systemName: "asterisk").foregroundStyle(AgenticiousStyle.violet)
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text("Required to start").font(.callout.weight(.semibold))
-                                    Text("Turn off for optional input, like a branch that defaults to the current one.")
-                                        .font(.caption).foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                            }
-                        }
-                        .toggleStyle(.switch)
-                        .padding(12)
-                        .background(AgenticiousStyle.ink, in: RoundedRectangle(cornerRadius: 12))
-                    }
-                    field("CARD TITLE", caption: "{{input}} becomes what you typed. Shows as “\(draft.title(for: Self.exampleInput))”.") {
-                        TextField("{{input}}", text: $draft.titlePattern).font(.body.monospaced())
-                    }
-                }
-                if !draft.isCustom { formPreview.frame(width: 280) }
+        card("Task title", symbol: "rectangle.and.pencil.and.ellipsis") {
+            field("CARD TITLE", caption: "{{input}} becomes what you typed.") {
+                TextField("{{input}}", text: $draft.titlePattern).font(.body.monospaced())
             }
         }
     }
 
-    /// A miniature of the Summon sheet's field, so label and hint read in context.
-    private var formPreview: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("PREVIEW").font(.system(size: 9, weight: .bold, design: .monospaced)).tracking(1).foregroundStyle(.secondary)
-            Text(draft.fieldLabel.isEmpty ? "Task input" : draft.fieldLabel).font(.headline)
-            Text(draft.fieldPlaceholder.isEmpty ? " " : draft.fieldPlaceholder)
-                .foregroundStyle(.tertiary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(10)
-                .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 10))
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(AgenticiousStyle.violet.opacity(0.3)))
-            Text(draft.isFieldRequired ? "Required" : "Optional").font(.caption).foregroundStyle(.secondary)
-        }
-        .padding(14)
-        .background(AgenticiousStyle.ink, in: RoundedRectangle(cornerRadius: 12))
-        .accessibilityElement(children: .combine)
-    }
-
     private var promptSection: some View {
         card("Prompt", symbol: "text.alignleft",
-             caption: "Notes and selected skills are added automatically." +
+             caption: "Selected skills are added automatically." +
                 (draft.prompt.contains("{{input}}") ? "" : " Without {{input}}, what you type is added after the prompt.")) {
             VStack(alignment: .trailing, spacing: 10) {
                 TextEditor(text: $draft.prompt)
