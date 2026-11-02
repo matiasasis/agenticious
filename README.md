@@ -100,7 +100,10 @@ Presets are saved per user in `~/Library/Application Support/Agenticious/task-pr
 file is preserved and reported instead of silently overwritten. On first launch, the bundled `task-presets.json`
 seeds this file; after that, the saved config supplies the presets without merging built-in definitions. Old field
 labels, hints, and required flags are ignored. The included presets are generic starting points,
-so customize their prompts and skill choices for your workflow.
+so customize their prompts and skill choices for your workflow. The starter set includes Custom task, Chat,
+Implement, Resolve & merge, Review PR, Fix CI, Ask for review, and Technical discovery.
+They follow the selected project’s conventions without requiring specific skills, labels, Slack channels,
+or local paths. Existing user configs are not replaced or extended when the app is updated.
 
 **Customize → Skills** browses `SKILL.md` files from personal `.agents/skills`, `.codex/skills` (respecting `CODEX_HOME`),
 `.claude/skills`, `/etc/codex/skills`, project skill folders up to the repository root, and Codex/Claude plugin

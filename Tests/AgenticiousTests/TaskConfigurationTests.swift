@@ -128,7 +128,7 @@ final class TaskConfigurationTests: XCTestCase {
         store.recordUse(of: fixCI)
         store.recordUse(of: review)
         store.recordUse(of: .custom)
-        XCTAssertEqual(store.offeredPresets.map(\.id), ["custom", "fixCI", "reviewPR", "chat", "implementTicket", "reviewComments"])
+        XCTAssertEqual(store.offeredPresets.map(\.id), ["custom", "fixCI", "reviewPR", "chat", "implementTicket", "reviewComments", "askReview", "technicalDiscovery"])
     }
 
     @MainActor
@@ -146,7 +146,7 @@ final class TaskConfigurationTests: XCTestCase {
 
         let reloaded = TaskPresetStore(url: url, defaults: defaults)
         XCTAssertEqual(reloaded.order, .arranged)
-        XCTAssertEqual(reloaded.offeredPresets.map(\.id), ["reviewComments", "chat", "implementTicket", "reviewPR", "fixCI", "custom"])
+        XCTAssertEqual(reloaded.offeredPresets.map(\.id), ["reviewComments", "chat", "implementTicket", "reviewPR", "fixCI", "askReview", "technicalDiscovery", "custom"])
     }
 
     @MainActor
@@ -157,7 +157,7 @@ final class TaskConfigurationTests: XCTestCase {
         try store.move(id: "reviewPR", to: store.presets.count)
         try store.move(id: "dropped text", to: 0)
 
-        XCTAssertEqual(store.presets.map(\.id), ["fixCI", "custom", "chat", "implementTicket", "reviewComments", "reviewPR"])
+        XCTAssertEqual(store.presets.map(\.id), ["fixCI", "custom", "chat", "implementTicket", "reviewComments", "askReview", "technicalDiscovery", "reviewPR"])
     }
 
     @MainActor
