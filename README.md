@@ -1,5 +1,24 @@
 # Agenticious
 
+
+## Download
+
+Download the Apple silicon build from [GitHub Releases](https://github.com/matiasasis/agenticious/releases).
+Requires macOS 14+ and Claude Code or Codex installed and authenticated.
+Unzip the download and move Agenticious.app to Applications.
+
+The app uses free ad-hoc signing; it has no Apple Developer ID signature or notarization.
+If macOS blocks the first launch and you trust the download, try opening it once, then go to
+**System Settings → Privacy & Security → Open Anyway** and confirm.
+See [Apple's instructions](https://support.apple.com/en-us/102445). Organization policies may prevent this override.
+
+## Publishing a release
+
+Run `script/release` on an Apple silicon Mac with Xcode installed. It builds an optimized app,
+verifies its ad-hoc signature, and writes `Agenticious-macOS-arm64.zip` and `SHA256SUMS.txt`
+to `.build/release/`. Upload both files to a versioned GitHub Release. No Apple Developer membership is required.
+The static download website is in `docs/`; configure GitHub Pages to serve that directory.
+
 A native macOS dashboard for running many coding agents (Claude Code and Codex) at once without juggling terminal windows.
 
 - **One card per agent**, with the original task as the big title.
@@ -81,7 +100,10 @@ Presets are saved per user in `~/Library/Application Support/Agenticious/task-pr
 file is preserved and reported instead of silently overwritten. On first launch, the bundled `task-presets.json`
 seeds this file; after that, the saved config supplies the presets without merging built-in definitions. Old field
 labels, hints, and required flags are ignored. The included presets are generic starting points,
-so customize their prompts and skill choices for your workflow.
+so customize their prompts and skill choices for your workflow. The starter set includes Custom task, Chat,
+Implement, Resolve & merge, Review PR, Fix CI, Ask for review, and Technical discovery.
+They follow the selected project’s conventions without requiring specific skills, labels, Slack channels,
+or local paths. Existing user configs are not replaced or extended when the app is updated.
 
 **Customize → Skills** browses `SKILL.md` files from personal `.agents/skills`, `.codex/skills` (respecting `CODEX_HOME`),
 `.claude/skills`, `/etc/codex/skills`, project skill folders up to the repository root, and Codex/Claude plugin
@@ -166,3 +188,6 @@ Agents report **Ended** with the `end` tool when you cancel work, ask them to st
 ## Chat tasks
 
 Choose **Chat** when summoning an agent to research a question or talk through an idea. Chat uses the selected workspace for context without creating a worktree, and does not require a step plan. The conversation shows your question, the agent's replies, and follow-up messages; **Research activity** reveals tool calls when you want the supporting detail. Replies support formatting, code blocks, and clickable source links. Answers leave the chat open for your next message. **End chat** stops the agent and saves the conversation in **History**, without marking unfinished research steps complete.
+
+Keep screenshots and UI captures outside the repository, including temporary files used for reviews.
+Only app assets and reusable artwork belong in the source tree.

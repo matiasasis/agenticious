@@ -1,0 +1,14 @@
+#!/bin/sh
+set -eu
+cd "$(dirname "$0")/.."
+if [ "$(uname -m)" != arm64 ]; then
+  echo "This release script currently packages Apple silicon builds only." >&2
+  exit 1
+fi
+script/build-app -c release
+codesign --verify --deep --strict .build/Agenticious.app
+mkdir -p .build/release
+COPYFILE_DISABLE=1 ditto -c -k --sequesterRsrc --keepParent .build/Agenticious.app .build/release/Agenticious-macOS-arm64.zip
+cd .build/release
+shasum -a 256 Agenticious-macOS-arm64.zip > SHA256SUMS.txt
+printf 'Release files: %s\n' "$PWD"

@@ -1,2 +1,10 @@
 .build/
 .swiftpm/
+
+/screenshots/
+/*-overview.png
+/*-sidebar.png
+/activity-*.png
+/design/activity-*.png
+/design/provider-badge.png
+/design/menu-icon-options.png

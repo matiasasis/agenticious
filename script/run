@@ -1,39 +1,7 @@
 #!/bin/sh
-# Build and launch Agenticious. Uses Xcode's toolchain directly with an explicit SDK, so it still works
-# when `xcodebuild` / the Command Line Tools are in a broken half-updated state.
-set -e
+set -eu
 cd "$(dirname "$0")/.."
-
-XCODE=/Applications/Xcode.app/Contents/Developer
-if [ -x "$XCODE/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-build" ]; then
-  export DEVELOPER_DIR="${DEVELOPER_DIR:-$XCODE}"
-  export SDKROOT="${SDKROOT:-$XCODE/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk}"
-  SWIFT_BUILD="$XCODE/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-build"
-else
-  SWIFT_BUILD="swift build"
-fi
-
-# Build per product: building everything also compiles an unused swift-argument-parser plugin that fails on newer toolchains.
-$SWIFT_BUILD --product agenticious-mcp "$@"
-$SWIFT_BUILD --product Agenticious "$@"
-BINARY_DIR=$($SWIFT_BUILD --show-bin-path "$@")
+script/build-app "$@"
 APP_DIR="$PWD/.build/Agenticious.app"
-mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
-cp "$BINARY_DIR/Agenticious" "$BINARY_DIR/agenticious-mcp" "$APP_DIR/Contents/MacOS/"
-ditto "$BINARY_DIR/Agenticious_Agenticious.bundle" "$APP_DIR/Contents/Resources/Agenticious_Agenticious.bundle"
-cp Resources/Info.plist "$APP_DIR/Contents/Info.plist"
-for sound in Glass Hero Basso; do
-  cp "/System/Library/Sounds/$sound.aiff" "$APP_DIR/Contents/Resources/"
-done
-ICON_DIR="$PWD/.build/Agenticious.iconset"
-mkdir -p "$ICON_DIR"
-for size in 16 32 128 256 512; do
-  sips -z "$size" "$size" Sources/Agenticious/Resources/BundleIcon.png --out "$ICON_DIR/icon_${size}x${size}.png" >/dev/null
-  double=$((size * 2))
-  sips -z "$double" "$double" Sources/Agenticious/Resources/BundleIcon.png --out "$ICON_DIR/icon_${size}x${size}@2x.png" >/dev/null
-done
-iconutil -c icns "$ICON_DIR" -o "$APP_DIR/Contents/Resources/Agenticious.icns"
-codesign --force --deep --sign - "$APP_DIR"
-# Launch Services and Notification Center cache app icons; re-registering makes a changed icon show up.
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP_DIR"
 exec open "$APP_DIR"
