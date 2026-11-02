@@ -188,3 +188,6 @@ Agents report **Ended** with the `end` tool when you cancel work, ask them to st
 ## Chat tasks
 
 Choose **Chat** when summoning an agent to research a question or talk through an idea. Chat uses the selected workspace for context without creating a worktree, and does not require a step plan. The conversation shows your question, the agent's replies, and follow-up messages; **Research activity** reveals tool calls when you want the supporting detail. Replies support formatting, code blocks, and clickable source links. Answers leave the chat open for your next message. **End chat** stops the agent and saves the conversation in **History**, without marking unfinished research steps complete.
+
+Keep screenshots and UI captures outside the repository, including temporary files used for reviews.
+Only app assets and reusable artwork belong in the source tree.
