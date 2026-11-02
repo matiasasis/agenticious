@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Agenticious is a native Mac dashboard for running Claude Code and Codex agents side by side. Download for Apple silicon Macs."
+    />
+    <meta name="theme-color" content="#11101a" />
+    <title>Agenticious — A home for your coding agents</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="wrap">
+      <a class="brand" href="./" aria-label="Agenticious home"
+        ><span class="mark" aria-hidden="true">A<span>✦</span></span
+        >Agenticious</a
+      >
+      <nav aria-label="Main navigation">
+        <a href="#install">Installation</a
+        ><a href="https://github.com/matiasasis/agenticious">GitHub ↗</a>
+      </nav>
+    </header>
+    <main>
+      <section class="hero wrap">
+        <div class="intro">
+          <p class="eyebrow">
+            <span class="dot"></span> YOUR AGENTS. ONE PLACE.
+          </p>
+          <h1>More agents.<br />Less <em>juggling.</em></h1>
+          <p class="lede">
+            A native Mac dashboard for Claude Code and Codex. Give each agent a
+            mission, follow its progress, and keep your work moving.
+          </p>
+          <div class="actions">
+            <a
+              class="button"
+              href="https://github.com/matiasasis/agenticious/releases/latest/download/Agenticious-macOS-arm64.zip"
+              >Download for Mac <span aria-hidden="true">↓</span></a
+            ><a class="text-link" href="#install">How to install ↗</a>
+          </div>
+          <p class="caption">
+            Free download · Apple silicon · macOS 14 or later
+          </p>
+          <p class="signing">
+            Not notarized by Apple. First launch requires a manual approval.
+          </p>
+        </div>
+        <div
+          class="preview"
+          role="img"
+          aria-label="Illustrative dashboard with three agent tasks: a completed bug fix, a running feature implementation, and a review waiting for input."
+        >
+          <div class="window-bar">
+            <span class="traffic">● ● ●</span><span>Agenticious</span
+            ><span>✦</span>
+          </div>
+          <div class="dashboard">
+            <div class="dashboard-heading">
+              <div>
+                <p class="eyebrow">YOUR WORKSPACE</p>
+                <h2>Make things happen.</h2>
+              </div>
+              <span class="summon">＋ Summon</span>
+            </div>
+            <div class="task">
+              <div class="task-top">
+                <span class="provider">✳ Claude Code</span
+                ><span class="status done">Complete</span>
+              </div>
+              <h3>Fix the checkout bug</h3>
+              <p>Tests passed. Ready for a look.</p>
+              <div class="progress"><span style="width: 100%"></span></div>
+              <div class="task-bottom">
+                <span>3 of 3 steps</span><span>↗ Pull request</span>
+              </div>
+            </div>
+            <div class="task">
+              <div class="task-top">
+                <span class="provider codex">◈ Codex</span
+                ><span class="status">Working</span>
+              </div>
+              <h3>Build the new search</h3>
+              <p>Connecting the interface to the API.</p>
+              <div class="progress"><span style="width: 66%"></span></div>
+              <div class="task-bottom">
+                <span>2 of 3 steps</span><span>⎇ Own worktree</span>
+              </div>
+            </div>
+            <div class="task compact">
+              <div>
+                <span class="provider">✳ Claude Code</span>
+                <h3>Review the release</h3>
+              </div>
+              <span class="status waiting">Needs you</span>
+            </div>
+            <p class="preview-note">An illustration of a calmer workspace.</p>
+          </div>
+        </div>
+      </section>
+      <section class="features wrap" aria-label="Features">
+        <article>
+          <span class="feature-number">01 / ORCHESTRATE</span>
+          <h2>A place for every mission.</h2>
+          <p>
+            Run agents side by side, with progress and questions gathered in a
+            single dashboard.
+          </p>
+        </article>
+        <article>
+          <span class="feature-number">02 / KEEP WORK SEPARATE</span>
+          <h2>Room to work in parallel.</h2>
+          <p>
+            Give tasks their own Git worktrees so agents can work on different
+            changes at the same time.
+          </p>
+        </article>
+        <article>
+          <span class="feature-number">03 / MAKE IT YOURS</span>
+          <h2>Your prompts. Your workflow.</h2>
+          <p>
+            Configure task presets and attach your own skills. Keep the tools
+            and accounts you already use.
+          </p>
+        </article>
+      </section>
+      <section id="install" class="install wrap">
+        <div>
+          <p class="eyebrow">UP AND RUNNING</p>
+          <h2>A few steps.<br />Then, summon.</h2>
+          <p>
+            You’ll need an Apple silicon Mac running macOS 14 or later, plus
+            Claude Code or Codex installed and signed in. Provider accounts and
+            usage are separate from this free app.
+          </p>
+        </div>
+        <ol>
+          <li>
+            <h3>Download and move to Applications</h3>
+            <p>
+              Unzip the download, then drag Agenticious.app into your
+              Applications folder.
+            </p>
+          </li>
+          <li>
+            <h3>Approve the first launch</h3>
+            <p>
+              Try opening Agenticious once. Because this build has no Apple
+              Developer ID signature or notarization, macOS may block it. If you
+              trust this download, open
+              <strong
+                >System Settings → Privacy &amp; Security → Open Anyway</strong
+              >, then confirm.
+              <a href="https://support.apple.com/en-us/102445"
+                >Read Apple’s instructions ↗</a
+              >
+            </p>
+            <p>
+              On a managed work Mac, your organization may restrict this option.
+              No need to disable Gatekeeper globally.
+            </p>
+          </li>
+          <li>
+            <h3>Choose your workspace and agent</h3>
+            <p>
+              Make sure your preferred provider’s CLI is available in your login
+              shell. Open Agenticious, choose a project, and describe your first
+              task.
+            </p>
+          </li>
+        </ol>
+      </section>
+      <section class="closing wrap">
+        <p class="eyebrow">BUILT FOR PEOPLE WHO BUILD</p>
+        <h2>Your next idea has company.</h2>
+        <a
+          class="button"
+          href="https://github.com/matiasasis/agenticious/releases/latest/download/Agenticious-macOS-arm64.zip"
+          >Get Agenticious <span aria-hidden="true">↓</span></a
+        >
+        <p>
+          <a href="https://github.com/matiasasis/agenticious/releases"
+            >Release notes &amp; checksums ↗</a
+          >
+        </p>
+      </section>
+    </main>
+    <footer class="wrap">
+      <span>Agenticious · Made by Matías Asís</span>
+      <div>
+        <a href="https://github.com/matiasasis/agenticious">Source</a
+        ><a href="https://github.com/matiasasis/agenticious/issues"
+          >Report an issue</a
+        >
+      </div>
+    </footer>
+  </body>
+</html>

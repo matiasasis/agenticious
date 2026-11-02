@@ -1,5 +1,24 @@
 # Agenticious
 
+
+## Download
+
+Download the Apple silicon build from [GitHub Releases](https://github.com/matiasasis/agenticious/releases).
+Requires macOS 14+ and Claude Code or Codex installed and authenticated.
+Unzip the download and move Agenticious.app to Applications.
+
+The app uses free ad-hoc signing; it has no Apple Developer ID signature or notarization.
+If macOS blocks the first launch and you trust the download, try opening it once, then go to
+**System Settings → Privacy & Security → Open Anyway** and confirm.
+See [Apple's instructions](https://support.apple.com/en-us/102445). Organization policies may prevent this override.
+
+## Publishing a release
+
+Run `script/release` on an Apple silicon Mac with Xcode installed. It builds an optimized app,
+verifies its ad-hoc signature, and writes `Agenticious-macOS-arm64.zip` and `SHA256SUMS.txt`
+to `.build/release/`. Upload both files to a versioned GitHub Release. No Apple Developer membership is required.
+The static download website is in `docs/`; configure GitHub Pages to serve that directory.
+
 A native macOS dashboard for running many coding agents (Claude Code and Codex) at once without juggling terminal windows.
 
 - **One card per agent**, with the original task as the big title.
