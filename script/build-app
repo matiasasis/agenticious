@@ -21,7 +21,7 @@ mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 cp "$BINARY_DIR/Agenticious" "$BINARY_DIR/agenticious-mcp" "$APP_DIR/Contents/MacOS/"
 ditto "$BINARY_DIR/Agenticious_Agenticious.bundle" "$APP_DIR/Contents/Resources/Agenticious_Agenticious.bundle"
 cp Resources/Info.plist "$APP_DIR/Contents/Info.plist"
-cp .build/checkouts/SwiftTerm/LICENSE "$APP_DIR/Contents/Resources/SwiftTerm-LICENSE.txt"
+install -m 644 .build/checkouts/SwiftTerm/LICENSE "$APP_DIR/Contents/Resources/SwiftTerm-LICENSE.txt"
 for sound in Glass Hero Basso; do
   cp "/System/Library/Sounds/$sound.aiff" "$APP_DIR/Contents/Resources/"
 done
