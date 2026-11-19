@@ -511,7 +511,12 @@ final class SessionStore: ObservableObject {
 
     private func startServer() {
         do {
-            let server = try EventServer(port: port) { [weak self] event, reply in
+            let server = try EventServer(port: port, onRequest: { [weak self] request, reply in
+                Task { @MainActor in
+                    guard let self else { return reply(nil) }
+                    reply(StreamDeck.answer(request, presets: self.presets.presets) { self.summon.show(presetID: $0.id, in: self) })
+                }
+            }) { [weak self] event, reply in
                 Task { @MainActor in
                     guard let self else { return reply(nil) }
                     if event.name == "AskUserQuestion" { self.hold(event, reply: reply) } else { reply(self.handle(event)) }

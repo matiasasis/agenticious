@@ -1,5 +1,7 @@
 .build/
 .swiftpm/
+streamdeck/node_modules/
+streamdeck/dist/
 
 /screenshots/
 /*-overview.png

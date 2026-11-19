@@ -37,9 +37,14 @@ final class SummonPanelController {
     /// change under them. Used from Agenticious itself, it behaves like the sheet.
     private var isOverAnotherApp: Bool { !NSRunningApplication.current.isActive || Self.borrowedFrom != nil }
 
-    func show(presetID: String, store: SessionStore) {
+    /// False when the window couldn't be shown, so whoever asked can say so.
+    @discardableResult
+    func show(presetID: String, store: SessionStore) -> Bool {
         // A modal window (the folder picker, say) owns the keyboard until it's answered.
-        guard NSApp.modalWindow == nil else { return NSSound.beep() }
+        guard NSApp.modalWindow == nil else {
+            NSSound.beep()
+            return false
+        }
         if let panel, let host {
             host.presetRequests.send(presetID)
             // Left open and pressed again from another app: come to the screen in use now. A window dragged
@@ -48,7 +53,8 @@ final class SummonPanelController {
                 let target = SummonPlacement.target()
                 if panel.screen?.visibleFrame != target.visible { place?(target) }
             }
-            return present(panel)
+            present(panel)
+            return true
         }
         Self.borrowedFrom = nil
         let target = SummonPlacement.target()
@@ -77,6 +83,7 @@ final class SummonPanelController {
         self.panel = panel
         self.host = host
         present(panel)
+        return true
     }
 
     func close() {

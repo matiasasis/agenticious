@@ -30,7 +30,8 @@ final class SummonHotkeys: ObservableObject {
             .sink { [weak self] _ in self?.center.unregisterAll() }.store(in: &subscriptions)
     }
 
-    func show(presetID: String, in store: SessionStore) { panel.show(presetID: presetID, store: store) }
+    @discardableResult
+    func show(presetID: String, in store: SessionStore) -> Bool { panel.show(presetID: presetID, store: store) }
 
     private func register() {
         var problems = plan.problems

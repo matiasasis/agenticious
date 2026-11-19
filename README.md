@@ -79,6 +79,8 @@ settings replace your own `statusLine` there (it shows the model and both limits
 | `Sources/Agenticious/UsageMonitor.swift` | Codex and Claude plan limits |
 | `Sources/Agenticious/HotkeyCenter.swift` | System-wide preset shortcuts (Carbon hot keys, no Accessibility permission) |
 | `Sources/Agenticious/SummonPanelController.swift` | The floating Summon window a shortcut opens over other apps |
+| `Sources/Agenticious/StreamDeck.swift` | What the Stream Deck plugin asks the app: the presets with their key images, and a Summon window |
+| `streamdeck/` | The Stream Deck plugin (JavaScript on Node.js) |
 | `Sources/agenticious-mcp/main.swift` | Stdio MCP server the agents call |
 
 ## Worktrees
@@ -125,6 +127,27 @@ Agenticious run (a dev build beside the installed app), the first one started ho
 flags them on its cards. Shortcuts are
 saved with the preset as an optional `hotkey`, e.g. `{ "key": "R", "keyCode": 15, "modifiers": ["control", "option"] }`;
 `keyCode` is the physical key, so the shortcut stays on it when the keyboard layout changes.
+
+**Stream Deck.** The plugin in `streamdeck/` puts every preset on a 15-key Stream Deck behind one key. The
+**Agenticious** key (the app's icon) opens a page with **Back** at the top left and a key for each preset, in the
+order you arranged them, so a preset keeps its place whichever you use most. Each key is drawn by the app like the
+preset's card: its name above its symbol. Pressing one opens the floating Summon window on that preset, exactly as
+its shortcut would, and returns the deck to the profile it was showing; presets need no shortcut for this. Past 14
+presets the last key becomes **More**. The page follows preset edits within a couple of seconds, and says
+**not running** when Agenticious is closed or older than the plugin.
+
+```sh
+cd streamdeck
+npm ci --ignore-scripts
+npm test
+node build.js   # dist/com.mati.agenticious.sdPlugin
+```
+
+Quit Stream Deck, copy `dist/com.mati.agenticious.sdPlugin` into
+`~/Library/Application Support/com.elgato.StreamDeck/Plugins/`, start Stream Deck again, and drag **Agenticious**
+from the action list onto a key. The first press installs the bundled page. The plugin talks to the app's loopback
+port (`GET /presets`, `POST /summon/<preset-id>` on 47821, or `AGENTICIOUS_PORT`); the app ignores those requests
+when a browser sends them for a web page. It needs Stream Deck 6.5 or later.
 
 **Customize → Skills** browses `SKILL.md` files from personal `.agents/skills`, `.codex/skills` (respecting `CODEX_HOME`),
 `.claude/skills`, `/etc/codex/skills`, project skill folders up to the repository root, and Codex/Claude plugin
