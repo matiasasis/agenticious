@@ -67,7 +67,7 @@ extension Hotkey {
                                        kVK_F11, kVK_F12, kVK_F13, kVK_F14, kVK_F15, kVK_F16, kVK_F17, kVK_F18, kVK_F19, kVK_F20]
 
     /// With ⌘ alone: editing, and the commands nearly every app has.
-    private static let standardKeys: Set<String> = ["A", "C", "V", "X", "Z", "Q", "W", "↩", "S", "N", "O", "P", "F", "H", "M", "T", ",", "Space", "⇥"]
+    private static let standardKeys: Set<String> = ["A", "C", "V", "X", "Z", "Q", "W", "↩", "S", "N", "O", "P", "F", "H", "M", "T", ",", "Space", "⇥", "+", "=", "-", "0"]
 
     /// Keys that type nothing, or nothing worth showing.
     private static let namedKeys: [Int: String] = [

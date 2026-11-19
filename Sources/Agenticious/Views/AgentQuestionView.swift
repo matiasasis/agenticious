@@ -13,7 +13,7 @@ struct QuestionCard: View {
         VStack(alignment: .leading, spacing: 18) {
             HStack {
                 Label("\(session.agent.displayName) is asking", systemImage: "questionmark.bubble.fill")
-                    .font(.headline).foregroundStyle(.orange)
+                    .scaledFont(.headline).foregroundStyle(.orange)
                 Spacer()
                 Button("Answer in terminal instead") {
                     session.releaseQuestion()
@@ -24,7 +24,7 @@ struct QuestionCard: View {
             }
             ForEach(questions) { question in block(question) }
             HStack {
-                Text(isComplete ? "⌘ Return to send" : "Answer every question to send.").font(.caption).foregroundStyle(.secondary)
+                Text(isComplete ? "⌘ Return to send" : "Answer every question to send.").scaledFont(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button(questions.count == 1 ? "Send answer" : "Send answers", systemImage: "paperplane.fill") {
                     store.answer(session, with: answers)
@@ -43,11 +43,11 @@ struct QuestionCard: View {
         VStack(alignment: .leading, spacing: 10) {
             if !question.header.isEmpty {
                 Text(question.header.uppercased())
-                    .font(.system(size: 9, weight: .bold, design: .monospaced)).tracking(1).foregroundStyle(AgenticiousStyle.violet)
+                    .scaledFont(.system(size: 9, weight: .bold, design: .monospaced)).tracking(1).foregroundStyle(AgenticiousStyle.violet)
             }
-            Text(question.text).font(.title3.weight(.semibold)).fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
+            Text(question.text).scaledFont(.title3.weight(.semibold)).fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
             if question.allowsMultiple {
-                Text("Choose any that apply.").font(.caption).foregroundStyle(.secondary)
+                Text("Choose any that apply.").scaledFont(.caption).foregroundStyle(.secondary)
             }
             ForEach(question.options, id: \.self) { option in
                 choice(option, in: question)
@@ -64,9 +64,9 @@ struct QuestionCard: View {
                                                           : (isChosen ? "largecircle.fill.circle" : "circle"))
                     .foregroundStyle(isChosen ? AgenticiousStyle.lime : AgenticiousStyle.violet.opacity(0.7))
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(option.label).font(.callout.weight(.semibold))
+                    Text(option.label).scaledFont(.callout.weight(.semibold))
                     if !option.detail.isEmpty {
-                        Text(option.detail).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        Text(option.detail).scaledFont(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 Spacer(minLength: 0)
@@ -127,11 +127,11 @@ struct ReplyComposer: View {
         HStack(alignment: .bottom, spacing: 10) {
             VStack(alignment: .leading, spacing: 6) {
                 if case let .needsYou(reason) = session.status {
-                    Label(reason, systemImage: "hand.raised.fill").font(.caption.weight(.semibold)).foregroundStyle(.orange).lineLimit(3)
+                    Label(reason, systemImage: "hand.raised.fill").scaledFont(.caption.weight(.semibold)).foregroundStyle(.orange).lineLimit(3)
                 }
                 SnippetEditor(text: $text, placeholder: session.isChat ? "Ask a follow-up or share your thoughts…" : "Reply to \(session.agent.displayName)…", minHeight: 40, maxHeight: 160)
                 if session.isChat && !session.canReplyInline {
-                    Text("You can send once the agent is ready for your reply.").font(.caption).foregroundStyle(.secondary)
+                    Text("You can send once the agent is ready for your reply.").scaledFont(.caption).foregroundStyle(.secondary)
                 }
             }
             Button("Send", systemImage: "paperplane.fill", action: send)

@@ -179,9 +179,15 @@ The top bar shows Codex model-specific quota availability (such as **GPT-6 Astra
 
 Below the sidebar branding, **Agents** counts tasks outside history, **Working** counts starting or actively working agents, and **Needs you** counts agents blocked on your input or approval. Waiting and idle processes do not count as working.
 
-**Customize** keeps task presets, skills, and preferences together while the agent sidebar stays visible. Preferences are split into sections: **General** (sidebar branch names, default worktree behavior), **Notifications**, and **Background refresh** (how often provider connections and usage limits are checked). The macOS menu bar shows a monochrome “A” with a spark, with a count only when agents need your attention.
+**Customize** keeps task presets, skills, and preferences together while the agent sidebar stays visible. Preferences are split into sections: **General** (sidebar branch names, default worktree behavior, text size), **Notifications**, and **Background refresh** (how often provider connections and usage limits are checked). The macOS menu bar shows a monochrome “A” with a spark, with a count only when agents need your attention.
 
 Every agent has an **Archive** button beside its status and step count, plus an archive action in its right-click menu. Archiving stops its process, descendants, and owned terminal process group (escalating to kill if needed), releases the terminal, removes its per-session launch configuration, and attempts to remove its worktree. Known leftover provider processes are identified by this session's exact launch markers after a restart. **Mark as finished** uses the same cleanup. History and Git branches are preserved; worktrees with uncommitted changes or another queued agent are kept, with a warning. The main checkout and shared scratch folder are never removed. Archived activity is read once without background polling. Use the Archive button or **Retry archive cleanup** to retry worktree cleanup on older finished tasks.
+
+### Text size
+
+**Customize → Preferences → General → Text size** scales the app's text from 100% to 150% in steps of 10%, and applies as you choose: the main window with its sheets and popovers, the menu bar panel, the floating Summon window, reply boxes, and the embedded terminal, which reflows to the new size. **View → Make Text Bigger** (**⌘+**, or **⌘=** without Shift), **Make Text Smaller** (**⌘−**), and **Actual Size** (**⌘0**) do the same from the keyboard while the main window is in front. Symbols set in text grow with it, and a box that holds text grows where the text would otherwise be cut off; spacing, corner radii, and decorative sizes stay as they are. Menus, alerts, tooltips, segmented controls, and the menu bar itself are drawn by macOS and keep the system's size.
+
+macOS apps do not follow a system-wide text size on their own, so this is the app's own setting. It is stored as `textScale`: launching with `-textScale 1.3` tries a size for one run without saving it; choosing a size in the app during that run takes over from the argument and is saved.
 
 ### Provider diagnostics
 

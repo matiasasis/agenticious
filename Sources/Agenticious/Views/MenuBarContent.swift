@@ -9,12 +9,12 @@ struct MenuBarContent: View {
         VStack(spacing: 0) {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Usage & limits").font(.title3.bold())
-                    Text("All your clients, at a glance").font(.caption).foregroundStyle(.secondary)
+                    Text("Usage & limits").scaledFont(.title3.bold())
+                    Text("All your clients, at a glance").scaledFont(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button { usage.refresh() } label: {
-                    Image(systemName: "arrow.clockwise")
+                    Image(systemName: "arrow.clockwise").scaledFont(.body)
                 }
                 .disabled(usage.isRefreshing)
                 .help("Refresh usage")
@@ -34,13 +34,13 @@ struct MenuBarContent: View {
 
             Divider()
             HStack {
-                Button("Open Agenticious") {
+                Button {
                     dismiss()
                     openWindow(id: "main")
                     NSApp.activate(ignoringOtherApps: true)
-                }.keyboardShortcut("o")
+                } label: { Text("Open Agenticious").scaledFont(.body) }.keyboardShortcut("o")
                 Spacer()
-                Button("Quit") { NSApp.terminate(nil) }.keyboardShortcut("q")
+                Button { NSApp.terminate(nil) } label: { Text("Quit").scaledFont(.body) }.keyboardShortcut("q")
             }.padding(14)
         }
         .frame(width: 400)
@@ -53,51 +53,51 @@ struct MenuBarContent: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 ProviderIcon(agent: agent, size: 20)
-                Text(agent.displayName).font(.headline)
+                Text(agent.displayName).scaledFont(.headline)
                 Spacer()
                 Text(agent == .codex ? "Session logs" : "Status line")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .scaledFont(.caption).foregroundStyle(.secondary)
             }
             if agent == .codex {
                 limits(usage.codexLimits.account, at: date,
                        empty: "No limits reported yet. Run a Codex session to record usage.")
                 ForEach(usage.codexLimits.models, id: \.name) { model in
                     Divider()
-                    Text(model.name).font(.subheadline.weight(.semibold))
+                    Text(model.name).scaledFont(.subheadline.weight(.semibold))
                     limits(model.limits, at: date, empty: "No limit reading available.")
                 }
                 if let reading = usage.codexModelQuotas, !reading.quotas.isEmpty {
                     Divider()
-                    Text("Model availability").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                    Text("Model availability").scaledFont(.caption.weight(.semibold)).foregroundStyle(.secondary)
                     ForEach(reading.quotas) { quota in
                         CodexModelQuotaStatus(quota: quota, checkedAt: reading.checkedAt,
                                               isStale: usage.codexModelQuotasStale)
                     }
                 }
                 if usage.codexModelQuotasStale {
-                    Text("Model availability could not be refreshed.").font(.caption).foregroundStyle(.orange)
+                    Text("Model availability could not be refreshed.").scaledFont(.caption).foregroundStyle(.orange)
                 }
                 Text("Latest recorded usage · updates when Codex reports limits")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .scaledFont(.caption).foregroundStyle(.secondary)
             } else {
                 limits(usage.claudeReading?.limits ?? [], at: date,
                        empty: "Limits appear after a Claude agent started here reports usage.")
                 if usage.claudeReading == nil, let tokens = usage.claudeTokensToday {
                     Text("Today: \(tokens.formatted(.number.notation(.compactName))) tokens")
-                        .font(.subheadline.weight(.medium))
+                        .scaledFont(.subheadline.weight(.medium))
                     Text("Input, output & cache writes · not a plan limit")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .scaledFont(.caption).foregroundStyle(.secondary)
                 }
                 if let reading = usage.claudeReading {
                     Text("Reported \(reading.takenAt.formatted(.relative(presentation: .named)))")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .scaledFont(.caption).foregroundStyle(.secondary)
                 }
             }
             if usage.isRefreshing {
-                Text("Checking for updates…").font(.caption).foregroundStyle(.secondary)
+                Text("Checking for updates…").scaledFont(.caption).foregroundStyle(.secondary)
             } else if let checked = usage.lastChecked {
                 Text("Checked \(checked.formatted(date: .omitted, time: .shortened))")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .scaledFont(.caption).foregroundStyle(.secondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -109,7 +109,7 @@ struct MenuBarContent: View {
     @ViewBuilder
     private func limits(_ limits: [UsageLimit], at date: Date, empty: String) -> some View {
         if limits.isEmpty {
-            Text(empty).font(.callout).foregroundStyle(.secondary)
+            Text(empty).scaledFont(.callout).foregroundStyle(.secondary)
         } else {
             ForEach(limits, id: \.windowMinutes) { limit in
                 MenuLimitRow(limit: limit, date: date)
@@ -133,7 +133,7 @@ struct MenuLimitRow: View {
                 } else {
                     Text("Awaiting update").foregroundStyle(.secondary)
                 }
-            }.font(.callout)
+            }.scaledFont(.callout)
             if let used = limit.reportedUsedPercent(at: date) {
                 UsageProgressBar(usedPercent: used)
                     .accessibilityLabel("\(limit.windowLabel) usage")
@@ -142,9 +142,9 @@ struct MenuLimitRow: View {
             if let reset = limit.resetsAt {
                 Text(reset <= date ? "Previous window ended · waiting for a new reading" :
                      "Resets \(reset.formatted(.relative(presentation: .named))) · \(reset.formatted(date: .abbreviated, time: .shortened))")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .scaledFont(.caption).foregroundStyle(.secondary)
             } else {
-                Text("Reset time unavailable").font(.caption).foregroundStyle(.secondary)
+                Text("Reset time unavailable").scaledFont(.caption).foregroundStyle(.secondary)
             }
         }
     }

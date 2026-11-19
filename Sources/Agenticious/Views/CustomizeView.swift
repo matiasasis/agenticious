@@ -6,7 +6,7 @@ struct CustomizeView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
-                Text("CUSTOMIZE").font(.system(size: 10, weight: .bold, design: .monospaced))
+                Text("CUSTOMIZE").scaledFont(.system(size: 10, weight: .bold, design: .monospaced))
                     .tracking(1).foregroundStyle(.secondary).padding(.trailing, 12)
                 tab("Task presets", symbol: "square.stack", selection: .settings)
                 tab("Skills", symbol: "books.vertical", selection: .skills)
@@ -54,6 +54,7 @@ enum PreferencesSection: String, CaseIterable, Identifiable {
 
 private struct PreferencesView: View {
     @AppStorage("preferencesSection") private var section = PreferencesSection.general
+    @Environment(\.textScale) private var textScale
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
@@ -71,11 +72,13 @@ private struct PreferencesView: View {
                     .accessibilityAddTraits(section == item ? .isSelected : [])
                 }
             }
-            .padding(20).frame(width: 230)
+            // Wider with larger text, but by what its longest title needs, not by the whole factor: the pane beside it
+            // needs the room more.
+            .padding(20).frame(width: 230 + 80 * (textScale - 1))
             Divider()
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    Text(section.title).font(.system(size: 30, weight: .bold, design: .rounded))
+                    Text(section.title).scaledFont(.system(size: 30, weight: .bold, design: .rounded))
                     switch section {
                     case .general: GeneralPreferencesView()
                     case .notifications: NotificationPreferencesView()
@@ -91,6 +94,13 @@ private struct PreferencesView: View {
 private struct GeneralPreferencesView: View {
     @AppStorage("sidebarShowBranches") private var showBranches = true
     @AppStorage("useWorktree") private var useWorktree = true
+    @AppStorage(TextScale.key) private var storedTextScale = 1.0
+    @Environment(\.textScale) private var textScale
+
+    /// A size between two steps (from `-textScale`) shows as the nearer one.
+    private var textSize: Binding<Double> {
+        Binding { TextScale.nearestStep(to: storedTextScale) } set: { TextScale.store($0) }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -98,7 +108,27 @@ private struct GeneralPreferencesView: View {
             Divider()
             Toggle("Use a separate worktree for new agents", isOn: $useWorktree)
             Text("Applies to git projects. You can change this for each mission when summoning an agent.")
-                .font(.caption).foregroundStyle(.secondary)
+                .scaledFont(.caption).foregroundStyle(.secondary)
+            Divider()
+            let sizeTitle = Text("Text size")
+            let sizePicker = Picker("Text size", selection: textSize) {
+                ForEach(TextScale.steps, id: \.self) { step in
+                    Text(TextScale.label(step) + (step == 1 ? " (default)" : "")).scaledFont(.body, textScale).tag(step)
+                }
+            }
+            .labelsHidden().pickerStyle(.menu).fixedSize(horizontal: textScale == 1, vertical: true)
+            let sideBySide = HStack(alignment: .firstTextBaseline) { sizeTitle; Spacer(); sizePicker.fixedSize() }
+            // With larger text in a narrow window the pop-up goes under its title instead of squeezing it out.
+            if textScale == 1 {
+                sideBySide
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    sideBySide
+                    VStack(alignment: .leading, spacing: 12) { sizeTitle; sizePicker }.frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            Text("Scales all text in Agenticious, the terminal included. ⌘+ and ⌘− change it too; ⌘0 puts it back.")
+                .scaledFont(.caption).foregroundStyle(.secondary)
         }
         .toggleStyle(.switch).padding(20)
         .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 16))
@@ -108,11 +138,12 @@ private struct GeneralPreferencesView: View {
 private struct RefreshPreferencesView: View {
     @AppStorage(BackgroundCheck.providers.defaultsKey) private var providers = BackgroundCheck.providers.recommended
     @AppStorage(BackgroundCheck.usage.defaultsKey) private var usage = BackgroundCheck.usage.recommended
+    @Environment(\.textScale) private var textScale
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
             Text("Checks only run while Agenticious is the app in front. When you come back to it, anything older than its interval refreshes right away; switching back and forth in between doesn't trigger extra checks.")
-                .font(.callout).foregroundStyle(.secondary)
+                .scaledFont(.callout).foregroundStyle(.secondary)
             Button("Use recommended for all", systemImage: "wand.and.stars") {
                 providers = BackgroundCheck.providers.recommended
                 usage = BackgroundCheck.usage.recommended
@@ -126,20 +157,27 @@ private struct RefreshPreferencesView: View {
 
     private func row(_ check: BackgroundCheck, selection: Binding<TimeInterval>) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(check.title).font(.headline)
-                Spacer()
-                Picker(check.title, selection: selection) {
-                    ForEach(check.options, id: \.self) { interval in
-                        Text(BackgroundCheck.label(for: interval) + (interval == check.recommended ? " (recommended)" : ""))
-                            .tag(interval)
-                    }
+            let title = Text(check.title).scaledFont(.headline)
+            let picker = Picker(check.title, selection: selection) {
+                ForEach(check.options, id: \.self) { interval in
+                    Text(BackgroundCheck.label(for: interval) + (interval == check.recommended ? " (recommended)" : ""))
+                        .scaledFont(.body, textScale).tag(interval)
                 }
-                .labelsHidden().pickerStyle(.menu).fixedSize()
             }
-            Text(check.detail).font(.callout).foregroundStyle(.secondary)
+            .labelsHidden().pickerStyle(.menu).fixedSize(horizontal: textScale == 1, vertical: true)
+            let sideBySide = HStack(alignment: .firstTextBaseline) { title; Spacer(); picker.fixedSize() }
+            // The pop-up never shrinks, so with larger text it goes under a title it would leave no room for.
+            if textScale == 1 {
+                sideBySide
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    sideBySide
+                    VStack(alignment: .leading, spacing: 12) { title; picker }.frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            Text(check.detail).scaledFont(.callout).foregroundStyle(.secondary)
             Label("Best fit: \(BackgroundCheck.label(for: check.recommended).lowercased()). \(check.reason)", systemImage: "star.fill")
-                .font(.caption).foregroundStyle(AgenticiousStyle.violet)
+                .scaledFont(.caption).foregroundStyle(AgenticiousStyle.violet)
         }
         .padding(20)
         .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 16))

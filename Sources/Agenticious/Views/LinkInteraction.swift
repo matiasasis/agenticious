@@ -37,7 +37,7 @@ struct LinkedMarkdownText: NSViewRepresentable {
     }
 
     func updateNSView(_ view: LinkTextView, context: Context) {
-        let content = Self.attributedText(text)
+        let content = Self.attributedText(text, scale: context.environment.textScale)
         if view.textStorage?.isEqual(to: content) != true {
             view.textStorage?.setAttributedString(content)
             view.window?.invalidateCursorRects(for: view)
@@ -49,13 +49,13 @@ struct LinkedMarkdownText: NSViewRepresentable {
         return nsView.fittingSize(width: width)
     }
 
-    static func attributedText(_ text: String) -> NSAttributedString {
+    static func attributedText(_ text: String, scale: CGFloat = 1) -> NSAttributedString {
         let parsed = (try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(text)
         let result = NSMutableAttributedString()
         for run in parsed.runs {
             let value = String(parsed[run.range].characters)
             let intent = run.inlinePresentationIntent ?? []
-            var font = intent.contains(.code) ? NSFont.monospacedSystemFont(ofSize: 13, weight: .regular) : NSFont.systemFont(ofSize: 13)
+            var font = intent.contains(.code) ? NSFont.monospacedSystemFont(ofSize: 13 * scale, weight: .regular) : NSFont.systemFont(ofSize: 13 * scale)
             if intent.contains(.stronglyEmphasized) { font = NSFontManager.shared.convert(font, toHaveTrait: .boldFontMask) }
             if intent.contains(.emphasized) { font = NSFontManager.shared.convert(font, toHaveTrait: .italicFontMask) }
             var attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.labelColor]

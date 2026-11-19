@@ -4,11 +4,13 @@ import SwiftUI
 /// One window: projects and their agents on the left; the selected agent (with its live terminal) or an overview on the right.
 struct MainView: View {
     @EnvironmentObject private var store: SessionStore
+    @Environment(\.textScale) private var textScale
 
     var body: some View {
         NavigationSplitView {
             Sidebar()
-                .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 420)
+                // Wider with the text, or the project names and the wordmark beside the icon are cut short.
+                .navigationSplitViewColumnWidth(min: 260 * textScale, ideal: 300 * textScale, max: 420 * textScale)
         } detail: {
             detail
                 .safeAreaInset(edge: .top, spacing: 0) { ControlRoomBar() }
@@ -90,10 +92,10 @@ private struct Sidebar: View {
             VStack(alignment: .leading, spacing: 18) {
                 if store.visibleSessions.isEmpty {
                     Text("Queue clear. Summon an agent to get started.")
-                        .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 4)
+                        .scaledFont(.caption).foregroundStyle(.secondary).padding(.horizontal, 4)
                 }
                 HStack {
-                    Text("WORKSPACES").font(.system(size: 10, weight: .bold, design: .monospaced)).tracking(1)
+                    Text("WORKSPACES").scaledFont(.system(size: 10, weight: .bold, design: .monospaced)).tracking(1)
                     Spacer()
                     Button("Add project folder…", systemImage: "folder.badge.plus", action: addProject)
                         .labelStyle(.iconOnly).buttonStyle(.plain).help("Add project folder")
@@ -124,9 +126,9 @@ private struct Sidebar: View {
                             .accessibilityHidden(true)
                     }
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("AGENTICIOUS").font(.system(size: 17, weight: .black, design: .rounded))
+                        Text("AGENTICIOUS").scaledFont(.system(size: 17, weight: .black, design: .rounded))
                         Text("A LITTLE CHAOS. A LOT DONE.")
-                            .font(.system(size: 8, weight: .bold, design: .monospaced))
+                            .scaledFont(.system(size: 8, weight: .bold, design: .monospaced))
                             .tracking(1).foregroundStyle(AgenticiousStyle.lime)
                     }
                     Spacer(minLength: 0)
@@ -143,7 +145,7 @@ private struct Sidebar: View {
                         Spacer()
                         Text("\(store.count(in: .finished))").monospacedDigit().foregroundStyle(.secondary)
                     }
-                    .font(.callout.weight(.semibold))
+                    .scaledFont(.callout.weight(.semibold))
                     .padding(14)
                     .foregroundStyle(store.selection == .history ? AgenticiousStyle.lime : .primary)
                     .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 12))
@@ -152,13 +154,13 @@ private struct Sidebar: View {
                 .accessibilityAddTraits(store.selection == .history ? .isSelected : [])
                 Button { store.selection = .settings } label: {
                     HStack(spacing: 12) {
-                        Image(systemName: "slider.horizontal.3").font(.title3).foregroundStyle(AgenticiousStyle.violet)
+                        Image(systemName: "slider.horizontal.3").scaledFont(.title3).foregroundStyle(AgenticiousStyle.violet)
                         VStack(alignment: .leading, spacing: 3) {
-                            Text("Customize").font(.callout.weight(.semibold))
-                            Text("Task presets, skills & preferences").font(.caption).foregroundStyle(.secondary)
+                            Text("Customize").scaledFont(.callout.weight(.semibold))
+                            Text("Task presets, skills & preferences").scaledFont(.caption).foregroundStyle(.secondary)
                         }
                         Spacer(minLength: 0)
-                        Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
+                        Image(systemName: "chevron.right").scaledFont(.caption).foregroundStyle(.secondary)
                     }
                     .padding(14)
                     .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 12))
@@ -188,17 +190,17 @@ private struct ProjectHeader: View {
                 HStack(spacing: 6) {
                     // Always laid out, even with nothing to fold, so every project name lines up.
                     Image(systemName: "chevron.right")
-                        .font(.caption.weight(.bold))
+                        .scaledFont(.caption.weight(.bold))
                         .foregroundStyle(.secondary)
                         .rotationEffect(.degrees(isCollapsed ? 0 : 90))
                         .frame(width: 12)
                         .opacity(group.sessions.isEmpty ? 0 : 1)
                     Label(group.project.name, systemImage: group.project.symbol)
-                        .font(.callout.weight(.semibold))
+                        .scaledFont(.callout.weight(.semibold))
                         .lineLimit(1)
                     if !group.sessions.isEmpty {
                         Text("\(group.sessions.count)")
-                            .font(.caption.monospacedDigit())
+                            .scaledFont(.caption.monospacedDigit())
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -285,14 +287,14 @@ private struct SessionRow: View {
                 HStack(spacing: 8) {
                     ChunkStrip(chunks: session.chunks, style: .compact, isRunning: session.isRunning)
                     Text("\(session.completedChunks)/\(session.chunks.count)")
-                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
+                        .scaledFont(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
                 }
             }
             if showBranches, let worktree = session.worktree {
                 BranchLabel(worktree: worktree, isRemoved: session.worktreeRemoved)
             }
             if case let .needsYou(reason) = session.status {
-                Text(reason).font(.caption).foregroundStyle(.orange).lineLimit(2)
+                Text(reason).scaledFont(.caption).foregroundStyle(.orange).lineLimit(2)
             }
         }
     }
@@ -302,7 +304,7 @@ private struct SessionRow: View {
         let status = HStack(spacing: 6) {
             StatusDot(status: session.status)
             Text(session.status.label).foregroundStyle(session.status.color)
-        }.font(.system(size: 10, weight: .semibold))
+        }.scaledFont(.system(size: 10, weight: .semibold))
 
         return ViewThatFits(in: .horizontal) {
             HStack(spacing: 8) {
@@ -355,8 +357,10 @@ struct SessionMenu: View {
 
 private struct OverviewView: View {
     @EnvironmentObject private var store: SessionStore
+    @Environment(\.textScale) private var textScale
 
-    private let columns = [GridItem(.adaptive(minimum: 320), spacing: 16)]
+    /// Cards widen with the text, so the provider badge and the status still fit on one line.
+    private var columns: [GridItem] { [GridItem(.adaptive(minimum: 320 * textScale), spacing: 16)] }
 
     var body: some View {
         ScrollView {
@@ -374,10 +378,10 @@ private struct OverviewView: View {
                     VStack(alignment: .leading, spacing: 14) {
                         HStack {
                             Label(group.project.name, systemImage: group.project.symbol)
-                                .font(.title3.bold())
+                                .scaledFont(.title3.bold())
                             Rectangle().fill(AgenticiousStyle.violet.opacity(0.25)).frame(height: 1)
                             Text("\(group.sessions.count) AGENTS")
-                                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                .scaledFont(.system(size: 10, weight: .semibold, design: .monospaced))
                                 .foregroundStyle(.secondary)
                         }
                         LazyVGrid(columns: columns, spacing: 16) {
@@ -402,7 +406,7 @@ struct SessionCard: View {
     @State private var isHovered = false
 
     private static let stepRows = 5
-    private let titleFont = Font.title3.weight(.semibold)
+    private let titleFont = ScaledFont.title3.weight(.semibold)
 
     var body: some View {
         // Drawn over an invisible worst-case card, so every card has the same height and long content is cut, not grown.
@@ -434,7 +438,7 @@ struct SessionCard: View {
                 }
                 if case let .needsYou(reason) = session.status {
                     Label(reason, systemImage: "hand.raised.fill")
-                        .font(.callout)
+                        .scaledFont(.callout)
                         .foregroundStyle(.orange)
                         .lineLimit(2)
                         .help(reason)
@@ -456,16 +460,16 @@ struct SessionCard: View {
             HStack(alignment: .top, spacing: 10) {
                 TaskTypeIcon(type: session.displayedTaskType)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(" ").font(titleFont).lineLimit(2, reservesSpace: true)
-                    Text(" ").font(.callout).lineLimit(3, reservesSpace: true)
+                    Text(" ").scaledFont(titleFont).lineLimit(2, reservesSpace: true)
+                    Text(" ").scaledFont(.callout).lineLimit(3, reservesSpace: true)
                 }.frame(maxWidth: .infinity, alignment: .leading)
             }
             ChunkStrip(chunks: [], style: .compact)
             VStack(alignment: .leading, spacing: 4) {
-                ForEach(0..<Self.stepRows, id: \.self) { _ in Label(" ", systemImage: "circle").font(.callout) }
+                ForEach(0..<Self.stepRows, id: \.self) { _ in Label(" ", systemImage: "circle").scaledFont(.callout) }
             }
-            Label(" ", systemImage: "hand.raised.fill").font(.callout).lineLimit(2, reservesSpace: true)
-            Label(" ", systemImage: "arrow.triangle.branch").font(.caption)
+            Label(" ", systemImage: "hand.raised.fill").scaledFont(.callout).lineLimit(2, reservesSpace: true)
+            Label(" ", systemImage: "arrow.triangle.branch").scaledFont(.caption)
             footer
         }
     }
@@ -484,7 +488,7 @@ struct SessionCard: View {
             Spacer()
             if !session.chunks.isEmpty { Text("\(session.completedChunks)/\(session.chunks.count) steps") }
         }
-        .font(.caption)
+        .scaledFont(.caption)
         .foregroundStyle(.secondary)
     }
 }

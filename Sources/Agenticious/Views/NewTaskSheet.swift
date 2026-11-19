@@ -6,6 +6,7 @@ struct NewTaskSheet: View {
     @EnvironmentObject private var store: SessionStore
     @EnvironmentObject private var presets: TaskPresetStore
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.textScale) private var textScale
 
     @AppStorage("lastTaskPreset") private var lastTaskPreset = "custom"
     @AppStorage("lastWorkspace") private var lastWorkspace = ""
@@ -53,7 +54,7 @@ struct NewTaskSheet: View {
                     SkillSelectionField(paths: $skillPaths, project: project)
                     if let launchError {
                         Label(launchError, systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.red).font(.callout)
+                            .foregroundStyle(.red).scaledFont(.callout)
                     }
                 }
                 .padding(.horizontal, 24)
@@ -103,15 +104,15 @@ struct NewTaskSheet: View {
     private var header: some View {
         HStack(spacing: 16) {
             Image(systemName: "sparkles")
-                .font(.system(size: 26))
+                .scaledFont(.system(size: 26))
                 .foregroundStyle(AgenticiousStyle.lime)
-                .frame(width: 44, height: 44)
+                .scaledFrame(width: 44, height: 44)
                 .background(AgenticiousStyle.lime.opacity(0.1), in: RoundedRectangle(cornerRadius: 16))
             VStack(alignment: .leading, spacing: 5) {
                 Text("Summon an agent")
-                    .font(.system(size: 26, weight: .bold, design: .rounded))
+                    .scaledFont(.system(size: 26, weight: .bold, design: .rounded))
                 Text("Choose a task. Add your skills. Let the magic happen.")
-                    .font(.callout).foregroundStyle(.secondary)
+                    .scaledFont(.callout).foregroundStyle(.secondary)
             }
             Spacer()
         }
@@ -121,11 +122,11 @@ struct NewTaskSheet: View {
 
     private var missionFields: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Task input").font(.headline)
+            Text("Task input").scaledFont(.headline)
             editor($task, minHeight: 100, focusOnAppear: true)
                 .accessibilityLabel("Task input")
             Text("Describe the task and any context. Type ``` for a code snippet.")
-                .font(.caption).foregroundStyle(.secondary)
+                .scaledFont(.caption).foregroundStyle(.secondary)
         }
     }
 
@@ -145,7 +146,7 @@ struct NewTaskSheet: View {
                                         images.removeAll { $0.id == image.id }
                                     }
                                     .labelStyle(.iconOnly).buttonStyle(.plain)
-                                    .font(.title3).foregroundStyle(.white, .black.opacity(0.7))
+                                    .scaledFont(.title3).foregroundStyle(.white, .black.opacity(0.7))
                                     .padding(4)
                                 }
                                 .accessibilityLabel("Attached image")
@@ -155,23 +156,23 @@ struct NewTaskSheet: View {
             }
             Label(images.isEmpty ? "Paste (⌘V) or drop images to show the agent." : "\(images.count) image\(images.count == 1 ? "" : "s") attached.",
                   systemImage: "photo.on.rectangle.angled")
-                .font(.caption).foregroundStyle(.secondary)
+                .scaledFont(.caption).foregroundStyle(.secondary)
         }
     }
 
     private var configurationFields: some View {
         VStack(alignment: .leading, spacing: 12) {
             Label("Agent & workspace", systemImage: "slider.horizontal.3")
-                .font(.headline).foregroundStyle(AgenticiousStyle.violet)
+                .scaledFont(.headline).foregroundStyle(AgenticiousStyle.violet)
             HStack(spacing: 12) {
                 ForEach(AgentKind.allCases) { choice in
                     Button { agent = choice } label: {
                         HStack(spacing: 8) {
                             ProviderIcon(agent: choice).foregroundStyle(Color.primary)
-                            Text(choice.displayName).font(.callout.weight(.semibold)).lineLimit(1)
+                            Text(choice.displayName).scaledFont(.callout.weight(.semibold)).lineLimit(1)
                             Image(systemName: "checkmark.circle.fill").opacity(agent == choice ? 1 : 0)
                         }
-                        .padding(.horizontal, 12).frame(height: 48)
+                        .padding(.horizontal, 12).scaledFrame(height: 48)
                         .foregroundStyle(agent == choice ? AgenticiousStyle.lime : .primary)
                         .background(agent == choice ? AgenticiousStyle.lime.opacity(0.1) : AgenticiousStyle.ink, in: RoundedRectangle(cornerRadius: 12))
                         .overlay(RoundedRectangle(cornerRadius: 12).stroke(agent == choice ? AgenticiousStyle.lime : AgenticiousStyle.violet.opacity(0.25)))
@@ -184,7 +185,7 @@ struct NewTaskSheet: View {
             thinkingEffort
             workspacePicker
             if !repository.isReady(for: project.path) {
-                ProgressView("Checking workspace…").controlSize(.small).font(.caption)
+                ProgressView("Checking workspace…").controlSize(.small).scaledFont(.caption)
             }
             if isGitProject && !template.isChat {
                 Toggle(isOn: $useWorktree) {
@@ -192,9 +193,9 @@ struct NewTaskSheet: View {
                         Image(systemName: "arrow.triangle.branch")
                             .foregroundStyle(AgenticiousStyle.violet)
                         VStack(alignment: .leading, spacing: 3) {
-                            Text("Give this agent its own worktree").font(.callout.weight(.semibold))
+                            Text("Give this agent its own worktree").scaledFont(.callout.weight(.semibold))
                             Text("A separate branch and folder for this mission.")
-                                .font(.caption).foregroundStyle(.secondary)
+                                .scaledFont(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
                     }
@@ -214,13 +215,13 @@ struct NewTaskSheet: View {
             HStack(spacing: 12) {
                 Image(systemName: "cpu").foregroundStyle(AgenticiousStyle.violet)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("MODEL").font(.system(size: 9, weight: .bold, design: .monospaced)).foregroundStyle(.secondary)
-                    Text(selectedModel.name).font(.callout.weight(.semibold))
+                    Text("MODEL").scaledFont(.system(size: 9, weight: .bold, design: .monospaced)).foregroundStyle(.secondary)
+                    Text(selectedModel.name).scaledFont(.callout.weight(.semibold))
                 }
                 Spacer()
-                Image(systemName: "chevron.up.chevron.down").font(.caption).foregroundStyle(AgenticiousStyle.violet)
+                Image(systemName: "chevron.up.chevron.down").scaledFont(.caption).foregroundStyle(AgenticiousStyle.violet)
             }
-            .padding(.horizontal, 12).frame(height: 48)
+            .padding(.horizontal, 12).scaledFrame(height: 48)
             .background(AgenticiousStyle.ink, in: RoundedRectangle(cornerRadius: 12))
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(AgenticiousStyle.violet.opacity(0.25)))
             .contentShape(RoundedRectangle(cornerRadius: 12))
@@ -229,7 +230,7 @@ struct NewTaskSheet: View {
         .popover(isPresented: $showingModels) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Choose a model").font(.headline).padding(8)
+                    Text("Choose a model").scaledFont(.headline).padding(8)
                     ForEach(models) { model in
                         Button {
                             modelSelection.wrappedValue = model.id
@@ -244,7 +245,7 @@ struct NewTaskSheet: View {
                         }.buttonStyle(.plain)
                     }
                 }.padding(8)
-            }.frame(width: 340, height: min(CGFloat(models.count * 40 + 60), 380))
+            }.frame(width: 340, height: modelListHeight)
                 .background(AgenticiousStyle.panel)
         }
         .accessibilityLabel("Model")
@@ -255,7 +256,7 @@ struct NewTaskSheet: View {
     private var thinkingEffort: some View {
         if !selectedModel.efforts.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
-                Text("THINKING EFFORT").font(.system(size: 9, weight: .bold, design: .monospaced)).foregroundStyle(.secondary)
+                Text("THINKING EFFORT").scaledFont(.system(size: 9, weight: .bold, design: .monospaced)).foregroundStyle(.secondary)
                 ScrollView(.horizontal) {
                     HStack(spacing: 6) {
                         effortChip("", title: defaultEffortName)
@@ -271,7 +272,7 @@ struct NewTaskSheet: View {
     private func effortChip(_ value: String, title: String) -> some View {
         Button { effortSelection.wrappedValue = value } label: {
             Text(title)
-                .font(.system(size: 11, weight: .semibold))
+                .scaledFont(.system(size: 11, weight: .semibold))
                 .padding(.horizontal, 12).padding(.vertical, 8)
                 .foregroundStyle(selectedEffort == value ? AgenticiousStyle.lime : .secondary)
                 .background(selectedEffort == value ? AgenticiousStyle.lime.opacity(0.1) : AgenticiousStyle.ink, in: Capsule())
@@ -285,7 +286,7 @@ struct NewTaskSheet: View {
     private var workspacePicker: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("WORKSPACE").font(.system(size: 9, weight: .bold, design: .monospaced)).foregroundStyle(.secondary)
+                Text("WORKSPACE").scaledFont(.system(size: 9, weight: .bold, design: .monospaced)).foregroundStyle(.secondary)
                 Spacer()
                 Button("Browse…", systemImage: "folder.badge.plus", action: addFolder)
                     .buttonStyle(AgenticiousButtonStyle(isPrimary: false, isCompact: true))
@@ -300,7 +301,7 @@ struct NewTaskSheet: View {
                                 symbol: choice.symbol,
                                 isSelected: project == choice
                             ) { project = choice }
-                            .frame(width: 200)
+                            .scaledFrame(width: 200)
                             .id(choice.id)
                             .help(choice.path ?? "Run from your home folder")
                         }
@@ -311,7 +312,7 @@ struct NewTaskSheet: View {
                 .onChange(of: project) { _, selected in proxy.scrollTo(selected.id, anchor: .center) }
             }
             if let path = project.path {
-                Text(path).font(.caption.monospaced()).foregroundStyle(.secondary)
+                Text(path).scaledFont(.caption.monospaced()).foregroundStyle(.secondary)
                     .lineLimit(1).truncationMode(.middle).help(path)
             }
         }
@@ -320,7 +321,7 @@ struct NewTaskSheet: View {
     private var footer: some View {
         HStack(spacing: 12) {
             Text("⌘ Return to summon")
-                .font(.caption).foregroundStyle(.secondary)
+                .scaledFont(.caption).foregroundStyle(.secondary)
             Spacer()
             Button("Cancel", role: .cancel, action: close)
                 .keyboardShortcut(.cancelAction)
@@ -353,6 +354,11 @@ struct NewTaskSheet: View {
     }
 
     private var models: [ModelChoice] { catalog[agent] ?? [] }
+
+    /// The heading and each model are one 16 pt line inside fixed padding, so only that line grows with the text.
+    private var modelListHeight: CGFloat {
+        min(CGFloat(models.count * 40 + 60) + CGFloat(models.count + 1) * 16 * (textScale - 1), 380)
+    }
 
     /// Remembered per agent. A model that's no longer offered falls back to Default.
     private var selectedModel: ModelChoice {
@@ -431,15 +437,17 @@ private struct TaskTemplatePicker: View {
     let templates: [TaskTemplate]
     @State private var width: CGFloat = 900
     @State private var showingAll = false
+    @Environment(\.textScale) private var textScale
 
-    private static let chipWidth: CGFloat = 180
+    /// Wider with the text, so a task name that fits today still fits.
+    private var chipWidth: CGFloat { 180 * textScale }
     private static let spacing: CGFloat = 8
     private static let rows = 2
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Choose a task").font(.headline)
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: Self.chipWidth), spacing: Self.spacing)], alignment: .leading, spacing: Self.spacing) {
+            Text("Choose a task").scaledFont(.headline)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: chipWidth), spacing: Self.spacing)], alignment: .leading, spacing: Self.spacing) {
                 ForEach(visible) { chip($0) }
                 if overflows { moreButton }
             }
@@ -451,14 +459,14 @@ private struct TaskTemplatePicker: View {
                 }
             }
             Text(selection.summary)
-                .font(.callout).foregroundStyle(.secondary)
+                .scaledFont(.callout).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
 
     /// Matches how an adaptive grid fills its width, so "more" lands in the last slot of the second row.
     private var capacity: Int {
-        max(1, Int((width + Self.spacing) / (Self.chipWidth + Self.spacing))) * Self.rows
+        max(1, Int((width + Self.spacing) / (chipWidth + Self.spacing))) * Self.rows
     }
 
     private var overflows: Bool { templates.count > capacity }
@@ -476,12 +484,12 @@ private struct TaskTemplatePicker: View {
         let isSelected = selection.id == template.id
         return Button { selection = template } label: {
             HStack(spacing: 8) {
-                Image(systemName: template.symbol).font(.callout)
-                Text(template.shortName).font(.system(size: 12, weight: .semibold)).lineLimit(1)
+                Image(systemName: template.symbol).scaledFont(.callout)
+                Text(template.shortName).scaledFont(.system(size: 12, weight: .semibold)).lineLimit(1)
                 Spacer(minLength: 0)
                 Image(systemName: "checkmark.circle.fill").opacity(isSelected ? 1 : 0)
             }
-            .padding(.horizontal, 12).frame(height: 40)
+            .padding(.horizontal, 12).scaledFrame(height: 40)
             .foregroundStyle(isSelected ? AgenticiousStyle.lime : .primary)
             .background(isSelected ? AgenticiousStyle.lime.opacity(0.1) : AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 12))
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(isSelected ? AgenticiousStyle.lime : AgenticiousStyle.violet.opacity(0.25)))
@@ -497,8 +505,8 @@ private struct TaskTemplatePicker: View {
     private var moreButton: some View {
         Button { withAnimation(.snappy) { showingAll.toggle() } } label: {
             Label(showingAll ? "Show less" : "\(templates.count - visible.count) more", systemImage: showingAll ? "chevron.up" : "ellipsis")
-                .font(.system(size: 12, weight: .semibold))
-                .frame(maxWidth: .infinity).frame(height: 40)
+                .scaledFont(.system(size: 12, weight: .semibold))
+                .frame(maxWidth: .infinity).scaledFrame(height: 40)
                 .foregroundStyle(AgenticiousStyle.violet)
                 .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(AgenticiousStyle.violet.opacity(0.4), style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
                 .contentShape(RoundedRectangle(cornerRadius: 12))
@@ -519,13 +527,13 @@ private struct SummonChoiceCard: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 8) {
-                Image(systemName: symbol).font(.callout)
-                Text(title).font(.callout.weight(.semibold)).lineLimit(1)
+                Image(systemName: symbol).scaledFont(.callout)
+                Text(title).scaledFont(.callout.weight(.semibold)).lineLimit(1)
                 Spacer(minLength: 0)
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .foregroundStyle(isSelected ? AgenticiousStyle.lime : AgenticiousStyle.violet.opacity(0.5))
             }
-            .padding(.horizontal, 12).frame(height: 40)
+            .padding(.horizontal, 12).scaledFrame(height: 40)
             .frame(maxWidth: .infinity, alignment: .leading)
             .foregroundStyle(isSelected ? AgenticiousStyle.lime : .primary)
             .background(isSelected ? AgenticiousStyle.lime.opacity(0.1) : AgenticiousStyle.ink, in: RoundedRectangle(cornerRadius: 12))

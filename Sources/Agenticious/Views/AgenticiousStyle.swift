@@ -18,15 +18,15 @@ struct ControlRoomHero: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Label("THE CONTROL ROOM", systemImage: "sparkles")
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                .scaledFont(.system(size: 10, weight: .bold, design: .monospaced))
                 .tracking(2)
                 .foregroundStyle(AgenticiousStyle.lime)
             Text(isEmpty ? "Let's raise\nsome agents." : "Beautiful chaos.\nUnder control.")
-                .font(.system(size: 36, weight: .black, design: .rounded))
+                .scaledFont(.system(size: 36, weight: .black, design: .rounded))
                 .tracking(-1.2)
                 .fixedSize(horizontal: true, vertical: false)
             Text("Big ideas. Strange powers. Work getting done.")
-                .font(.callout)
+                .scaledFont(.callout)
                 .foregroundStyle(.secondary)
         }
         .padding(30)
@@ -48,11 +48,11 @@ struct DashboardMetric: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 4) {
             Text("\(value)")
-                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .scaledFont(.system(size: 15, weight: .bold, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(color)
             Text(title)
-                .font(.system(size: 8, weight: .bold, design: .monospaced))
+                .scaledFont(.system(size: 8, weight: .bold, design: .monospaced))
                 .tracking(0.5)
                 .foregroundStyle(.secondary)
         }
@@ -73,7 +73,7 @@ struct AgenticiousButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 13, weight: .semibold))
+            .scaledFont(.system(size: 13, weight: .semibold))
             .padding(.horizontal, isCompact ? 10 : 18)
             .padding(.vertical, isCompact ? 6 : 11)
             .foregroundStyle(isPrimary ? AgenticiousStyle.ink : Color.primary)
@@ -92,7 +92,7 @@ struct PillButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 10, weight: .semibold))
+            .scaledFont(.system(size: 10, weight: .semibold))
             .lineLimit(1)
             .fixedSize()
             .padding(.horizontal, 8).padding(.vertical, 5)

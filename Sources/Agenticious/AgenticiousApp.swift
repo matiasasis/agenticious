@@ -49,11 +49,13 @@ struct AgenticiousApp: App {
                 Button("Settings…") { store.selection = .settings }
                     .keyboardShortcut(",")
             }
+            TextSizeCommands()
         }
 
         MenuBarExtra {
             MenuBarContent()
                 .environmentObject(store.usage)
+                .textScaled()
         } label: {
             HStack(spacing: 4) {
                 Image(nsImage: AgenticiousMenuIcon.image)
@@ -77,6 +79,7 @@ extension View {
             .environmentObject(store.presets)
             .environmentObject(store.skillLocations)
             .environmentObject(store.summon)
+            .textScaled()
     }
 }
 
@@ -86,6 +89,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         NSApp.applicationIconImage = Bundle.module.url(forResource: "BundleIcon", withExtension: "png").flatMap(NSImage.init(contentsOf:))
         NSApp.activate(ignoringOtherApps: true)
+        TextScale.acceptCommandEquals()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }

@@ -382,7 +382,9 @@ final class SessionStore: ObservableObject {
     }
 
     private func attachTerminal(to session: AgentSession, running spec: LaunchSpec) {
-        let terminal = LocalProcessTerminalView(frame: NSRect(x: 0, y: 0, width: 900, height: 500))
+        let terminal = AgentTerminalView(frame: NSRect(x: 0, y: 0, width: 900, height: 500))
+        // Before the process exists, so the CLI starts on the grid it will keep.
+        terminal.setFontSize(NSFont.systemFontSize * TextScale.clamped(UserDefaults.standard.double(forKey: TextScale.key)))
         let bridge = TerminalBridge { [weak self, weak session, weak terminal] exitCode in
             guard let session, !session.isArchiving, session.isRunning, session.terminalView === terminal else { return }
             let oldStatus = session.status

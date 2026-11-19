@@ -4,6 +4,7 @@ import AppKit
 struct TaskSettingsView: View {
     @EnvironmentObject private var presets: TaskPresetStore
     @EnvironmentObject private var hotkeys: SummonHotkeys
+    @Environment(\.textScale) private var textScale
     @State private var editing: TaskTemplate?
     @State private var deleting: TaskTemplate?
     @State private var dropTarget: String?
@@ -14,7 +15,7 @@ struct TaskSettingsView: View {
             VStack(alignment: .leading, spacing: 24) {
                 HStack {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Your agents. Your rules.").font(.system(size: 30, weight: .bold, design: .rounded))
+                        Text("Your agents. Your rules.").scaledFont(.system(size: 30, weight: .bold, design: .rounded))
                         Text("Configure the task presets shown when you summon an agent.").foregroundStyle(.secondary)
                     }
                     Spacer()
@@ -23,18 +24,20 @@ struct TaskSettingsView: View {
                 }
                 if let loadError = presets.loadError {
                     Text(loadError).foregroundStyle(.orange)
-                    Button("Show saved presets") { NSWorkspace.shared.activateFileViewerSelecting([presets.url]) }
+                    Button { NSWorkspace.shared.activateFileViewerSelecting([presets.url]) } label: {
+                        Text("Show saved presets").scaledFont(.body)
+                    }
                 }
                 orderPicker
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 280), spacing: 16)], spacing: 16) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 280 * textScale), spacing: 16)], spacing: 16) {
                     ForEach(Array(presets.presets.enumerated()), id: \.element.id) { index, preset in
                         VStack(alignment: .leading, spacing: 14) {
                             HStack(spacing: 12) {
                                 Image(systemName: preset.symbol)
-                                    .font(.system(size: 18))
-                                    .frame(width: 40, height: 40)
+                                    .scaledFont(.system(size: 18))
+                                    .scaledFrame(width: 40, height: 40)
                                     .background(AgenticiousStyle.lime.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
-                                Text(preset.name).font(.title3.bold())
+                                Text(preset.name).scaledFont(.title3.bold())
                                 Spacer(minLength: 0)
                                 Image(systemName: "line.3.horizontal")
                                     .foregroundStyle(.secondary)
@@ -42,7 +45,7 @@ struct TaskSettingsView: View {
                             }
                             .foregroundStyle(AgenticiousStyle.lime)
                             Text(preset.summary.isEmpty ? "Your reusable agent prompt." : preset.summary)
-                                .foregroundStyle(.secondary).lineLimit(3).frame(minHeight: 40, alignment: .topLeading)
+                                .foregroundStyle(.secondary).lineLimit(3).scaledFrame(minHeight: 40, alignment: .topLeading)
                             HStack {
                                 Text("\(preset.skillPaths.count) attached skills")
                                 Spacer()
@@ -50,9 +53,9 @@ struct TaskSettingsView: View {
                                     Text(hotkey.display).monospaced().accessibilityLabel("Shortcut \(hotkey.display)")
                                 }
                             }
-                            .font(.caption).foregroundStyle(AgenticiousStyle.violet)
+                            .scaledFont(.caption).foregroundStyle(AgenticiousStyle.violet)
                             if let problem = hotkeys.problems[preset.id] {
-                                Label(problem, systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(.orange)
+                                Label(problem, systemImage: "exclamationmark.triangle.fill").scaledFont(.caption).foregroundStyle(.orange)
                             }
                             HStack {
                                 Button("Edit preset", systemImage: "pencil") { editing = preset }
@@ -79,7 +82,7 @@ struct TaskSettingsView: View {
                     }
                 }
                 Text("Saved on this Mac for your user account. Changes apply to new tasks; running agents keep their original prompts.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .scaledFont(.caption).foregroundStyle(.secondary)
             }
             .padding(28)
         }
@@ -101,10 +104,10 @@ struct TaskSettingsView: View {
     private var orderPicker: some View {
         HStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Order in the Summon sheet").font(.headline)
+                Text("Order in the Summon sheet").scaledFont(.headline)
                 Text(presets.order == .arranged ? "Drag the cards below to arrange them."
                      : "The custom task first, then the presets you start most.")
-                    .font(.callout).foregroundStyle(.secondary)
+                    .scaledFont(.callout).foregroundStyle(.secondary)
             }
             Spacer()
             Picker("Order in the Summon sheet", selection: $presets.order) {
@@ -165,15 +168,15 @@ private struct PresetEditorSheet: View {
     private var header: some View {
         HStack(spacing: 16) {
             Image(systemName: draft.symbol)
-                .font(.system(size: 24))
+                .scaledFont(.system(size: 24))
                 .foregroundStyle(AgenticiousStyle.lime)
-                .frame(width: 44, height: 44)
+                .scaledFrame(width: 44, height: 44)
                 .background(AgenticiousStyle.lime.opacity(0.1), in: RoundedRectangle(cornerRadius: 16))
             VStack(alignment: .leading, spacing: 5) {
                 Text(isNew ? "Shape a task preset" : "Edit preset")
-                    .font(.system(size: 26, weight: .bold, design: .rounded))
+                    .scaledFont(.system(size: 26, weight: .bold, design: .rounded))
                 Text("Icon, prompt and skills. All yours.")
-                    .font(.callout).foregroundStyle(.secondary)
+                    .scaledFont(.callout).foregroundStyle(.secondary)
             }
             Spacer()
         }
@@ -186,12 +189,12 @@ private struct PresetEditorSheet: View {
             HStack(alignment: .top, spacing: 16) {
                 Button { choosingIcon.toggle() } label: {
                     VStack(spacing: 6) {
-                        Image(systemName: draft.symbol).font(.system(size: 30))
+                        Image(systemName: draft.symbol).scaledFont(.system(size: 30))
                             .foregroundStyle(AgenticiousStyle.lime)
-                            .frame(width: 76, height: 76)
+                            .scaledFrame(width: 76, height: 76)
                             .background(AgenticiousStyle.lime.opacity(0.1), in: RoundedRectangle(cornerRadius: 16))
                             .overlay(RoundedRectangle(cornerRadius: 16).stroke(AgenticiousStyle.lime.opacity(0.5)))
-                        Text("Change").font(.caption.weight(.semibold)).foregroundStyle(AgenticiousStyle.violet)
+                        Text("Change").scaledFont(.caption.weight(.semibold)).foregroundStyle(AgenticiousStyle.violet)
                     }
                     .contentShape(Rectangle())
                 }
@@ -202,7 +205,7 @@ private struct PresetEditorSheet: View {
                     PresetIconPicker(symbol: $draft.symbol) { choosingIcon = false }
                 }
                 VStack(alignment: .leading, spacing: 12) {
-                    field("NAME") { TextField("Preset name", text: $draft.name).font(.title3.weight(.semibold)) }
+                    field("NAME") { TextField("Preset name", text: $draft.name).scaledFont(.title3.weight(.semibold)) }
                     field("DESCRIPTION") { TextField("What does this task do?", text: $draft.summary) }
                 }
             }
@@ -221,7 +224,7 @@ private struct PresetEditorSheet: View {
     private var summonForm: some View {
         card("Task title", symbol: "rectangle.and.pencil.and.ellipsis") {
             field("CARD TITLE", caption: "{{input}} becomes what you typed.") {
-                TextField("{{input}}", text: $draft.titlePattern).font(.body.monospaced())
+                TextField("{{input}}", text: $draft.titlePattern).scaledFont(.body.monospaced())
             }
         }
     }
@@ -232,7 +235,7 @@ private struct PresetEditorSheet: View {
                 (draft.prompt.contains("{{input}}") ? "" : " Without {{input}}, what you type is added after the prompt.")) {
             VStack(alignment: .trailing, spacing: 10) {
                 TextEditor(text: $draft.prompt)
-                    .font(.system(.body, design: .monospaced))
+                    .scaledFont(.system(.body, design: .monospaced))
                     .scrollContentBackground(.hidden)
                     .padding(10)
                     .frame(minHeight: 220)
@@ -249,7 +252,7 @@ private struct PresetEditorSheet: View {
     private var skills: some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("BROWSE SKILLS FROM").font(.system(size: 9, weight: .bold, design: .monospaced)).tracking(1).foregroundStyle(.secondary)
+                Text("BROWSE SKILLS FROM").scaledFont(.system(size: 9, weight: .bold, design: .monospaced)).tracking(1).foregroundStyle(.secondary)
                 SkillProjectPicker(project: $project)
             }
             SkillSelectionField(paths: $draft.skillPaths, project: project)
@@ -261,14 +264,14 @@ private struct PresetEditorSheet: View {
     private var preview: some View {
         DisclosureGroup {
             Text(draft.instructions(for: Self.exampleInput))
-                .font(.system(.callout, design: .monospaced))
+                .scaledFont(.system(.callout, design: .monospaced))
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(12)
                 .background(AgenticiousStyle.ink, in: RoundedRectangle(cornerRadius: 10))
                 .padding(.top, 10)
         } label: {
-            Label("Preview the full prompt", systemImage: "eye").font(.headline).foregroundStyle(AgenticiousStyle.violet)
+            Label("Preview the full prompt", systemImage: "eye").scaledFont(.headline).foregroundStyle(AgenticiousStyle.violet)
         }
         .padding(18)
         .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 16))
@@ -277,9 +280,9 @@ private struct PresetEditorSheet: View {
     private var footer: some View {
         HStack(spacing: 12) {
             if let message = error ?? draft.validationMessage ?? shortcutProblem {
-                Label(message, systemImage: "exclamationmark.triangle.fill").font(.callout).foregroundStyle(.orange)
+                Label(message, systemImage: "exclamationmark.triangle.fill").scaledFont(.callout).foregroundStyle(.orange)
             } else {
-                Text("⌘ Return to save").font(.caption).foregroundStyle(.secondary)
+                Text("⌘ Return to save").scaledFont(.caption).foregroundStyle(.secondary)
             }
             Spacer()
             Button("Cancel", role: .cancel) { dismiss() }
@@ -302,8 +305,8 @@ private struct PresetEditorSheet: View {
     private func card(_ title: String, symbol: String, caption: String? = nil, @ViewBuilder content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
-                Label(title, systemImage: symbol).font(.headline).foregroundStyle(AgenticiousStyle.violet)
-                if let caption { Text(caption).font(.caption).foregroundStyle(.secondary) }
+                Label(title, systemImage: symbol).scaledFont(.headline).foregroundStyle(AgenticiousStyle.violet)
+                if let caption { Text(caption).scaledFont(.caption).foregroundStyle(.secondary) }
             }
             content()
         }
@@ -314,13 +317,13 @@ private struct PresetEditorSheet: View {
 
     private func field(_ label: String, caption: String? = nil, @ViewBuilder input: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(label).font(.system(size: 9, weight: .bold, design: .monospaced)).tracking(1).foregroundStyle(.secondary)
+            Text(label).scaledFont(.system(size: 9, weight: .bold, design: .monospaced)).tracking(1).foregroundStyle(.secondary)
             input()
                 .textFieldStyle(.plain)
                 .padding(10)
                 .background(AgenticiousStyle.ink, in: RoundedRectangle(cornerRadius: 10))
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(AgenticiousStyle.violet.opacity(0.3)))
-            if let caption { Text(caption).font(.caption).foregroundStyle(.secondary) }
+            if let caption { Text(caption).scaledFont(.caption).foregroundStyle(.secondary) }
         }
     }
 }

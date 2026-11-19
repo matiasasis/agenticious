@@ -18,7 +18,7 @@ struct HotkeyRecorder: View {
                 Button("Remove shortcut", systemImage: "xmark.circle") { hotkey = nil; hint = nil }
                     .labelStyle(.iconOnly).buttonStyle(.borderless)
             }
-            if let hint { Text(hint).font(.caption).foregroundStyle(.orange) }
+            if let hint { Text(hint).scaledFont(.caption).foregroundStyle(.orange) }
         }
         .onDisappear(perform: stop)
         // Shortcuts are off while recording; switching apps mid-recording must not leave them off.

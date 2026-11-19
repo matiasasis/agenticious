@@ -152,7 +152,7 @@ final class AgentSession: ObservableObject, Identifiable {
     var conversationID: String?
     /// Claude's log of this conversation, from its hooks. Subagent logs sit next to it.
     var transcriptURL: URL?
-    var terminalView: LocalProcessTerminalView?
+    var terminalView: AgentTerminalView?
     var terminalBridge: TerminalBridge?
 
     init(

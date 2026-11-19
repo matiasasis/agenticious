@@ -10,8 +10,10 @@ struct SnippetEditor: View {
     var minHeight: CGFloat = 40
     var maxHeight: CGFloat = 320
     var focusOnAppear = false
+    @Environment(\.textScale) private var textScale
 
     var body: some View {
+        let font = font.scaled(textScale)
         SnippetTextArea(text: $text, font: font, minHeight: minHeight, maxHeight: maxHeight, focusOnAppear: focusOnAppear)
             .overlay(alignment: .topLeading) {
                 if text.isEmpty {
@@ -66,9 +68,10 @@ private struct SnippetTextArea: NSViewRepresentable {
     }
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        let fontChanged = context.coordinator.parent.font != font
         context.coordinator.parent = self
-        guard let textView = scrollView.documentView as? NSTextView, textView.string != text else { return }
-        textView.string = text
+        guard let textView = scrollView.documentView as? NSTextView, textView.string != text || fontChanged else { return }
+        if textView.string != text { textView.string = text }
         context.coordinator.highlight(textView)
     }
 

@@ -2,6 +2,10 @@ import SwiftUI
 
 struct ChunkGridLayout: Layout {
     static let cardHeight: CGFloat = 72
+    /// The text size: a card holds two lines of title, so it grows taller with them. It doesn't grow wider: more
+    /// rows of cards would take the space the activity under them needs.
+    var scale: CGFloat = 1
+    private var cardHeight: CGFloat { Self.cardHeight * scale }
     private let minimumWidth: CGFloat = 180
     private let spacing: CGFloat = 8
 
@@ -30,8 +34,8 @@ struct ChunkGridLayout: Layout {
             let columns = baseCount + (row < extra ? 1 : 0)
             let cardWidth = max(0, (width - CGFloat(columns - 1) * spacing) / CGFloat(columns))
             return (0..<columns).map { column in
-                CGRect(x: CGFloat(column) * (cardWidth + spacing), y: CGFloat(row) * (Self.cardHeight + spacing),
-                       width: cardWidth, height: Self.cardHeight)
+                CGRect(x: CGFloat(column) * (cardWidth + spacing), y: CGFloat(row) * (cardHeight + spacing),
+                       width: cardWidth, height: cardHeight)
             }
         }
     }

@@ -3,6 +3,7 @@ import AppKit
 
 struct SkillLibraryView: View {
     @EnvironmentObject private var locations: SkillLocations
+    @Environment(\.textScale) private var textScale
     @StateObject private var catalog = SkillCatalog()
     @State private var project = Project.none
     @State private var query = ""
@@ -21,7 +22,7 @@ struct SkillLibraryView: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Skill library").font(.system(size: 28, weight: .bold, design: .rounded))
+                    Text("Skill library").scaledFont(.system(size: 28, weight: .bold, design: .rounded))
                     Text("Find your agents' know-how. Make it your own.").foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -33,26 +34,26 @@ struct SkillLibraryView: View {
             HStack {
                 TextField("Search skills", text: $query).textFieldStyle(.roundedBorder)
                 SkillProjectPicker(project: $project)
-                    .frame(maxWidth: 320)
+                    .scaledFrame(maxWidth: 320)
             }
             HStack(spacing: 12) {
                 Text("Personal, project, and cached plugin skills · \(catalog.skills.count) found")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .scaledFont(.caption).foregroundStyle(.secondary)
                 if catalog.isLoading { ProgressView().controlSize(.small) }
                 Spacer()
-                Menu("Search folders") {
+                Menu {
                     Button("Add a folder…") {
                         if let url = FolderPicker.choose() { locations.add(url) }
                     }
                     ForEach(locations.paths, id: \.self) { path in
                         Button("Stop searching \(path)") { locations.remove(path) }
                     }
-                }
+                } label: { Text("Search folders").scaledFont(.body, textScale) }
                 .fixedSize()
             }
             if !catalog.issues.isEmpty {
                 DisclosureGroup("\(catalog.issues.count) folders or skills could not be read") {
-                    ScrollView { Text(catalog.issues.joined(separator: "\n")).font(.caption).textSelection(.enabled) }.frame(maxHeight: 80)
+                    ScrollView { Text(catalog.issues.joined(separator: "\n")).scaledFont(.caption).textSelection(.enabled) }.frame(maxHeight: 80)
                 }
                 .foregroundStyle(.orange)
             }
@@ -98,8 +99,8 @@ struct SkillLibraryView: View {
                         .labelsHidden().toggleStyle(.checkbox)
                     }
                     VStack(alignment: .leading, spacing: 5) {
-                        Text(skill.name).font(.headline).lineLimit(2)
-                        Text(skill.source).font(.caption).foregroundStyle(.secondary)
+                        Text(skill.name).scaledFont(.headline).lineLimit(2)
+                        Text(skill.source).scaledFont(.caption).foregroundStyle(.secondary)
                     }
                 }
                 .padding(.vertical, 6)
@@ -110,7 +111,11 @@ struct SkillLibraryView: View {
         .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 14))
         .overlay {
             if matchingSkills.isEmpty && !catalog.isLoading {
-                ContentUnavailableView("No skills found", systemImage: "sparkles", description: Text("Choose a project, add a search folder, or create a skill."))
+                ContentUnavailableView {
+                    Label("No skills found", systemImage: "sparkles").scaledFont(.largeTitle.bold())
+                } description: {
+                    Text("Choose a project, add a search folder, or create a skill.").scaledFont(.body)
+                }
             }
         }
     }
@@ -121,7 +126,11 @@ struct SkillLibraryView: View {
             SkillDetailView(skill: skill, edit: { editing = skill })
                 .id("\(skill.id)|\(refreshID)")
         } else {
-            ContentUnavailableView("Explore a skill", systemImage: "books.vertical", description: Text("Select a skill to read its instructions and see where it lives."))
+            ContentUnavailableView {
+                Label("Explore a skill", systemImage: "books.vertical").scaledFont(.largeTitle.bold())
+            } description: {
+                Text("Select a skill to read its instructions and see where it lives.").scaledFont(.body)
+            }
         }
     }
 }
@@ -135,9 +144,9 @@ private struct SkillDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Text(skill.name).font(.title2.bold()).textSelection(.enabled)
+                Text(skill.name).scaledFont(.title2.bold()).textSelection(.enabled)
                 Text(skill.summary).foregroundStyle(.secondary)
-                Text(skill.url.path).font(.caption.monospaced()).foregroundStyle(AgenticiousStyle.violet).textSelection(.enabled)
+                Text(skill.url.path).scaledFont(.caption.monospaced()).foregroundStyle(AgenticiousStyle.violet).textSelection(.enabled)
                 HStack {
                     Button("Show in Finder", systemImage: "folder") { NSWorkspace.shared.activateFileViewerSelecting([skill.url]) }
                         .buttonStyle(AgenticiousButtonStyle(isPrimary: false, isCompact: true))
@@ -146,9 +155,9 @@ private struct SkillDetailView: View {
                             .buttonStyle(AgenticiousButtonStyle(isCompact: true))
                     }
                 }
-                if !skill.isEditable { Text("Cached plugin skill. Availability and required tools depend on the agent's plugin setup.").font(.caption).foregroundStyle(.secondary) }
+                if !skill.isEditable { Text("Cached plugin skill. Availability and required tools depend on the agent's plugin setup.").scaledFont(.caption).foregroundStyle(.secondary) }
                 Divider()
-                Text(error ?? content).font(.system(.callout, design: .monospaced)).textSelection(.enabled)
+                Text(error ?? content).scaledFont(.system(.callout, design: .monospaced)).textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(20)
@@ -169,9 +178,9 @@ struct SkillProjectPicker: View {
         Button { choosing.toggle() } label: {
             HStack(spacing: 10) {
                 Image(systemName: project == .none ? "person" : "folder").foregroundStyle(AgenticiousStyle.violet)
-                Text(project == .none ? "Personal skills only" : project.name).font(.callout.weight(.semibold)).lineLimit(1)
+                Text(project == .none ? "Personal skills only" : project.name).scaledFont(.callout.weight(.semibold)).lineLimit(1)
                 Spacer(minLength: 0)
-                Image(systemName: "chevron.up.chevron.down").font(.caption).foregroundStyle(AgenticiousStyle.violet)
+                Image(systemName: "chevron.up.chevron.down").scaledFont(.caption).foregroundStyle(AgenticiousStyle.violet)
             }
             .padding(.horizontal, 12).frame(height: 36)
             .background(AgenticiousStyle.ink, in: RoundedRectangle(cornerRadius: 10))
@@ -194,7 +203,7 @@ struct SkillProjectPicker: View {
                 }
                 .buttonStyle(.plain)
             }
-            .padding(8).frame(width: 300).background(AgenticiousStyle.panel)
+            .padding(8).scaledFrame(width: 300).background(AgenticiousStyle.panel)
         }
     }
 
@@ -228,18 +237,18 @@ struct SkillSelectionField: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Label("Skills", systemImage: "books.vertical").font(.headline)
+                Label("Skills", systemImage: "books.vertical").scaledFont(.headline)
                 Spacer()
                 Button("Choose skills", systemImage: "plus") { choosing = true }
                     .buttonStyle(AgenticiousButtonStyle(isCompact: true))
             }
             Text(paths.isEmpty ? "Optionally add installed skills to this task." : "The agent will be asked to read and apply these skills.")
-                .font(.caption).foregroundStyle(.secondary)
+                .scaledFont(.caption).foregroundStyle(.secondary)
             ForEach(paths, id: \.self) { path in
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(URL(fileURLWithPath: path).deletingLastPathComponent().lastPathComponent).font(.callout.bold())
-                        Text(path).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                        Text(URL(fileURLWithPath: path).deletingLastPathComponent().lastPathComponent).scaledFont(.callout.bold())
+                        Text(path).scaledFont(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                     }
                     Spacer()
                     Button("Remove skill", systemImage: "xmark.circle") { paths.removeAll { $0 == path } }

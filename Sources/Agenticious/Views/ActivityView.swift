@@ -9,6 +9,15 @@ struct ActivityView: View {
     @State private var loadedSession: UUID?
     @State private var followLatest = true
     @State private var showResearch = false
+    @Environment(\.textScale) private var textScale
+
+    private var emptyState: some View {
+        ContentUnavailableView {
+            Label("No activity yet", systemImage: "text.bubble").scaledFont(.largeTitle.bold())
+        } description: {
+            Text("Messages and tool calls appear here when the provider writes them to this session’s log.").scaledFont(.body)
+        }
+    }
 
     private var visibleEntries: [ActivityEntry] {
         session.isChat && !showResearch ? entries.filter { $0.kind != .tool } : entries
@@ -18,25 +27,28 @@ struct ActivityView: View {
         VStack(spacing: 0) {
             HStack {
                 Label(session.isChat ? "Conversation" : "Live activity", systemImage: session.isChat ? "bubble.left.and.bubble.right" : "waveform.path")
-                    .font(.caption.weight(.semibold)).foregroundStyle(AgenticiousStyle.violet)
+                    .scaledFont(.caption.weight(.semibold)).foregroundStyle(AgenticiousStyle.violet)
                 Spacer()
-                if session.isChat { Toggle("Research activity", isOn: $showResearch).toggleStyle(.checkbox).font(.caption) }
-                Toggle("Follow latest", isOn: $followLatest).toggleStyle(.checkbox).font(.caption)
+                if session.isChat { Toggle("Research activity", isOn: $showResearch).toggleStyle(.checkbox).scaledFont(.caption) }
+                Toggle("Follow latest", isOn: $followLatest).toggleStyle(.checkbox).scaledFont(.caption)
                 Button("Respond in terminal", action: openTerminal).buttonStyle(AgenticiousButtonStyle(isPrimary: false, isCompact: true))
             }.padding(12)
             if let question = session.pendingQuestion {
-                ScrollView {
-                    QuestionCard(session: session, questions: question.questions, openTerminal: openTerminal)
-                        .id(question.toolUseID)
-                        .padding(.horizontal, 20).padding(.bottom, 12)
+                // Its own height while there is room; in a short pane it shrinks and scrolls, so every option and
+                // Send answers stay within reach.
+                HugUpTo(limit: 460) {
+                    ScrollView {
+                        QuestionCard(session: session, questions: question.questions, openTerminal: openTerminal)
+                            .id(question.toolUseID)
+                            .padding(.horizontal, 20).padding(.bottom, 12)
+                    }
                 }
-                .frame(maxHeight: 460)
-                .fixedSize(horizontal: false, vertical: true)
+                .layoutPriority(1)
             }
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 16) {
-                        if let notice { Text(notice).font(.caption).foregroundStyle(.secondary) }
+                        if let notice { Text(notice).scaledFont(.caption).foregroundStyle(.secondary) }
                         if session.isChat {
                             ActivityCard(entry: ActivityEntry(id: "opening-question", kind: .userMessage, title: "Your question",
                                                              body: session.displayedTaskType.details(for: session.task)),
@@ -51,9 +63,14 @@ struct ActivityView: View {
                     if loadedSession != session.id {
                         BackgroundTaskLabel(task: "Loading activity…")
                     } else if entries.isEmpty && !session.isChat {
-                        ContentUnavailableView("No activity yet", systemImage: "text.bubble", description: Text("Messages and tool calls appear here when the provider writes them to this session’s log."))
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .allowsHitTesting(false)
+                        // The notice line sits at the top of the same pane: keep the empty state clear of it.
+                        let clearance: CGFloat = notice == nil ? 0 : 20 * textScale
+                        ViewThatFits(in: .vertical) {
+                            emptyState.padding(.vertical, clearance)
+                            emptyState.padding(.top, clearance)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .allowsHitTesting(false)
                     }
                 }
                 .onChange(of: entries) { _, _ in if followLatest { proxy.scrollTo("latest", anchor: .bottom) } }
@@ -163,20 +180,20 @@ struct ActivityCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 icon.foregroundStyle(accent)
-                Text(entry.displayTitle).font(.callout.weight(.semibold)).foregroundStyle(entry.kind == .message ? accent : .primary)
+                Text(entry.displayTitle).scaledFont(.callout.weight(.semibold)).foregroundStyle(entry.kind == .message ? accent : .primary)
                 if entry.kind == .tool {
                     Spacer()
-                    Text(stateLabel).font(.caption.weight(.semibold)).foregroundStyle(color)
+                    Text(stateLabel).scaledFont(.caption.weight(.semibold)).foregroundStyle(color)
                 }
             }
             if let directory = entry.directory {
-                Label(directory, systemImage: "folder").font(.caption.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
+                Label(directory, systemImage: "folder").scaledFont(.caption.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
             }
             if entry.kind != .tool {
                 ActivityMarkdown(text: entry.body)
             } else {
                 HStack(alignment: .top) {
-                    Text(entry.body).font(.system(size: 12, design: .monospaced)).foregroundStyle(AgenticiousStyle.lime)
+                    Text(entry.body).scaledFont(.system(size: 12, design: .monospaced)).foregroundStyle(AgenticiousStyle.lime)
                         .textSelection(.enabled).lineLimit(expandedInput ? nil : 10).frame(maxWidth: .infinity, alignment: .leading)
                     Button("Copy command or input", systemImage: "doc.on.doc") {
                         NSPasteboard.general.clearContents()
@@ -185,17 +202,17 @@ struct ActivityCard: View {
                 }.padding(12).background(AgenticiousStyle.ink, in: RoundedRectangle(cornerRadius: 10))
                 if entry.body.count > 500 || entry.body.components(separatedBy: .newlines).count > 10 {
                     Button(expandedInput ? "Collapse input" : "Show full input") { expandedInput.toggle() }
-                        .font(.caption).buttonStyle(.plain).foregroundStyle(AgenticiousStyle.violet)
+                        .scaledFont(.caption).buttonStyle(.plain).foregroundStyle(AgenticiousStyle.violet)
                 }
                 if let file = entry.file, file.hasPrefix("/") {
                     Link(destination: URL(fileURLWithPath: file)) { Label(file, systemImage: "doc.text") }
-                        .font(.caption).foregroundStyle(AgenticiousStyle.violet).linkCursor()
+                        .scaledFont(.caption).foregroundStyle(AgenticiousStyle.violet).linkCursor()
                 }
                 if !entry.output.isEmpty {
                     DisclosureGroup(isExpanded: $expanded) {
-                        Text(entry.output).font(.system(size: 11, design: .monospaced)).textSelection(.enabled)
+                        Text(entry.output).scaledFont(.system(size: 11, design: .monospaced)).textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 8)
-                    } label: { Text("Output · \(entry.output.components(separatedBy: .newlines).count) lines").font(.caption) }
+                    } label: { Text("Output · \(entry.output.components(separatedBy: .newlines).count) lines").scaledFont(.caption) }
                     .tint(AgenticiousStyle.violet)
                 }
             }
@@ -216,7 +233,7 @@ private struct ReplyingIndicator: View {
         HStack(spacing: 8) {
             ProviderIcon(agent: agent, size: 14).foregroundStyle(AgenticiousStyle.lime)
             ProgressView().controlSize(.small)
-            Text("Whiskering…").font(.callout.italic()).foregroundStyle(.secondary)
+            Text("Whiskering…").scaledFont(.callout.italic()).foregroundStyle(.secondary)
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
         .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 14))
@@ -257,13 +274,13 @@ private struct ActivityMarkdown: View {
                 case let .paragraph(text):
                     LinkedMarkdownText(text: text)
                 case let .heading(level, text):
-                    Text(inlineMarkdown(text)).font(headingFont(level)).textSelection(.enabled)
+                    Text(inlineMarkdown(text)).scaledFont(headingFont(level)).textSelection(.enabled)
                         .padding(.top, level <= 2 ? 6 : 2)
                 case let .list(items):
                     VStack(alignment: .leading, spacing: 4) {
                         ForEach(Array(items.enumerated()), id: \.offset) { _, item in
                             HStack(alignment: .top, spacing: 6) {
-                                Text(item.marker).font(.system(size: 13).monospacedDigit()).foregroundStyle(.secondary)
+                                Text(item.marker).scaledFont(.system(size: 13).monospacedDigit()).foregroundStyle(.secondary)
                                 LinkedMarkdownText(text: item.text)
                             }.padding(.leading, CGFloat(min(item.depth, 6)) * 16)
                         }
@@ -276,13 +293,13 @@ private struct ActivityMarkdown: View {
                 case let .table(table):
                     MarkdownTableView(table: table)
                 case let .code(code):
-                    Text(code).font(.system(size: 12, design: .monospaced)).textSelection(.enabled)
+                    Text(code).scaledFont(.system(size: 12, design: .monospaced)).textSelection(.enabled)
                         .padding(12).frame(maxWidth: .infinity, alignment: .leading)
                         .background(AgenticiousStyle.ink, in: RoundedRectangle(cornerRadius: 10))
                 case let .diagram(diagram):
                     ScrollView(.horizontal) {
                         // Menlo's box-drawing glyphs fill the line, so borders join up; SF Mono's leave gaps.
-                        Text(diagram).font(.custom("Menlo", size: 12)).textSelection(.enabled)
+                        Text(diagram).scaledFont(.custom("Menlo", size: 12)).textSelection(.enabled)
                             .fixedSize().padding(.vertical, 2)
                     }
                 case .rule:
@@ -292,7 +309,7 @@ private struct ActivityMarkdown: View {
         }
     }
 
-    private func headingFont(_ level: Int) -> Font {
+    private func headingFont(_ level: Int) -> ScaledFont {
         switch level {
         case 1: .system(size: 20, weight: .bold)
         case 2: .system(size: 17, weight: .semibold)
@@ -328,7 +345,7 @@ private struct MarkdownTableView: View {
 
     /// Wraps long cells onto more lines instead of truncating them.
     private func cell(_ text: String, weight: Font.Weight = .regular) -> some View {
-        Text(inlineMarkdown(text)).font(.system(size: 13, weight: weight)).fixedSize(horizontal: false, vertical: true)
+        Text(inlineMarkdown(text)).scaledFont(.system(size: 13, weight: weight)).fixedSize(horizontal: false, vertical: true)
     }
 
     private func alignment(_ column: Int) -> HorizontalAlignment {
@@ -345,4 +362,19 @@ private func inlineMarkdown(_ text: String) -> AttributedString {
     var parsed = (try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(text)
     for run in parsed.runs where run.link != nil { parsed[run.range].foregroundColor = AgenticiousStyle.violet }
     return parsed
+}
+
+/// As tall as its content up to `limit`, and shorter when it is offered less.
+struct HugUpTo: Layout {
+    var limit: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let view = subviews.first else { return .zero }
+        let ideal = view.sizeThatFits(ProposedViewSize(width: proposal.width, height: nil))
+        return CGSize(width: proposal.width ?? ideal.width, height: min(ideal.height, limit, proposal.height ?? .infinity))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        subviews.first?.place(at: bounds.origin, proposal: ProposedViewSize(bounds.size))
+    }
 }
