@@ -77,6 +77,8 @@ settings replace your own `statusLine` there (it shows the model and both limits
 | `Sources/Agenticious/EventInterpreter.swift` | Event → status / chunks |
 | `Sources/Agenticious/SessionStore.swift` | Running sessions, terminal processes, dock badge |
 | `Sources/Agenticious/UsageMonitor.swift` | Codex and Claude plan limits |
+| `Sources/Agenticious/HotkeyCenter.swift` | System-wide preset shortcuts (Carbon hot keys, no Accessibility permission) |
+| `Sources/Agenticious/SummonPanelController.swift` | The floating Summon window a shortcut opens over other apps |
 | `Sources/agenticious-mcp/main.swift` | Stdio MCP server the agents call |
 
 ## Worktrees
@@ -105,6 +107,25 @@ Implement, Resolve & merge, Review PR, Fix CI, Ask for review, and Technical dis
 They follow the selected project’s conventions without requiring specific skills, labels, Slack channels,
 or local paths. Existing user configs are not replaced or extended when the app is updated.
 
+**Shortcuts.** Give a preset a shortcut in its editor: click **Record shortcut** and press the keys, for example
+`⌃⌥R` (Esc cancels). It needs ⌘, ⌃ or ⌥ unless it is a function key, and standard shortcuts such as ⌘V, ⌘S or
+⌘Q are refused. From then on, pressing it in any app while Agenticious is running opens a floating Summon window over
+what you are working on, with that preset selected and the workspace you last summoned in. **Start agent**
+(⌘ Return), **Cancel** or Esc closes it and you carry on where you were: the agent starts in the background and
+the main window stays put, still showing what it was showing. Pressing another preset's shortcut while the window
+is open switches the preset and keeps what you typed; pressed from an app on another display, the window comes to
+that display. Shortcuts need no Accessibility permission. **Browse…** makes Agenticious the active app for the
+folder picker; closing the Summon window hands you back to the app you were in. Pressed while Agenticious itself is
+in front, a shortcut works like **⌘N** and the main window turns to the new agent.
+
+No preset has a shortcut until you record one. Two presets can't share a shortcut: the editor says who has it,
+and in a hand-edited file the first preset keeps it. A shortcut that can't work is flagged on its preset's card.
+macOS doesn't report a shortcut another app already uses, so if nothing opens, pick another. When two copies of
+Agenticious run (a dev build beside the installed app), the first one started holds the shortcuts and the other
+flags them on its cards. Shortcuts are
+saved with the preset as an optional `hotkey`, e.g. `{ "key": "R", "keyCode": 15, "modifiers": ["control", "option"] }`;
+`keyCode` is the physical key, so the shortcut stays on it when the keyboard layout changes.
+
 **Customize → Skills** browses `SKILL.md` files from personal `.agents/skills`, `.codex/skills` (respecting `CODEX_HOME`),
 `.claude/skills`, `/etc/codex/skills`, project skill folders up to the repository root, and Codex/Claude plugin
 caches. Add other locations with **Search folders**. Symlinked folders are followed and identical files are
@@ -118,8 +139,8 @@ Use **Choose skills** in a task or preset to attach skills. Agenticious asks the
 absolute paths and resolve supporting resources from their skill folders. Missing or unreadable selected files
 prevent launch with an error; attaching a skill does not install its tools or enable its plugin.
 
-For UI inspection, `--settings`, `--skills`, and `--new-agent [preset-id]` can be combined with
-`--snapshot-dir /tmp/agenticious-shots`. Run configuration and skill tests with `swift test`.
+For UI inspection, `--settings`, `--skills`, `--new-agent [preset-id]`, and `--summon-panel [preset-id]` (the
+floating window, saved as `Summon agent.png`) can be combined with `--snapshot-dir /tmp/agenticious-shots`. Run configuration and skill tests with `swift test`.
 
 ## Next steps
 
@@ -131,7 +152,7 @@ For UI inspection, `--settings`, `--skills`, and `--new-agent [preset-id]` can b
 
 The sidebar shows active agents grouped by workspace. **History** below the workspace list opens archived agents, newest first, with 20 results per page. Search by task, workspace, branch, or provider; opening an agent and returning to History preserves your search and page. Tasks stay in **Queue** regardless of their status. Use **Mark as finished** at the bottom of an agent view to stop it, clean up its resources, and move its history to **History**. **Move to Queue** restores the saved task to the list; it does not recreate a removed worktree. Resume is available only while its working directory still exists. Existing completed tasks return to Queue when upgrading to this manual behavior. Each card uses its status color for its background tint and border, with a stronger border for the selected sidebar card. Each card shows its provider, status, task, and completed steps; select a card to return to its terminal, or right-click for session actions. Use the folder button beside **Workspaces** to add a project.
 
-The top bar shows Codex model-specific quota availability (such as **GPT-6 Astra: Available** or **Limit reached**) separately from its account percentages. Provider limits stay side by side while there is room, hiding the Control Room label before stacking in a narrow window. Summon agents from the workspace buttons or with **⌘N**. The live usage response reports availability and an optional reset time rather than a percentage. It refreshes at the usage-check interval in Preferences using your existing Codex sign-in. If a refresh fails, the last result is explicitly labeled as last reported; account percentages continue to come from local logs.
+The top bar shows Codex model-specific quota availability (such as **GPT-6 Astra: Available** or **Limit reached**) separately from its account percentages. Provider limits stay side by side while there is room, hiding the Control Room label before stacking in a narrow window. Summon agents from the workspace buttons, with **⌘N**, or from any app with a preset's shortcut. The live usage response reports availability and an optional reset time rather than a percentage. It refreshes at the usage-check interval in Preferences using your existing Codex sign-in. If a refresh fails, the last result is explicitly labeled as last reported; account percentages continue to come from local logs.
 
 Below the sidebar branding, **Agents** counts tasks outside history, **Working** counts starting or actively working agents, and **Needs you** counts agents blocked on your input or approval. Waiting and idle processes do not count as working.
 
@@ -161,7 +182,7 @@ Activity reads the session's local Claude or Codex JSONL log every two seconds w
 
 The view reads up to the latest 4 MiB, shows at most 200 entries, and labels content truncated beyond 32 KiB per field. Activity history comes from the provider's log, so disabling or deleting those logs also removes that history from this view. No additional transcript copy is saved by Agenticious.
 
-The summon sheet remembers the last task preset and workspace, plus provider, model, and effort (model and effort separately per provider). Opening a workspace's **+** button still selects that workspace explicitly. Removed favorites are not restored as the default workspace. The larger sheet adapts to the available display size and keeps model selection beside the compact provider choices.
+The summon sheet remembers the last task preset and workspace, plus provider, model, and effort (model and effort separately per provider). Opening a workspace's **+** button still selects that workspace explicitly. Removed favorites are not restored as the default workspace. A preset's shortcut opens on the last workspace whichever agent is selected. The larger sheet adapts to the available display size and keeps model selection beside the compact provider choices.
 
 Provider icons use monochrome template rendering. The Claude mark comes from the official Claude desktop app (`TrayIconTemplate@3x.png`); the OpenAI mark used for Codex comes from the official ChatGPT app (`webview/assets/openai-logo-regular-ceb75a1754fa.svg` in `app.asar`). Their trademarks belong to Anthropic and OpenAI.
 

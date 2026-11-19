@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import Combine
 
 struct NewTaskSheet: View {
     @EnvironmentObject private var store: SessionStore
@@ -9,6 +10,8 @@ struct NewTaskSheet: View {
     @AppStorage("lastTaskPreset") private var lastTaskPreset = "custom"
     @AppStorage("lastWorkspace") private var lastWorkspace = ""
     private let restoreTemplate: Bool
+    /// Set in the floating Summon window, which isn't a SwiftUI presentation: `dismiss` has nothing to end there.
+    private let host: SummonWindowHost?
 
     @AppStorage("lastAgent") private var agent: AgentKind = .claude
     @AppStorage("claudeModel") private var claudeModel = ""
@@ -28,8 +31,9 @@ struct NewTaskSheet: View {
     @State private var pasteMonitor: Any?
     @State private var catalog: [AgentKind: [ModelChoice]]
 
-    init(project: Project, template: TaskTemplate? = nil) {
+    init(project: Project, template: TaskTemplate? = nil, host: SummonWindowHost? = nil) {
         restoreTemplate = template == nil
+        self.host = host
         _project = State(initialValue: project)
         _template = State(initialValue: template ?? .custom)
         _catalog = State(initialValue: Dictionary(uniqueKeysWithValues: AgentKind.allCases.map { ($0, ModelCatalog.models(for: $0)) }))
@@ -57,8 +61,7 @@ struct NewTaskSheet: View {
             }
             footer
         }
-        .frame(width: min(960, (NSScreen.main?.visibleFrame.width ?? 1040) - 80),
-               height: min(850, (NSScreen.main?.visibleFrame.height ?? 950) - 100))
+        .frame(width: min(960, screen.width - 80), height: min(850, screen.height - 100))
         .background(AgenticiousStyle.ink)
         .tint(AgenticiousStyle.lime)
         .preferredColorScheme(.dark)
@@ -82,7 +85,19 @@ struct NewTaskSheet: View {
             lastTaskPreset = id
         }
         .onChange(of: project) { _, project in lastWorkspace = project.path ?? "" }
+        .onReceive(presetRequests) { template = presets.preset(id: $0) }
         .task(id: project.path) { await repository.check(project.path) }
+    }
+
+    /// The floating window says which screen it opened on; `NSScreen.main` needn't be it while another app has the keyboard.
+    private var screen: CGSize { (host?.visibleFrame ?? NSScreen.main?.visibleFrame)?.size ?? CGSize(width: 1040, height: 950) }
+
+    private var presetRequests: AnyPublisher<String, Never> {
+        host?.presetRequests.eraseToAnyPublisher() ?? Empty().eraseToAnyPublisher()
+    }
+
+    private func close() {
+        if let host { host.close() } else { dismiss() }
     }
 
     private var header: some View {
@@ -307,7 +322,7 @@ struct NewTaskSheet: View {
             Text("⌘ Return to summon")
                 .font(.caption).foregroundStyle(.secondary)
             Spacer()
-            Button("Cancel", role: .cancel) { dismiss() }
+            Button("Cancel", role: .cancel, action: close)
                 .keyboardShortcut(.cancelAction)
                 .buttonStyle(AgenticiousButtonStyle(isPrimary: false))
             Button(template.isChat ? "Start chat" : "Start agent", systemImage: template.isChat ? "bubble.left.and.bubble.right" : "sparkles", action: start)
@@ -375,8 +390,10 @@ struct NewTaskSheet: View {
     private func watchForPastedImages() {
         guard pasteMonitor == nil else { return }
         pasteMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            guard event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
-                  event.charactersIgnoringModifiers == "v" else { return event }
+            // The sheet and the floating window can be open together; each attaches only what's pasted into its own window.
+            guard let window = event.window, host.map({ $0.window === window }) ?? !(window is SummonPanel),
+                  event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
+                  (event.characters(byApplyingModifiers: .command) ?? event.charactersIgnoringModifiers) == "v" else { return event }
             let pasted = PastedImage.read(from: .general)
             guard !pasted.isEmpty else { return event }
             images += pasted
@@ -397,10 +414,11 @@ struct NewTaskSheet: View {
                 project: project,
                 isolated: isGitProject && useWorktree && !template.isChat,
                 taskType: TaskType(template: template, input: task, notes: ""),
-                images: images
+                images: images,
+                select: host?.showsNewAgent() ?? true
             )
             presets.recordUse(of: template)
-            dismiss()
+            close()
         } catch {
             launchError = error.localizedDescription
         }

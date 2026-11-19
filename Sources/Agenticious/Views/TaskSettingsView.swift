@@ -3,6 +3,7 @@ import AppKit
 
 struct TaskSettingsView: View {
     @EnvironmentObject private var presets: TaskPresetStore
+    @EnvironmentObject private var hotkeys: SummonHotkeys
     @State private var editing: TaskTemplate?
     @State private var deleting: TaskTemplate?
     @State private var dropTarget: String?
@@ -42,7 +43,17 @@ struct TaskSettingsView: View {
                             .foregroundStyle(AgenticiousStyle.lime)
                             Text(preset.summary.isEmpty ? "Your reusable agent prompt." : preset.summary)
                                 .foregroundStyle(.secondary).lineLimit(3).frame(minHeight: 40, alignment: .topLeading)
-                            Text("\(preset.skillPaths.count) attached skills").font(.caption).foregroundStyle(AgenticiousStyle.violet)
+                            HStack {
+                                Text("\(preset.skillPaths.count) attached skills")
+                                Spacer()
+                                if let hotkey = preset.hotkey {
+                                    Text(hotkey.display).monospaced().accessibilityLabel("Shortcut \(hotkey.display)")
+                                }
+                            }
+                            .font(.caption).foregroundStyle(AgenticiousStyle.violet)
+                            if let problem = hotkeys.problems[preset.id] {
+                                Label(problem, systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(.orange)
+                            }
                             HStack {
                                 Button("Edit preset", systemImage: "pencil") { editing = preset }
                                     .buttonStyle(AgenticiousButtonStyle(isCompact: true))
@@ -134,6 +145,7 @@ private struct PresetEditorSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     identity
+                    shortcut
                     summonForm
                     promptSection
                     skills
@@ -197,6 +209,15 @@ private struct PresetEditorSheet: View {
         }
     }
 
+    private var shortcut: some View {
+        card("Shortcut", symbol: "keyboard",
+             caption: "Press it in any app to open a floating Summon window on this preset, in the workspace you last summoned in.") {
+            HotkeyRecorder(hotkey: $draft.hotkey)
+        }
+    }
+
+    private var shortcutProblem: String? { HotkeyPlan(presets: presets.presets, editing: draft).problems[draft.id] }
+
     private var summonForm: some View {
         card("Task title", symbol: "rectangle.and.pencil.and.ellipsis") {
             field("CARD TITLE", caption: "{{input}} becomes what you typed.") {
@@ -255,7 +276,7 @@ private struct PresetEditorSheet: View {
 
     private var footer: some View {
         HStack(spacing: 12) {
-            if let message = error ?? draft.validationMessage {
+            if let message = error ?? draft.validationMessage ?? shortcutProblem {
                 Label(message, systemImage: "exclamationmark.triangle.fill").font(.callout).foregroundStyle(.orange)
             } else {
                 Text("⌘ Return to save").font(.caption).foregroundStyle(.secondary)
@@ -270,7 +291,7 @@ private struct PresetEditorSheet: View {
             }
             .keyboardShortcut(.return, modifiers: .command)
             .buttonStyle(AgenticiousButtonStyle())
-            .disabled(draft.validationMessage != nil)
+            .disabled(draft.validationMessage != nil || shortcutProblem != nil)
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 18)

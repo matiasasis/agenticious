@@ -4,7 +4,7 @@ import SwiftUI
 @main
 struct AgenticiousApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @StateObject private var store = SessionStore()
+    @StateObject private var store = SessionStore(registersHotkeys: true)
 
     init() {
         Self.importUnbundledSettings()
@@ -35,12 +35,7 @@ struct AgenticiousApp: App {
     var body: some Scene {
         Window("Agenticious", id: "main") {
             MainView()
-                .environmentObject(store)
-                .environmentObject(store.notifications)
-                .environmentObject(store.usage)
-                .environmentObject(store.diagnostics)
-                .environmentObject(store.presets)
-                .environmentObject(store.skillLocations)
+                .agenticiousEnvironment(store)
                 .frame(minWidth: 960, minHeight: 600)
         }
         .defaultSize(width: 1400, height: 880)
@@ -68,6 +63,20 @@ struct AgenticiousApp: App {
             .accessibilityLabel("Agenticious, \(store.attentionCount) agents need attention")
         }
         .menuBarExtraStyle(.window)
+    }
+}
+
+extension View {
+    /// Everything the app's views read from the environment, for the main window and the floating Summon window alike.
+    @MainActor
+    func agenticiousEnvironment(_ store: SessionStore) -> some View {
+        environmentObject(store)
+            .environmentObject(store.notifications)
+            .environmentObject(store.usage)
+            .environmentObject(store.diagnostics)
+            .environmentObject(store.presets)
+            .environmentObject(store.skillLocations)
+            .environmentObject(store.summon)
     }
 }
 

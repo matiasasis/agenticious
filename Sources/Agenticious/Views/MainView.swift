@@ -62,6 +62,7 @@ struct MainView: View {
     private func launchFromCommandLine() {
         guard let options = store.takeCommandLineOptions() else { return }
         if let template = options.newAgentTemplate { store.composer = Composer(project: defaultProject, template: store.presets.preset(id: template)) }
+        if let template = options.summonPanelTemplate { store.summon.show(presetID: template, in: store) }
         if options.showSettings { store.selection = .settings }
         if options.showPreferences { store.selection = .preferences }
         if options.showSkills { store.selection = .skills }
@@ -490,6 +491,7 @@ struct SessionCard: View {
 
 // MARK: - Menu bar
 
+@MainActor
 enum FolderPicker {
     static func choose(startingAt path: String? = nil) -> URL? {
         let panel = NSOpenPanel()
@@ -497,6 +499,7 @@ enum FolderPicker {
         panel.canChooseFiles = false
         panel.prompt = "Add"
         panel.directoryURL = path.map { URL(fileURLWithPath: $0) }
+        NSApp.activateForChildWindow()
         return panel.runModal() == .OK ? panel.url : nil
     }
 }
