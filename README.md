@@ -28,6 +28,9 @@ A native macOS dashboard for running many coding agents (Claude Code and Codex) 
 - **Usage**: session and weekly limits for both. Codex's come from its session logs. Claude's come from the status line
   of agents started here (until one has replied, you see an estimate of today's tokens instead). Usage and provider
   checks only run while Agenticious is the active app, at intervals set in **Customize → Preferences → Background refresh**.
+- **Summon from anywhere**: give a task preset a system-wide shortcut, or put every preset behind one Stream Deck key,
+  and a floating Summon window opens over whatever you are working on.
+- **Text size**: scale all of the app's text, the terminal included, from 100% to 150%.
 
 ## Run
 
