@@ -5,7 +5,8 @@ import AppKit
 ///     Agenticious --task "Fix the flaky spec" --agent codex --model gpt-6-sol --effort high --dir ~/code/app --snapshot-dir /tmp/shots
 ///
 /// Without `--dir` the agent runs under "No project"; without `--model` / `--effort` the CLI's defaults apply.
-/// `--new-agent [template]` opens the New Agent sheet instead, e.g. `--new-agent fixCI`.
+/// `--new-agent [template]` opens the New Agent sheet instead, e.g. `--new-agent fixCI`;
+/// `--summon-panel [template]` opens the floating Summon window a preset's shortcut would.
 struct LaunchOptions {
     let task: String?
     let agent: AgentKind
@@ -14,6 +15,7 @@ struct LaunchOptions {
     let directory: URL?
     let snapshotDirectory: URL?
     let newAgentTemplate: String?
+    let summonPanelTemplate: String?
     let showPreferences: Bool
     let showSettings: Bool
     let showSkills: Bool
@@ -40,7 +42,12 @@ struct LaunchOptions {
         showProviders = arguments.contains("--providers")
         sessionToShow = value("--session").flatMap(UUID.init(uuidString:))
         showFinished = arguments.contains("--finished")
-        newAgentTemplate = arguments.contains("--new-agent") ? value("--new-agent").flatMap { $0.hasPrefix("--") ? nil : $0 } ?? "custom" : nil
+        /// The preset named after the flag; the custom task when the flag stands alone.
+        func preset(_ flag: String) -> String? {
+            arguments.contains(flag) ? value(flag).flatMap { $0.hasPrefix("--") ? nil : $0 } ?? "custom" : nil
+        }
+        newAgentTemplate = preset("--new-agent")
+        summonPanelTemplate = preset("--summon-panel")
     }
 }
 

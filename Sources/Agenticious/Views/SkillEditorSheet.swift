@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SkillEditorSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.textScale) private var textScale
     let project: Project
     var skill: InstalledSkill?
     let saved: (URL) -> Void
@@ -16,31 +17,31 @@ struct SkillEditorSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Label(skill == nil ? "Create a skill" : "Edit skill", systemImage: "sparkles")
-                .font(.system(size: 26, weight: .bold, design: .rounded))
+                .scaledFont(.system(size: 26, weight: .bold, design: .rounded))
             if let skill {
-                Text(skill.url.path).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                Text(skill.url.path).scaledFont(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                 Text("Edit the complete file. Existing metadata and supporting files are preserved.")
-                    .font(.callout).foregroundStyle(.secondary)
+                    .scaledFont(.callout).foregroundStyle(.secondary)
             } else {
                 TextField("Skill name (e.g. review-accessibility)", text: $name)
                 TextField("Description: what it does and when to use it", text: $summary)
                 HStack {
                     Picker("Agent", selection: $destination) {
-                        Text("Codex").tag("codex")
-                        Text("Claude Code").tag("claude")
+                        Text("Codex").scaledFont(.body, textScale).tag("codex")
+                        Text("Claude Code").scaledFont(.body, textScale).tag("claude")
                     }
                     Toggle("Only this project", isOn: $projectOnly).disabled(project.path == nil)
                 }
-                Text(destinationRoot.path).font(.caption).foregroundStyle(AgenticiousStyle.violet).textSelection(.enabled)
+                Text(destinationRoot.path).scaledFont(.caption).foregroundStyle(AgenticiousStyle.violet).textSelection(.enabled)
             }
-            Text(skill == nil ? "Instructions" : "SKILL.md").font(.headline)
+            Text(skill == nil ? "Instructions" : "SKILL.md").scaledFont(.headline)
             TextEditor(text: $instructions)
-                .font(.system(.body, design: .monospaced))
+                .scaledFont(.system(.body, design: .monospaced))
                 .scrollContentBackground(.hidden)
                 .padding(12)
                 .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 12))
                 .accessibilityLabel("Skill instructions")
-            if let error { Text(error).foregroundStyle(.orange).font(.callout) }
+            if let error { Text(error).foregroundStyle(.orange).scaledFont(.callout) }
             HStack {
                 Spacer()
                 Button("Cancel") { dismiss() }.buttonStyle(AgenticiousButtonStyle(isPrimary: false)).keyboardShortcut(.cancelAction)

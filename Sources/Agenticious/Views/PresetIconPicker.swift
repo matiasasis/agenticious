@@ -33,11 +33,12 @@ enum PresetIcons {
 struct PresetIconPicker: View {
     @Binding var symbol: String
     let done: () -> Void
+    @Environment(\.textScale) private var textScale
     @State private var query = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Choose an icon").font(.headline)
+            Text("Choose an icon").scaledFont(.headline)
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").foregroundStyle(AgenticiousStyle.violet)
                 TextField("Search icons", text: $query).textFieldStyle(.plain)
@@ -49,20 +50,20 @@ struct PresetIconPicker: View {
                 VStack(alignment: .leading, spacing: 14) {
                     ForEach(groups, id: \.title) { group in
                         Text(group.title.uppercased())
-                            .font(.system(size: 9, weight: .bold, design: .monospaced)).tracking(1).foregroundStyle(.secondary)
-                        LazyVGrid(columns: Array(repeating: GridItem(.fixed(40), spacing: 8), count: 8), alignment: .leading, spacing: 8) {
+                            .scaledFont(.system(size: 9, weight: .bold, design: .monospaced)).tracking(1).foregroundStyle(.secondary)
+                        LazyVGrid(columns: Array(repeating: GridItem(.fixed(40 * textScale), spacing: 8), count: 8), alignment: .leading, spacing: 8) {
                             ForEach(group.symbols, id: \.self, content: tile)
                         }
                     }
                     if groups.isEmpty {
-                        Text("No icons match “\(query)”.").font(.callout).foregroundStyle(.secondary)
+                        Text("No icons match “\(query)”.").scaledFont(.callout).foregroundStyle(.secondary)
                     }
                 }
                 .padding(1)
             }
         }
         .padding(16)
-        .frame(width: 400, height: 440)
+        .scaledFrame(width: 400, height: 440)
         .background(AgenticiousStyle.panel)
     }
 
@@ -83,8 +84,8 @@ struct PresetIconPicker: View {
             done()
         } label: {
             Image(systemName: candidate)
-                .font(.system(size: 17))
-                .frame(width: 40, height: 40)
+                .scaledFont(.system(size: 17))
+                .scaledFrame(width: 40, height: 40)
                 .foregroundStyle(isSelected ? AgenticiousStyle.lime : .primary)
                 .background(isSelected ? AgenticiousStyle.lime.opacity(0.1) : AgenticiousStyle.ink, in: RoundedRectangle(cornerRadius: 10))
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(isSelected ? AgenticiousStyle.lime : AgenticiousStyle.violet.opacity(0.25)))

@@ -8,15 +8,15 @@ struct NotificationPreferencesView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             Label("A little noise. At the right time.", systemImage: "bell.badge")
-                .font(.headline).foregroundStyle(AgenticiousStyle.lime)
+                .scaledFont(.headline).foregroundStyle(AgenticiousStyle.lime)
             Text("Get a heads-up when an agent needs you, finishes its turn, completes or ends a mission, or stops unexpectedly. Click a notification to open that agent, or use its buttons to reply, resume or archive without switching apps.")
-                .font(.callout).foregroundStyle(.secondary)
+                .scaledFont(.callout).foregroundStyle(.secondary)
             if !notifications.available {
                 Text("Launch with script/run to enable macOS notifications.")
-                    .font(.callout).foregroundStyle(AgenticiousStyle.violet)
+                    .scaledFont(.callout).foregroundStyle(AgenticiousStyle.violet)
             } else if notifications.authorization == .denied {
                 HStack {
-                    Text("Notifications are disabled in macOS.").font(.callout)
+                    Text("Notifications are disabled in macOS.").scaledFont(.callout)
                     Spacer()
                     Button("Open System Settings") {
                         if let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension") {
@@ -34,7 +34,7 @@ struct NotificationPreferencesView: View {
             Divider()
             Toggle("Play sounds", isOn: $notifications.soundsEnabled)
             Text("Distinct sounds for attention, success and errors. Soft feedback when starting an agent or marking it finished. Sounds also work with notifications turned off.")
-                .font(.caption).foregroundStyle(.secondary)
+                .scaledFont(.caption).foregroundStyle(.secondary)
             HStack {
                 Button("Preview sound") { notifications.playSound("Glass") }
                     .disabled(!notifications.soundsEnabled)
@@ -44,7 +44,7 @@ struct NotificationPreferencesView: View {
                 }
             }.buttonStyle(AgenticiousButtonStyle(isCompact: true))
             if let error = notifications.error {
-                Text(error).font(.caption).foregroundStyle(.orange)
+                Text(error).scaledFont(.caption).foregroundStyle(.orange)
             }
         }
         .toggleStyle(.switch).padding(20)

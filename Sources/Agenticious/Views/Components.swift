@@ -8,9 +8,9 @@ struct AgentBadge: View {
     var body: some View {
         HStack(spacing: 5) {
             ProviderIcon(agent: agent, size: 12)
-            Text(agent.displayName).font(.caption.weight(.semibold))
+            Text(agent.displayName).scaledFont(.caption.weight(.semibold))
             if let detail {
-                Text(detail).font(.caption2).foregroundStyle(.secondary)
+                Text(detail).scaledFont(.caption2).foregroundStyle(.secondary)
             }
         }
         .lineLimit(1)
@@ -46,7 +46,7 @@ struct BranchLabel: View {
 
     var body: some View {
         Label(worktree.branch, systemImage: "arrow.triangle.branch")
-            .font(.caption)
+            .scaledFont(.caption)
             .foregroundStyle(.secondary)
             .strikethrough(isRemoved)
             .lineLimit(1)
@@ -62,7 +62,7 @@ struct StatusPill: View {
             StatusDot(status: status)
             Text(status.label)
         }
-        .font(.caption.weight(.semibold))
+        .scaledFont(.caption.weight(.semibold))
         .padding(.horizontal, 8)
         .padding(.vertical, 3)
         .background(status.color.opacity(0.15), in: Capsule())
@@ -122,9 +122,9 @@ struct StartupProgressView: View {
             ForEach(visibleSteps) { step in
                 HStack(spacing: 8) {
                     if step.status == .inProgress {
-                        ProgressView().controlSize(.mini).frame(width: 14)
+                        ProgressView().controlSize(.mini).scaledFrame(width: 14)
                     } else {
-                        Image(systemName: step.status.symbol).foregroundStyle(step.status.color).frame(width: 14)
+                        Image(systemName: step.status.symbol).foregroundStyle(step.status.color).scaledFrame(width: 14)
                     }
                     Text(step.title)
                         .foregroundStyle(step.status == .inProgress ? .primary : .secondary)
@@ -134,7 +134,7 @@ struct StartupProgressView: View {
                 .accessibilityElement(children: .combine)
             }
         }
-        .font(isCompact ? .caption : .callout)
+        .scaledFont(isCompact ? .caption : .callout)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
@@ -146,11 +146,12 @@ struct ChunkStrip: View {
     let style: Style
     /// An agent that isn't running won't post a plan, so don't say we're waiting for one.
     var isRunning = true
+    @Environment(\.textScale) private var textScale
 
     var body: some View {
         if chunks.isEmpty {
             Text(isRunning ? "Waiting for the agent's plan…" : "No plan")
-                .font(.caption)
+                .scaledFont(.caption)
                 .foregroundStyle(.secondary)
         } else if style == .compact {
             HStack(spacing: 4) {
@@ -162,7 +163,7 @@ struct ChunkStrip: View {
                 }
             }
         } else {
-            ChunkGridLayout {
+            ChunkGridLayout(scale: textScale) {
                 ForEach(chunks) { chunk in ChunkBox(chunk: chunk) }
             }
         }
@@ -186,12 +187,12 @@ struct ChunkList: View {
                 } icon: {
                     Image(systemName: chunk.status.symbol).foregroundStyle(chunk.status.color)
                 }
-                .font(.callout)
+                .scaledFont(.callout)
                 .lineLimit(1)
             }
             if chunks.count > limit {
                 Label("\(chunks.count - shown) more steps", systemImage: "ellipsis.circle")
-                    .font(.callout)
+                    .scaledFont(.callout)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
@@ -208,8 +209,8 @@ private struct ChunkBox: View {
             ChunkHeading(chunk: chunk, titleLineLimit: 2)
                 .multilineTextAlignment(.leading)
                 .padding(.horizontal, 12)
-                .frame(maxWidth: .infinity, minHeight: ChunkGridLayout.cardHeight, maxHeight: ChunkGridLayout.cardHeight,
-                       alignment: .leading)
+                .scaledFrame(maxWidth: .infinity, minHeight: ChunkGridLayout.cardHeight, maxHeight: ChunkGridLayout.cardHeight,
+                             alignment: .leading)
                 .background(chunk.status.color.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
                 .overlay(RoundedRectangle(cornerRadius: 8).stroke(chunk.status.color.opacity(0.5)))
                 .contentShape(RoundedRectangle(cornerRadius: 8))
@@ -230,9 +231,9 @@ struct ChunkDetails: View {
             VStack(alignment: .leading, spacing: 12) {
                 ChunkHeading(chunk: chunk)
                 if let note = chunk.note, !note.isEmpty {
-                    Text(note).font(.callout).foregroundStyle(.secondary)
+                    Text(note).scaledFont(.callout).foregroundStyle(.secondary)
                 } else {
-                    Text("No details yet.").font(.callout).foregroundStyle(.secondary)
+                    Text("No details yet.").scaledFont(.callout).foregroundStyle(.secondary)
                 }
             }
             .textSelection(.enabled)
@@ -252,10 +253,10 @@ private struct ChunkHeading: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Label("Step \(chunk.id) · \(chunk.status.label)", systemImage: chunk.status.symbol)
-                .font(.caption.weight(.semibold))
+                .scaledFont(.caption.weight(.semibold))
                 .foregroundStyle(chunk.status.color)
             Text(chunk.title)
-                .font(.headline)
+                .scaledFont(.headline)
                 .foregroundStyle(.primary)
                 .lineLimit(titleLineLimit)
         }
@@ -313,7 +314,7 @@ struct UsageBar: View {
                 "from the status line of a Claude agent started here.")
         } else if let tokens = usage.claudeTokensToday {
             Text("Claude today: \(tokens.formatted(.number.notation(.compactName))) tok")
-                .font(.caption)
+                .scaledFont(.caption)
                 .help("Input + output + cache-write tokens since midnight, read from ~/.claude/projects. " +
                     "Your session and weekly limits show up here once a Claude agent started from Agenticious replies.")
         }
@@ -328,7 +329,7 @@ struct UsageBar: View {
                 ForEach(usage.codexLimits.models, id: \.name) { model in
                     Divider().frame(height: 22)
                     Text(model.name)
-                        .font(.caption2.weight(.semibold))
+                        .scaledFont(.caption2.weight(.semibold))
                         .help("\(model.name) has its own limit, separate from the rest of Codex.")
                     ForEach(model.limits, id: \.windowMinutes) {
                         LimitGauge(limit: $0, source: "Read from the latest Codex session that used \(model.name).")
@@ -342,7 +343,7 @@ struct UsageBar: View {
                         @ViewBuilder extra: () -> some View = { EmptyView() }) -> some View {
         HStack(spacing: 8) {
             Text(name)
-                .font(.caption.weight(.semibold))
+                .scaledFont(.caption.weight(.semibold))
             ForEach(limits, id: \.windowMinutes) { LimitGauge(limit: $0, source: source) }
             extra()
         }
@@ -360,14 +361,14 @@ struct CodexModelQuotaStatus: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(quota.name).font(.caption2.weight(.semibold))
+            Text(quota.name).scaledFont(.caption2.weight(.semibold))
             Label(isStale ? "Last reported: \(quota.status)" : quota.status,
                   systemImage: isStale ? "clock" : quota.available ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
-                .font(.system(size: 10))
+                .scaledFont(.system(size: 10))
                 .foregroundStyle(isStale ? Color.secondary : quota.available ? AgenticiousStyle.lime : .orange)
             if !quota.available, let availableAt = quota.availableAt {
                 Text("Resets \(availableAt.formatted(.relative(presentation: .named)))")
-                    .font(.system(size: 10))
+                    .scaledFont(.system(size: 10))
             }
         }
         .fixedSize()
@@ -412,7 +413,7 @@ private struct LimitGauge: View {
 
         VStack(alignment: .leading, spacing: 2) {
             Text("\(limit.windowLabel) \(Int(percent.rounded()))%")
-                .font(.system(size: 10))
+                .scaledFont(.system(size: 10))
                 .monospacedDigit().lineLimit(1)
             UsageProgressBar(usedPercent: percent)
                 .frame(width: 62)
@@ -468,7 +469,7 @@ struct PullRequestLinks: View {
     private func link(_ reference: PullRequestReference) -> some View {
         Link(destination: reference.url) {
             Label(reference.label, systemImage: "arrow.triangle.pull")
-                .font(.caption.weight(.semibold))
+                .scaledFont(.caption.weight(.semibold))
                 .lineLimit(1)
                 .truncationMode(.middle)
                 .padding(.horizontal, 10).padding(.vertical, 6)
@@ -522,6 +523,12 @@ struct ControlRoomBar: View {
             content(showsTitle: true)
             content(showsTitle: false)
             content(showsTitle: false, stacksUsage: true)
+            // Nothing above fits (large text in a narrow window, a Codex model with its own limits): the usage
+            // scrolls, so the Providers button stays inside the window.
+            HStack(spacing: 12) {
+                ScrollView(.horizontal) { UsageBar(isStacked: true) }.scrollIndicators(.never)
+                providersButton
+            }
         }
         .padding(.horizontal, 18).padding(.vertical, 12)
         .background(AgenticiousStyle.ink)
@@ -531,13 +538,17 @@ struct ControlRoomBar: View {
     private func content(showsTitle: Bool, stacksUsage: Bool = false) -> some View {
         HStack(spacing: 12) {
             if showsTitle {
-                Text("CONTROL ROOM").font(.system(size: 10, weight: .bold, design: .monospaced))
+                Text("CONTROL ROOM").scaledFont(.system(size: 10, weight: .bold, design: .monospaced))
                     .tracking(1).foregroundStyle(AgenticiousStyle.violet)
             }
             Spacer(minLength: showsTitle ? 8 : 0)
             UsageBar(isStacked: stacksUsage)
-            ProviderStatusButton().buttonStyle(AgenticiousButtonStyle(isPrimary: false, isCompact: true)).labelStyle(.iconOnly)
+            providersButton
         }
+    }
+
+    private var providersButton: some View {
+        ProviderStatusButton().buttonStyle(AgenticiousButtonStyle(isPrimary: false, isCompact: true)).labelStyle(.iconOnly)
     }
 }
 
@@ -570,12 +581,12 @@ struct TaskHeading: View {
             TaskTypeIcon(type: type, size: size)
             VStack(alignment: .leading, spacing: size == .large ? 6 : 4) {
                 Text(type.name)
-                    .font(titleFont)
+                    .scaledFont(titleFont)
                     .foregroundStyle(.primary)
                     .lineLimit(2)
                 if !details.isEmpty {
                     Text(details)
-                        .font(detailsFont)
+                        .scaledFont(detailsFont)
                         .foregroundStyle(.secondary)
                         .lineLimit(size == .large ? 4 : 3)
                 }
@@ -594,7 +605,7 @@ struct TaskHeading: View {
         }
     }
 
-    private var titleFont: Font {
+    private var titleFont: ScaledFont {
         switch size {
         case .compact: .system(size: 13, weight: .semibold)
         case .regular: .title3.weight(.semibold)
@@ -602,7 +613,7 @@ struct TaskHeading: View {
         }
     }
 
-    private var detailsFont: Font {
+    private var detailsFont: ScaledFont {
         switch size {
         case .compact: .system(size: 11)
         case .regular: .callout
@@ -618,9 +629,9 @@ struct TaskTypeIcon: View {
     var body: some View {
         let isLarge = size == .large
         Image(systemName: NSImage(systemSymbolName: type.symbol, accessibilityDescription: nil) == nil ? "sparkles" : type.symbol)
-            .font(.system(size: isLarge ? 20 : 13, weight: .semibold))
+            .scaledFont(.system(size: isLarge ? 20 : 13, weight: .semibold))
             .foregroundStyle(AgenticiousStyle.violet)
-            .frame(width: isLarge ? 40 : 26, height: isLarge ? 40 : 26)
+            .scaledFrame(width: isLarge ? 40 : 26, height: isLarge ? 40 : 26)
             .background(AgenticiousStyle.violet.opacity(0.12), in: RoundedRectangle(cornerRadius: isLarge ? 10 : 7))
             .help(type.name)
             .accessibilityLabel(type.name)
@@ -650,7 +661,7 @@ struct BackgroundTaskLabel: View {
     var body: some View {
         HStack(spacing: 8) {
             ProgressView().controlSize(.small)
-            Text(task).font(isCompact ? .caption.weight(.semibold) : .callout.weight(.semibold))
+            Text(task).scaledFont(isCompact ? .caption.weight(.semibold) : .callout.weight(.semibold))
         }
         .padding(.horizontal, isCompact ? 10 : 14).padding(.vertical, isCompact ? 6 : 8)
         .background(AgenticiousStyle.panel, in: Capsule())

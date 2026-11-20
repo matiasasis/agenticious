@@ -6,6 +6,7 @@ import SwiftUI
 struct SessionDetailView: View {
     @EnvironmentObject private var store: SessionStore
     @ObservedObject var session: AgentSession
+    @Environment(\.textScale) private var textScale
     @State private var showActivity = true
 
     var body: some View {
@@ -16,6 +17,8 @@ struct SessionDetailView: View {
 
                 HStack(spacing: 12) {
                     AgentBadge(agent: session.agent, detail: session.modelSummary)
+                        // Larger text fills this row sooner; the branch and the folder give way before the provider's name.
+                        .layoutPriority(textScale > 1 ? 1 : 0)
                     StatusPill(status: session.status)
                         .fixedSize()
                     if !session.isChat, !session.chunks.isEmpty {
@@ -54,7 +57,7 @@ struct SessionDetailView: View {
                     Spacer()
                     if let worktree = session.worktree { BranchLabel(worktree: worktree, isRemoved: session.worktreeRemoved) }
                     Label(session.project.path ?? "No project", systemImage: session.project.symbol)
-                        .font(.caption)
+                        .scaledFont(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .truncationMode(.head)
@@ -78,6 +81,8 @@ struct SessionDetailView: View {
             }
             .padding(20)
             .background(AgenticiousStyle.panel)
+            // Larger text makes the header taller than its even share; the scrolling activity below gives way, not the banner.
+            .layoutPriority(textScale > 1 ? 1 : 0)
 
             Divider()
 
@@ -99,21 +104,20 @@ struct SessionDetailView: View {
             if showActivity {
                 ActivityView(session: session) { showActivity = false }
             } else if session.terminalView == nil, let task = session.backgroundTask {
-                ContentUnavailableView { Label(task, systemImage: "hourglass") } description: {
-                    Text("The terminal opens once \(session.agent.displayName) is running.")
+                ContentUnavailableView { Label(task, systemImage: "hourglass").scaledFont(.largeTitle.bold()) } description: {
+                    Text("The terminal opens once \(session.agent.displayName) is running.").scaledFont(.body)
                 }
             } else if session.terminalView == nil {
-                ContentUnavailableView(
-                    "Not running", systemImage: "moon.zzz",
-                    description: Text("Resume to reopen \(session.agent.displayName)'s conversation, with everything it already knows.")
-                )
+                ContentUnavailableView { Label("Not running", systemImage: "moon.zzz").scaledFont(.largeTitle.bold()) } description: {
+                    Text("Resume to reopen \(session.agent.displayName)'s conversation, with everything it already knows.").scaledFont(.body)
+                }
             } else {
                 TerminalContainer(session: session)
             }
             if session.isMarkedFinished || session.canMarkFinished {
                 HStack {
                     Text(session.isMarkedFinished ? "History saved in Finished." : "Finishing stops the agent and cleans up its worktree.")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .scaledFont(.caption).foregroundStyle(.secondary)
                     Spacer()
                     Button(session.archiveActionTitle, systemImage: session.archiveActionSymbol) {
                         store.markFinished(session, finished: !session.isMarkedFinished)
@@ -177,7 +181,7 @@ private struct Banner: View {
         } icon: {
             Image(systemName: systemImage)
         }
-        .font(.callout)
+        .scaledFont(.callout)
         .foregroundStyle(color)
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -185,17 +189,49 @@ private struct Banner: View {
     }
 }
 
+/// An agent's terminal. SwiftTerm's font setter soft-resets the emulator: it would show a caret the CLI had hidden
+/// and drop its cursor-key mode, so a text size change puts both back.
+final class AgentTerminalView: LocalProcessTerminalView {
+    private var caretHidden = false
+
+    override func showCursor(source: Terminal) {
+        caretHidden = false
+        super.showCursor(source: source)
+    }
+
+    override func hideCursor(source: Terminal) {
+        caretHidden = true
+        super.hideCursor(source: source)
+    }
+
+    /// Does nothing at the size it already has, which at the normal text size is always.
+    func setFontSize(_ size: CGFloat) {
+        guard font.pointSize != size else { return }
+        let emulator = getTerminal()
+        let (hidden, applicationCursor) = (caretHidden, emulator.applicationCursor)
+        font = .monospacedSystemFont(ofSize: size, weight: .regular)
+        emulator.applicationCursor = applicationCursor
+        if hidden { emulator.hideCursor() }
+        // The setter sizes the grid from the full width; this takes the scroller off again.
+        setFrameSize(frame.size)
+    }
+}
+
 /// Hosts the session's long-lived terminal view. The view is owned by the session, so switching agents
 /// in the sidebar re-attaches to the same running process instead of starting a new one.
 struct TerminalContainer: NSViewRepresentable {
     @ObservedObject var session: AgentSession
+    @Environment(\.textScale) private var textScale
 
     func makeNSView(context: Context) -> PaddedTerminalHost {
         PaddedTerminalHost()
     }
 
     func updateNSView(_ container: PaddedTerminalHost, context: Context) {
-        guard let terminal = session.terminalView, terminal.superview !== container else { return }
+        guard let terminal = session.terminalView else { return }
+        // The terminal outlives this view, so one started at another text size catches up when it is shown.
+        terminal.setFontSize(NSFont.systemFontSize * textScale)
+        guard terminal.superview !== container else { return }
 
         // Resuming swaps in a new terminal; drop the one whose process ended.
         container.subviews.forEach { $0.removeFromSuperview() }

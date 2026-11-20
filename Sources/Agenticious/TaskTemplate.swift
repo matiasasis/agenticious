@@ -8,6 +8,8 @@ struct TaskTemplate: Codable, Identifiable, Equatable {
     var titlePattern = "{{input}}"
     var prompt = "{{input}}"
     var skillPaths: [String] = []
+    /// Opens the floating Summon window on this preset from any app. Optional, so files saved before shortcuts load unchanged.
+    var hotkey: Hotkey?
 
     var isCustom: Bool { id == "custom" }
     var isChat: Bool { id == "chat" }

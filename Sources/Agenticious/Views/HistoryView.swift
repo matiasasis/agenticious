@@ -8,7 +8,7 @@ struct HistoryView: View {
         VStack(alignment: .leading, spacing: 20) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("History").font(.system(size: 30, weight: .bold, design: .rounded))
+                    Text("History").scaledFont(.system(size: 30, weight: .bold, design: .rounded))
                     Text("Finished and archived agents, newest first.").foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -31,8 +31,10 @@ struct HistoryView: View {
                 ContentUnavailableView {
                     Label(store.history.search.isEmpty ? "No history yet" : "No matching agents",
                           systemImage: "clock.arrow.circlepath")
+                        .scaledFont(.largeTitle.bold())
                 } description: {
                     Text(store.history.search.isEmpty ? "Archived agents will appear here." : "Try another task, workspace, branch or provider.")
+                        .scaledFont(.body)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -52,13 +54,13 @@ struct HistoryView: View {
             HStack(spacing: 12) {
                 Text(page.summary).foregroundStyle(.secondary)
                 Spacer()
-                Button("Previous") { store.history.page = page.number - 1 }
+                Button { store.history.page = page.number - 1 } label: { Text("Previous").scaledFont(.callout) }
                     .disabled(page.number == 1)
                 Text("Page \(page.number) of \(page.count)").monospacedDigit()
-                Button("Next") { store.history.page = page.number + 1 }
+                Button { store.history.page = page.number + 1 } label: { Text("Next").scaledFont(.callout) }
                     .disabled(page.number == page.count)
             }
-            .font(.callout)
+            .scaledFont(.callout)
         }
         .padding(24)
     }
@@ -75,7 +77,7 @@ private struct HistoryRow: View {
                 Spacer()
                 Text(session.startedAt, format: .dateTime.month(.abbreviated).day().year().hour().minute())
             }
-            .font(.caption).foregroundStyle(.secondary)
+            .scaledFont(.caption).foregroundStyle(.secondary)
             TaskHeading(type: session.displayedTaskType, task: session.task, size: .compact)
             HStack {
                 AgentBadge(agent: session.agent, detail: session.modelSummary)

@@ -66,6 +66,7 @@ final class SessionStore: ObservableObject {
     let diagnostics = ProviderDiagnostics()
     let presets = TaskPresetStore()
     let skillLocations = SkillLocations()
+    let summon = SummonHotkeys()
     private var server: EventServer?
     private var backgroundRefresh: BackgroundRefresh?
     private var database: SessionDatabase?
@@ -74,7 +75,8 @@ final class SessionStore: ObservableObject {
     private var snapshotter: WindowSnapshotter?
     private var commandLineOptionsPending = true
 
-    init(databaseURL: URL? = nil) {
+    /// Only the app registers shortcuts: a store built in a test reads the same presets file.
+    init(databaseURL: URL? = nil, registersHotkeys: Bool = false) {
         port = ProcessInfo.processInfo.environment["AGENTICIOUS_PORT"].flatMap(UInt16.init) ?? Self.defaultPort
         favorites = (UserDefaults.standard.stringArray(forKey: Self.favoritesKey) ?? []).map(Project.init(path:))
         openDatabase(url: databaseURL)
@@ -86,17 +88,22 @@ final class SessionStore: ObservableObject {
             .init(check: .providers, lastChecked: { diagnostics.lastChecked }, run: { Task { await diagnostics.refresh() } }),
             .init(check: .usage, lastChecked: { usage.lastChecked }, run: usage.refresh),
         ])
+        if registersHotkeys { summon.start(self) }
     }
 
     // MARK: - Reading
 
-    var composerProject: Project {
-        if let selectedSession { return selectedSession.project }
-        if let path = UserDefaults.standard.string(forKey: "lastWorkspace") {
-            if path.isEmpty { return .none }
-            if let favorite = favorites.first(where: { $0.path == path }) { return favorite }
-        }
-        return favorites.first ?? .none
+    var composerProject: Project { selectedSession?.project ?? lastUsedProject }
+
+    /// The workspace of the last summon. A shortcut fires over other apps, where the agent selected here says nothing.
+    var lastUsedProject: Project {
+        Self.lastUsedProject(path: UserDefaults.standard.string(forKey: "lastWorkspace"), favorites: favorites)
+    }
+
+    /// "" is "No project"; a folder that's no longer a favorite falls back to the first one.
+    nonisolated static func lastUsedProject(path: String?, favorites: [Project]) -> Project {
+        if path == "" { return .none }
+        return favorites.first { $0.path == path } ?? favorites.first ?? .none
     }
 
     var attentionCount: Int { sessions.filter { !$0.isMarkedFinished && $0.status.needsAttention }.count }
@@ -244,7 +251,8 @@ final class SessionStore: ObservableObject {
     @discardableResult
     func launch(
         task: String, prompt: String? = nil, agent: AgentKind, model: ModelChoice? = nil, effort: String? = nil,
-        project: Project, isolated: Bool = false, taskType: TaskType? = nil, images: [PastedImage] = []
+        project: Project, isolated: Bool = false, taskType: TaskType? = nil, images: [PastedImage] = [],
+        select: Bool = true
     ) throws -> AgentSession {
         let id = UUID()
         let imageFiles = try PastedImage.save(images, into: AgentLauncher.sessionDirectory(for: id).appendingPathComponent("images"))
@@ -257,7 +265,8 @@ final class SessionStore: ObservableObject {
         let worktreeIn = isolated && !session.isChat ? project.path : nil
         session.backgroundTask = worktreeIn == nil ? "Starting \(agent.displayName)…" : "Creating its worktree…"
         sessions.insert(session, at: 0)
-        selection = .session(session.id)
+        // Summoned from the floating window over another app, the main window keeps showing what it was showing.
+        if select { selection = .session(session.id) }
 
         Task { await start(session, worktreeIn: worktreeIn, images: imageFiles) }
         return session
@@ -284,6 +293,8 @@ final class SessionStore: ObservableObject {
             if selection == .session(session.id) { selection = .overview }
             if let folder = try? AgentLauncher.sessionDirectory(for: session.id) { try? FileManager.default.removeItem(at: folder) }
             alert = "Couldn't start the agent: \(error.localizedDescription)"
+            // Summoned from the floating window, nobody is looking at the main window where this shows.
+            NSApp?.requestUserAttention(.informationalRequest)
         }
     }
 
@@ -371,7 +382,9 @@ final class SessionStore: ObservableObject {
     }
 
     private func attachTerminal(to session: AgentSession, running spec: LaunchSpec) {
-        let terminal = LocalProcessTerminalView(frame: NSRect(x: 0, y: 0, width: 900, height: 500))
+        let terminal = AgentTerminalView(frame: NSRect(x: 0, y: 0, width: 900, height: 500))
+        // Before the process exists, so the CLI starts on the grid it will keep.
+        terminal.setFontSize(NSFont.systemFontSize * TextScale.clamped(UserDefaults.standard.double(forKey: TextScale.key)))
         let bridge = TerminalBridge { [weak self, weak session, weak terminal] exitCode in
             guard let session, !session.isArchiving, session.isRunning, session.terminalView === terminal else { return }
             let oldStatus = session.status
@@ -500,7 +513,12 @@ final class SessionStore: ObservableObject {
 
     private func startServer() {
         do {
-            let server = try EventServer(port: port) { [weak self] event, reply in
+            let server = try EventServer(port: port, onRequest: { [weak self] request, reply in
+                Task { @MainActor in
+                    guard let self else { return reply(nil) }
+                    reply(StreamDeck.answer(request, presets: self.presets.presets) { self.summon.show(presetID: $0.id, in: self) })
+                }
+            }) { [weak self] event, reply in
                 Task { @MainActor in
                     guard let self else { return reply(nil) }
                     if event.name == "AskUserQuestion" { self.hold(event, reply: reply) } else { reply(self.handle(event)) }

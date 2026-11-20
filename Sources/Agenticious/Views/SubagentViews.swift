@@ -26,7 +26,7 @@ struct SubagentStack: View {
                 if !ended.isEmpty {
                     Button { showsEnded.toggle() } label: {
                         Label(summary(of: ended), systemImage: showsEnded ? "chevron.down" : "chevron.right")
-                            .font(.system(size: 10, weight: .semibold))
+                            .scaledFont(.system(size: 10, weight: .semibold))
                             .foregroundStyle(.secondary)
                             .contentShape(Rectangle())
                     }
@@ -68,12 +68,12 @@ private struct SubagentRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Circle().fill(subagent.state.color).frame(width: 6, height: 6)
-                    Text(subagent.displayTitle).font(.system(size: 11, weight: .semibold)).lineLimit(1)
+                    Text(subagent.displayTitle).scaledFont(.system(size: 11, weight: .semibold)).lineLimit(1)
                     Spacer(minLength: 4)
-                    Text(subagent.state.label).font(.system(size: 9, weight: .semibold)).foregroundStyle(subagent.state.color)
+                    Text(subagent.state.label).scaledFont(.system(size: 9, weight: .semibold)).foregroundStyle(subagent.state.color)
                 }
                 if let detail = subagent.detail {
-                    Text(detail).font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1)
+                    Text(detail).scaledFont(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1)
                 }
             }
             .padding(.horizontal, 10).padding(.vertical, 7)
@@ -111,8 +111,11 @@ struct SubagentDetailView: View {
                         await follow(subagent.transcript, isRunning: subagent.state == .running)
                     }
             } else {
-                ContentUnavailableView("Subagent not found", systemImage: "person.2.slash",
-                                       description: Text("Its agent no longer lists it."))
+                ContentUnavailableView {
+                    Label("Subagent not found", systemImage: "person.2.slash").scaledFont(.largeTitle.bold())
+                } description: {
+                    Text("Its agent no longer lists it.").scaledFont(.body)
+                }
             }
         }
     }
@@ -125,24 +128,24 @@ struct SubagentDetailView: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(AgenticiousStyle.lime)
-            .font(.callout)
+            .scaledFont(.callout)
             Text(subagent.displayTitle)
-                .font(.system(size: 26, weight: .bold, design: .rounded))
+                .scaledFont(.system(size: 26, weight: .bold, design: .rounded))
                 .textSelection(.enabled)
             HStack(spacing: 10) {
                 if !subagent.type.isEmpty {
-                    Text(subagent.type).font(.caption.weight(.semibold))
+                    Text(subagent.type).scaledFont(.caption.weight(.semibold))
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(AgenticiousStyle.violet.opacity(0.15), in: Capsule())
                         .foregroundStyle(AgenticiousStyle.violet)
                 }
                 Label(subagent.state.label, systemImage: "circle.fill")
-                    .font(.caption.weight(.semibold)).foregroundStyle(subagent.state.color)
+                    .scaledFont(.caption.weight(.semibold)).foregroundStyle(subagent.state.color)
                     .labelStyle(SmallDotLabelStyle())
                 Spacer()
             }
             Text("Runs inside this agent's process: pausing or ending the agent stops it too. Talk to it through the agent.")
-                .font(.caption).foregroundStyle(.secondary)
+                .scaledFont(.caption).foregroundStyle(.secondary)
         }
         .padding(24)
     }
@@ -151,7 +154,7 @@ struct SubagentDetailView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 16) {
-                    if let notice { Text(notice).font(.caption).foregroundStyle(.secondary) }
+                    if let notice { Text(notice).scaledFont(.caption).foregroundStyle(.secondary) }
                     ForEach(entries) { ActivityCard(entry: $0, agent: session.agent, isRunning: isRunning) }
                     Color.clear.frame(height: 1).id("latest")
                 }.padding(20)
@@ -160,9 +163,12 @@ struct SubagentDetailView: View {
                 if !isLoaded {
                     BackgroundTaskLabel(task: "Loading activity…")
                 } else if entries.isEmpty {
-                    ContentUnavailableView("No activity yet", systemImage: "text.bubble",
-                                           description: Text("Its messages and tool calls appear here once Claude writes them to its log."))
-                        .allowsHitTesting(false)
+                    ContentUnavailableView {
+                        Label("No activity yet", systemImage: "text.bubble").scaledFont(.largeTitle.bold())
+                    } description: {
+                        Text("Its messages and tool calls appear here once Claude writes them to its log.").scaledFont(.body)
+                    }
+                    .allowsHitTesting(false)
                 }
             }
             .onChange(of: entries) { _, _ in proxy.scrollTo("latest", anchor: .bottom) }
@@ -208,7 +214,7 @@ struct SubagentDetailView: View {
 private struct SmallDotLabelStyle: LabelStyle {
     func makeBody(configuration: Configuration) -> some View {
         HStack(spacing: 5) {
-            configuration.icon.font(.system(size: 6))
+            configuration.icon.scaledFont(.system(size: 6))
             configuration.title
         }
     }

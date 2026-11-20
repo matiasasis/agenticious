@@ -28,6 +28,9 @@ A native macOS dashboard for running many coding agents (Claude Code and Codex) 
 - **Usage**: session and weekly limits for both. Codex's come from its session logs. Claude's come from the status line
   of agents started here (until one has replied, you see an estimate of today's tokens instead). Usage and provider
   checks only run while Agenticious is the active app, at intervals set in **Customize → Preferences → Background refresh**.
+- **Summon from anywhere**: give a task preset a system-wide shortcut, or put every preset behind one Stream Deck key,
+  and a floating Summon window opens over whatever you are working on.
+- **Text size**: scale all of the app's text, the terminal included, from 100% to 150%.
 
 ## Run
 
@@ -77,6 +80,10 @@ settings replace your own `statusLine` there (it shows the model and both limits
 | `Sources/Agenticious/EventInterpreter.swift` | Event → status / chunks |
 | `Sources/Agenticious/SessionStore.swift` | Running sessions, terminal processes, dock badge |
 | `Sources/Agenticious/UsageMonitor.swift` | Codex and Claude plan limits |
+| `Sources/Agenticious/HotkeyCenter.swift` | System-wide preset shortcuts (Carbon hot keys, no Accessibility permission) |
+| `Sources/Agenticious/SummonPanelController.swift` | The floating Summon window a shortcut opens over other apps |
+| `Sources/Agenticious/StreamDeck.swift` | What the Stream Deck plugin asks the app: the presets with their key images, and a Summon window |
+| `streamdeck/` | The Stream Deck plugin (JavaScript on Node.js) |
 | `Sources/agenticious-mcp/main.swift` | Stdio MCP server the agents call |
 
 ## Worktrees
@@ -105,6 +112,46 @@ Implement, Resolve & merge, Review PR, Fix CI, Ask for review, and Technical dis
 They follow the selected project’s conventions without requiring specific skills, labels, Slack channels,
 or local paths. Existing user configs are not replaced or extended when the app is updated.
 
+**Shortcuts.** Give a preset a shortcut in its editor: click **Record shortcut** and press the keys, for example
+`⌃⌥R` (Esc cancels). It needs ⌘, ⌃ or ⌥ unless it is a function key, and standard shortcuts such as ⌘V, ⌘S or
+⌘Q are refused. From then on, pressing it in any app while Agenticious is running opens a floating Summon window over
+what you are working on, with that preset selected and the workspace you last summoned in. **Start agent**
+(⌘ Return), **Cancel** or Esc closes it and you carry on where you were: the agent starts in the background and
+the main window stays put, still showing what it was showing. Pressing another preset's shortcut while the window
+is open switches the preset and keeps what you typed; pressed from an app on another display, the window comes to
+that display. Shortcuts need no Accessibility permission. **Browse…** makes Agenticious the active app for the
+folder picker; closing the Summon window hands you back to the app you were in. Pressed while Agenticious itself is
+in front, a shortcut works like **⌘N** and the main window turns to the new agent.
+
+No preset has a shortcut until you record one. Two presets can't share a shortcut: the editor says who has it,
+and in a hand-edited file the first preset keeps it. A shortcut that can't work is flagged on its preset's card.
+macOS doesn't report a shortcut another app already uses, so if nothing opens, pick another. When two copies of
+Agenticious run (a dev build beside the installed app), the first one started holds the shortcuts and the other
+flags them on its cards. Shortcuts are
+saved with the preset as an optional `hotkey`, e.g. `{ "key": "R", "keyCode": 15, "modifiers": ["control", "option"] }`;
+`keyCode` is the physical key, so the shortcut stays on it when the keyboard layout changes.
+
+**Stream Deck.** The plugin in `streamdeck/` puts every preset on a 15-key Stream Deck behind one key. The
+**Agenticious** key (the app's icon) opens a page with **Back** at the top left and a key for each preset, in the
+order you arranged them, so a preset keeps its place whichever you use most. Each key is drawn by the app like the
+preset's card: its name above its symbol. Pressing one opens the floating Summon window on that preset, exactly as
+its shortcut would, and returns the deck to the profile it was showing; presets need no shortcut for this. Past 14
+presets the last key becomes **More**. The page follows preset edits within a couple of seconds, and says
+**not running** when Agenticious is closed or older than the plugin.
+
+```sh
+cd streamdeck
+npm ci --ignore-scripts
+npm test
+node build.js   # dist/com.mati.agenticious.sdPlugin
+```
+
+Quit Stream Deck, copy `dist/com.mati.agenticious.sdPlugin` into
+`~/Library/Application Support/com.elgato.StreamDeck/Plugins/`, start Stream Deck again, and drag **Agenticious**
+from the action list onto a key. The first press installs the bundled page. The plugin talks to the app's loopback
+port (`GET /presets`, `POST /summon/<preset-id>` on 47821, or `AGENTICIOUS_PORT`); the app ignores those requests
+when a browser sends them for a web page. It needs Stream Deck 6.5 or later.
+
 **Customize → Skills** browses `SKILL.md` files from personal `.agents/skills`, `.codex/skills` (respecting `CODEX_HOME`),
 `.claude/skills`, `/etc/codex/skills`, project skill folders up to the repository root, and Codex/Claude plugin
 caches. Add other locations with **Search folders**. Symlinked folders are followed and identical files are
@@ -118,8 +165,8 @@ Use **Choose skills** in a task or preset to attach skills. Agenticious asks the
 absolute paths and resolve supporting resources from their skill folders. Missing or unreadable selected files
 prevent launch with an error; attaching a skill does not install its tools or enable its plugin.
 
-For UI inspection, `--settings`, `--skills`, and `--new-agent [preset-id]` can be combined with
-`--snapshot-dir /tmp/agenticious-shots`. Run configuration and skill tests with `swift test`.
+For UI inspection, `--settings`, `--skills`, `--new-agent [preset-id]`, and `--summon-panel [preset-id]` (the
+floating window, saved as `Summon agent.png`) can be combined with `--snapshot-dir /tmp/agenticious-shots`. Run configuration and skill tests with `swift test`.
 
 ## Next steps
 
@@ -131,13 +178,19 @@ For UI inspection, `--settings`, `--skills`, and `--new-agent [preset-id]` can b
 
 The sidebar shows active agents grouped by workspace. **History** below the workspace list opens archived agents, newest first, with 20 results per page. Search by task, workspace, branch, or provider; opening an agent and returning to History preserves your search and page. Tasks stay in **Queue** regardless of their status. Use **Mark as finished** at the bottom of an agent view to stop it, clean up its resources, and move its history to **History**. **Move to Queue** restores the saved task to the list; it does not recreate a removed worktree. Resume is available only while its working directory still exists. Existing completed tasks return to Queue when upgrading to this manual behavior. Each card uses its status color for its background tint and border, with a stronger border for the selected sidebar card. Each card shows its provider, status, task, and completed steps; select a card to return to its terminal, or right-click for session actions. Use the folder button beside **Workspaces** to add a project.
 
-The top bar shows Codex model-specific quota availability (such as **GPT-6 Astra: Available** or **Limit reached**) separately from its account percentages. Provider limits stay side by side while there is room, hiding the Control Room label before stacking in a narrow window. Summon agents from the workspace buttons or with **⌘N**. The live usage response reports availability and an optional reset time rather than a percentage. It refreshes at the usage-check interval in Preferences using your existing Codex sign-in. If a refresh fails, the last result is explicitly labeled as last reported; account percentages continue to come from local logs.
+The top bar shows Codex model-specific quota availability (such as **GPT-6 Astra: Available** or **Limit reached**) separately from its account percentages. Provider limits stay side by side while there is room, hiding the Control Room label before stacking in a narrow window. Summon agents from the workspace buttons, with **⌘N**, or from any app with a preset's shortcut. The live usage response reports availability and an optional reset time rather than a percentage. It refreshes at the usage-check interval in Preferences using your existing Codex sign-in. If a refresh fails, the last result is explicitly labeled as last reported; account percentages continue to come from local logs.
 
 Below the sidebar branding, **Agents** counts tasks outside history, **Working** counts starting or actively working agents, and **Needs you** counts agents blocked on your input or approval. Waiting and idle processes do not count as working.
 
-**Customize** keeps task presets, skills, and preferences together while the agent sidebar stays visible. Preferences are split into sections: **General** (sidebar branch names, default worktree behavior), **Notifications**, and **Background refresh** (how often provider connections and usage limits are checked). The macOS menu bar shows a monochrome “A” with a spark, with a count only when agents need your attention.
+**Customize** keeps task presets, skills, and preferences together while the agent sidebar stays visible. Preferences are split into sections: **General** (sidebar branch names, default worktree behavior, text size), **Notifications**, and **Background refresh** (how often provider connections and usage limits are checked). The macOS menu bar shows a monochrome “A” with a spark, with a count only when agents need your attention.
 
 Every agent has an **Archive** button beside its status and step count, plus an archive action in its right-click menu. Archiving stops its process, descendants, and owned terminal process group (escalating to kill if needed), releases the terminal, removes its per-session launch configuration, and attempts to remove its worktree. Known leftover provider processes are identified by this session's exact launch markers after a restart. **Mark as finished** uses the same cleanup. History and Git branches are preserved; worktrees with uncommitted changes or another queued agent are kept, with a warning. The main checkout and shared scratch folder are never removed. Archived activity is read once without background polling. Use the Archive button or **Retry archive cleanup** to retry worktree cleanup on older finished tasks.
+
+### Text size
+
+**Customize → Preferences → General → Text size** scales the app's text from 100% to 150% in steps of 10%, and applies as you choose: the main window with its sheets and popovers, the menu bar panel, the floating Summon window, reply boxes, and the embedded terminal, which reflows to the new size. **View → Make Text Bigger** (**⌘+**, or **⌘=** without Shift), **Make Text Smaller** (**⌘−**), and **Actual Size** (**⌘0**) do the same from the keyboard while the main window is in front. Symbols set in text grow with it, and a box that holds text grows where the text would otherwise be cut off; spacing, corner radii, and decorative sizes stay as they are. Menus, alerts, tooltips, segmented controls, and the menu bar itself are drawn by macOS and keep the system's size.
+
+macOS apps do not follow a system-wide text size on their own, so this is the app's own setting. It is stored as `textScale`: launching with `-textScale 1.3` tries a size for one run without saving it; choosing a size in the app during that run takes over from the argument and is saved.
 
 ### Provider diagnostics
 
@@ -161,7 +214,7 @@ Activity reads the session's local Claude or Codex JSONL log every two seconds w
 
 The view reads up to the latest 4 MiB, shows at most 200 entries, and labels content truncated beyond 32 KiB per field. Activity history comes from the provider's log, so disabling or deleting those logs also removes that history from this view. No additional transcript copy is saved by Agenticious.
 
-The summon sheet remembers the last task preset and workspace, plus provider, model, and effort (model and effort separately per provider). Opening a workspace's **+** button still selects that workspace explicitly. Removed favorites are not restored as the default workspace. The larger sheet adapts to the available display size and keeps model selection beside the compact provider choices.
+The summon sheet remembers the last task preset and workspace, plus provider, model, and effort (model and effort separately per provider). Opening a workspace's **+** button still selects that workspace explicitly. Removed favorites are not restored as the default workspace. A preset's shortcut opens on the last workspace whichever agent is selected. The larger sheet adapts to the available display size and keeps model selection beside the compact provider choices.
 
 Provider icons use monochrome template rendering. The Claude mark comes from the official Claude desktop app (`TrayIconTemplate@3x.png`); the OpenAI mark used for Codex comes from the official ChatGPT app (`webview/assets/openai-logo-regular-ceb75a1754fa.svg` in `app.asar`). Their trademarks belong to Anthropic and OpenAI.
 

@@ -21,7 +21,7 @@ struct CleanupTaskList: View {
                 .padding(.top, 6)
             } label: {
                 Label("\(count) cleanup \(count == 1 ? "task runs" : "tasks run") when this agent ends", systemImage: "sparkles")
-                    .font(.caption.weight(.semibold))
+                    .scaledFont(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
             }
             .tint(AgenticiousStyle.violet)
@@ -31,12 +31,12 @@ struct CleanupTaskList: View {
     private func row(_ task: CleanupTask, source: String, remove: (() -> Void)?) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(task.title).font(.caption.weight(.semibold))
-                Text(task.command).font(.system(size: 11, design: .monospaced)).foregroundStyle(AgenticiousStyle.lime)
+                Text(task.title).scaledFont(.caption.weight(.semibold))
+                Text(task.command).scaledFont(.system(size: 11, design: .monospaced)).foregroundStyle(AgenticiousStyle.lime)
                     .textSelection(.enabled).lineLimit(3)
             }
             Spacer()
-            Text(source).font(.caption2).foregroundStyle(.secondary)
+            Text(source).scaledFont(.caption2).foregroundStyle(.secondary)
             if let remove {
                 Button("Don't run this", systemImage: "xmark.circle", action: remove)
                     .labelStyle(.iconOnly).buttonStyle(.plain).foregroundStyle(.secondary)
@@ -56,21 +56,21 @@ struct WorkspaceCleanupSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Cleanup for \(project.name)").font(.title3.weight(.bold))
+            Text("Cleanup for \(project.name)").scaledFont(.title3.weight(.bold))
             Text("""
                 One command per line. They run for every agent in this workspace when it is ended, marked as finished, \
                 or archived: after the agent stops and before its worktree is removed, in its working directory. \
                 Agents also register their own cleanup for what they create. Lines starting with # are skipped.
                 """)
-                .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                .scaledFont(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             TextEditor(text: $text)
-                .font(.system(size: 12, design: .monospaced))
+                .scaledFont(.system(size: 12, design: .monospaced))
                 .scrollContentBackground(.hidden)
                 .padding(8)
                 .background(AgenticiousStyle.ink, in: RoundedRectangle(cornerRadius: 8))
                 .frame(minHeight: 160)
             Text("Available: $AGENTICIOUS_WORKTREE, $AGENTICIOUS_BRANCH, $AGENTICIOUS_DIRECTORY, $AGENTICIOUS_PROJECT, $AGENTICIOUS_SESSION. Each command gets two minutes.")
-                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                .scaledFont(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             HStack {
                 Spacer()
                 Button("Cancel") { dismiss() }

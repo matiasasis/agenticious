@@ -3,13 +3,14 @@ import SwiftUI
 struct ProvidersView: View {
     @EnvironmentObject private var store: SessionStore
     @EnvironmentObject private var diagnostics: ProviderDiagnostics
+    @Environment(\.textScale) private var textScale
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 HStack {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Keep your agents connected.").font(.system(size: 30, weight: .bold, design: .rounded))
+                        Text("Keep your agents connected.").scaledFont(.system(size: 30, weight: .bold, design: .rounded))
                         Text("Account access, MCP connections, and provider warnings.").foregroundStyle(.secondary)
                     }
                     Spacer()
@@ -20,23 +21,23 @@ struct ProvidersView: View {
                 }
                 HStack {
                     Picker("Check in", selection: $diagnostics.project) {
-                        Text("Home folder").tag(Project.none)
+                        Text("Home folder").scaledFont(.body, textScale).tag(Project.none)
                         ForEach(store.projectGroups.filter { $0.project != .none }) { group in
-                            Text(group.project.name).tag(group.project)
+                            Text(group.project.name).scaledFont(.body, textScale).tag(group.project)
                         }
-                    }.frame(maxWidth: 360)
-                    Button("Choose folder…") {
+                    }.scaledFrame(maxWidth: 360)
+                    Button {
                         if let url = FolderPicker.choose() { diagnostics.project = store.addFavorite(url) }
-                    }
+                    } label: { Text("Choose folder…").scaledFont(.body) }
                 }
                 .disabled(diagnostics.isBusy)
                 Text(diagnostics.project.path ?? FileManager.default.homeDirectoryForCurrentUser.path)
-                    .font(.caption.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
+                    .scaledFont(.caption.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
                 ForEach(AgentKind.allCases) { agent in
                     ProviderCard(agent: agent, report: diagnostics.reports[agent], isChecking: diagnostics.isBusy)
                 }
                 Text("Checks reflect the selected folder, not an existing agent’s worktree or session overrides. Refresh after signing in or changing configuration. Server URLs, tokens, and raw command output are not displayed.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .scaledFont(.caption).foregroundStyle(.secondary)
             }.padding(28)
         }
         .alert("Could not disconnect", isPresented: Binding(
@@ -75,11 +76,11 @@ private struct ProviderCard: View {
                 HStack(alignment: .top, spacing: 12) {
                     Image(systemName: check.needsAttention ? "exclamationmark.triangle.fill" : "circle.dotted")
                         .foregroundStyle(check.needsAttention ? Color.orange : AgenticiousStyle.violet)
-                    Text(check.id).fontWeight(.semibold).frame(width: 170, alignment: .leading)
+                    Text(check.id).fontWeight(.semibold).scaledFrame(width: 170, alignment: .leading)
                     Text(check.message).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
                     if check.isClaudeAIConnector {
                         Link("Manage in Claude", destination: URL(string: "https://claude.ai/customize/connectors")!)
-                            .font(.callout)
+                            .scaledFont(.callout)
                             .help("Disconnect account connectors in Claude’s connector settings.")
                     } else if let server = check.serverName {
                         Button("Disconnect", role: .destructive) { serverToDisconnect = server }
@@ -91,11 +92,11 @@ private struct ProviderCard: View {
             }
             Divider()
             Text(agent == .claude ? "Use /mcp inside Claude Code to reconnect or approve servers." : "Use codex mcp login <server-name> for OAuth. Use /mcp inside Codex to inspect live connections.")
-                .font(.callout).foregroundStyle(AgenticiousStyle.violet)
+                .scaledFont(.callout).foregroundStyle(AgenticiousStyle.violet)
             Text(agent == .claude ? "Details: claude auth status · claude mcp list" : "Details: codex login status · codex mcp list")
-                .font(.caption.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
+                .scaledFont(.caption.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
             if let date = report?.checkedAt {
-                Text("Checked \(date.formatted(date: .omitted, time: .shortened))").font(.caption).foregroundStyle(.secondary)
+                Text("Checked \(date.formatted(date: .omitted, time: .shortened))").scaledFont(.caption).foregroundStyle(.secondary)
             }
         }
         .padding(20).background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 18))
@@ -130,9 +131,9 @@ struct ProviderStatusButton: View {
         .help("\(diagnostics.attentionCount) provider warnings · \(diagnostics.project.path ?? "Home folder")")
         .popover(isPresented: $showingStatus) {
             VStack(alignment: .leading, spacing: 16) {
-                Text("Provider connections").font(.headline)
+                Text("Provider connections").scaledFont(.headline)
                 Text(diagnostics.project.name == "No project" ? "Home folder" : diagnostics.project.name)
-                    .font(.caption).foregroundStyle(.secondary)
+                    .scaledFont(.caption).foregroundStyle(.secondary)
                 ForEach(AgentKind.allCases) { agent in
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
@@ -140,16 +141,16 @@ struct ProviderStatusButton: View {
                             Spacer()
                             let count = diagnostics.reports[agent]?.attentionCount ?? 0
                             Text(diagnostics.isChecking ? "Checking…" : diagnostics.reports[agent] == nil ? "Not checked" : count > 0 ? "\(count) need attention" : "No warnings reported")
-                                .font(.caption).foregroundStyle(count > 0 ? Color.orange : .secondary)
+                                .scaledFont(.caption).foregroundStyle(count > 0 ? Color.orange : .secondary)
                         }
                         ForEach(Array((diagnostics.reports[agent]?.checks.filter(\.needsAttention) ?? []).prefix(3))) { check in
-                            Text(check.id + ": " + check.message).font(.caption).foregroundStyle(.orange)
+                            Text(check.id + ": " + check.message).scaledFont(.caption).foregroundStyle(.orange)
                                 .lineLimit(2)
                         }
                     }
                 }
                 Text("Codex reports configured authentication; live connections are not checked.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .scaledFont(.caption).foregroundStyle(.secondary)
                 Divider()
                 HStack {
                     Button("Refresh", systemImage: "arrow.clockwise") { Task { await diagnostics.refresh() } }
@@ -161,7 +162,7 @@ struct ProviderStatusButton: View {
                         store.selection = .providers
                     }.buttonStyle(AgenticiousButtonStyle(isCompact: true))
                 }
-            }.padding(20).frame(width: 360).background(AgenticiousStyle.ink)
+            }.padding(20).scaledFrame(width: 360).background(AgenticiousStyle.ink)
         }
     }
 }
