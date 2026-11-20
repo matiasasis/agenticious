@@ -33,7 +33,7 @@ const actions = Object.keys(actionNames).map(kind => ({UUID: `com.mati.agenticio
   Controllers: ['Keypad'], UserTitleEnabled: false, States: [{Image: `images/${kind}`, ShowTitle: false}]}));
 writeFileSync(path.join(plugin, 'manifest.json'), JSON.stringify({Name: 'Agenticious',
   Author: 'Matias Asis', Description: 'Summon an Agenticious agent from any preset with one key.',
-  Version: '0.1.0.0', UUID: 'com.mati.agenticious', SDKVersion: 2,
+  Version: '1.1.0.0', UUID: 'com.mati.agenticious', SDKVersion: 2,
   CodePath: 'plugin/main.js', Nodejs: {Version: '20'}, Icon: 'images/launcher',
   Category: 'Agenticious', CategoryIcon: 'images/launcher',
   OS: [{Platform: 'mac', MinimumVersion: '14'}], Software: {MinimumVersion: '6.5'}, Actions: actions,

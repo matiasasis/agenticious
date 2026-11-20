@@ -8,7 +8,11 @@ fi
 script/build-app -c release
 codesign --verify --deep --strict .build/Agenticious.app
 mkdir -p .build/release
+rm -f .build/release/Agenticious-macOS-arm64.zip .build/release/Agenticious.streamDeckPlugin
 COPYFILE_DISABLE=1 ditto -c -k --sequesterRsrc --keepParent .build/Agenticious.app .build/release/Agenticious-macOS-arm64.zip
+# The Stream Deck plugin: a .streamDeckPlugin is a ZIP of the .sdPlugin folder, installed by opening it.
+(cd streamdeck && npm ci --ignore-scripts && npm test && node build.js)
+(cd streamdeck/dist && COPYFILE_DISABLE=1 ditto -c -k --norsrc --keepParent com.mati.agenticious.sdPlugin ../../.build/release/Agenticious.streamDeckPlugin)
 cd .build/release
-shasum -a 256 Agenticious-macOS-arm64.zip > SHA256SUMS.txt
+shasum -a 256 Agenticious-macOS-arm64.zip Agenticious.streamDeckPlugin > SHA256SUMS.txt
 printf 'Release files: %s\n' "$PWD"

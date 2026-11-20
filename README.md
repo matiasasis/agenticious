@@ -6,17 +6,30 @@
 Download the Apple silicon build from [GitHub Releases](https://github.com/matiasasis/agenticious/releases).
 Requires macOS 14+ and Claude Code or Codex installed and authenticated.
 Unzip the download and move Agenticious.app to Applications.
+For a Stream Deck, download `Agenticious.streamDeckPlugin` from the same release and open it (see **Stream Deck** below).
 
 The app uses free ad-hoc signing; it has no Apple Developer ID signature or notarization.
 If macOS blocks the first launch and you trust the download, try opening it once, then go to
 **System Settings → Privacy & Security → Open Anyway** and confirm.
 See [Apple's instructions](https://support.apple.com/en-us/102445). Organization policies may prevent this override.
 
+### What's new in 1.1.0
+
+- **Permission requests in Activity**: Allow or Deny what Claude asks to run from a card, with a **Permission required** status.
+- **Agents that never start**: a missing CLI or a failed launch shows **Didn't start** with what the terminal said, and
+  a shell start-up waiting for you (an update prompt, a password) shows as **Needs you**. **Try again** relaunches.
+- **Recent task inputs**: the Summon sheet offers each preset's recent inputs, ready to use again.
+- **Summon from anywhere**: give a preset a system-wide shortcut; choose whether its floating window opens on the main
+  display, the current display, or over the current window.
+- **Stream Deck plugin**: every preset behind one key, now a download of its own.
+- **Text size**: scale the whole app, terminal included, up to 150%.
+
 ## Publishing a release
 
 Run `script/release` on an Apple silicon Mac with Xcode installed. It builds an optimized app,
-verifies its ad-hoc signature, and writes `Agenticious-macOS-arm64.zip` and `SHA256SUMS.txt`
-to `.build/release/`. Upload both files to a versioned GitHub Release. No Apple Developer membership is required.
+verifies its ad-hoc signature, builds and tests the Stream Deck plugin (it needs Node.js and npm), and writes
+`Agenticious-macOS-arm64.zip`, `Agenticious.streamDeckPlugin` and `SHA256SUMS.txt` to `.build/release/`.
+Set the version in `Resources/Info.plist` and `streamdeck/build.js` first. Upload all three files to a versioned GitHub Release. No Apple Developer membership is required.
 The static download website is in `docs/`; configure GitHub Pages to serve that directory.
 
 A native macOS dashboard for running many coding agents (Claude Code and Codex) at once without juggling terminal windows.
@@ -180,6 +193,10 @@ its shortcut would, and returns the deck to the profile it was showing; presets 
 presets the last key becomes **More**. The page follows preset edits within a couple of seconds, and says
 **not running** when Agenticious is closed or older than the plugin.
 
+To install it, download `Agenticious.streamDeckPlugin` from
+[GitHub Releases](https://github.com/matiasasis/agenticious/releases) and open it; Stream Deck asks to install it.
+Then drag **Agenticious** from the action list onto a key. To build it from source instead:
+
 ```sh
 cd streamdeck
 npm ci --ignore-scripts
@@ -188,8 +205,7 @@ node build.js   # dist/com.mati.agenticious.sdPlugin
 ```
 
 Quit Stream Deck, copy `dist/com.mati.agenticious.sdPlugin` into
-`~/Library/Application Support/com.elgato.StreamDeck/Plugins/`, start Stream Deck again, and drag **Agenticious**
-from the action list onto a key. The first press installs the bundled page. The plugin talks to the app's loopback
+`~/Library/Application Support/com.elgato.StreamDeck/Plugins/`, and start Stream Deck again. The first press installs the bundled page. The plugin talks to the app's loopback
 port (`GET /presets`, `POST /summon/<preset-id>` on 47821, or `AGENTICIOUS_PORT`); the app ignores those requests
 when a browser sends them for a web page. It needs Stream Deck 6.5 or later.
 
