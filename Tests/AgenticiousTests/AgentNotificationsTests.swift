@@ -32,6 +32,16 @@ final class AgentNotificationsTests: XCTestCase {
         XCTAssertEqual(AgentAlert.completed.actions, [.archive, .open])
         XCTAssertEqual(AgentAlert.failed.actions, [.resume, .open])
         XCTAssertEqual(AgentAlert.needsYou.actions, [.open])
+        XCTAssertEqual(AgentAlert.notStarted.actions, [.open])
+        XCTAssertEqual(AgentAlert.notStarted.sound, "Basso")
+        XCTAssertEqual(AgentAlert.notStarted.message(task: "Fix the build"), "Didn't start · Fix the build")
+    }
+
+    func testALaunchThatDidNotStartAlertsOnce() {
+        let failure = SessionStatus.notStarted(LaunchFailure(code: 127, output: ["zsh:1: command not found: claude"], resuming: false))
+        XCTAssertEqual(AgentAlert.transition(from: .starting, to: failure), .notStarted)
+        XCTAssertEqual(AgentAlert.transition(from: .needsYou("Your shell start-up is waiting"), to: failure), .notStarted)
+        XCTAssertNil(AgentAlert.transition(from: failure, to: .notStarted(LaunchFailure(code: 127, output: [], resuming: false))))
     }
 
     @MainActor

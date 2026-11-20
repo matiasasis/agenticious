@@ -12,11 +12,26 @@ struct LaunchSpec {
 struct AgentLauncher {
     let port: UInt16
     var supportDirectory: URL?
+    /// The environment agents start from. Tests pass their own.
+    var inherited = ProcessInfo.processInfo.environment
+
+    /// Switches that stop a login shell's start-up files from blocking before the agent runs. Each is read once, by
+    /// Oh My Zsh, and nothing else. The command unsets them before `exec`, so the CLI and its shells see the user's
+    /// own environment.
+    static let startupSwitches = [
+        // The default update check asks "[oh-my-zsh] Would you like to update? [Y/n]" and waits for a key. A
+        // `zstyle ':omz:update' mode` in .zshrc still wins; the start-up watch reports that question instead.
+        "DISABLE_AUTO_UPDATE": "true",
+        // The tmux plugin's autostart would attach tmux instead of running the agent.
+        "ZSH_TMUX_AUTOSTARTED": "true",
+    ]
 
     /// Resume sends a continuation prompt for unfinished missions; chats reopen at the prompt.
     @MainActor
     func spec(for session: AgentSession, resuming: Bool = false, images: [URL] = []) throws -> LaunchSpec {
         var variables = baseEnvironment(for: session)
+        let switches = Self.startupSwitches.filter { variables[$0.key] == nil }
+        variables.merge(switches) { current, _ in current }
         variables["AD_CONVERSATION"] = session.conversationID
         variables["AD_RESUME_PROMPT"] = resuming ? session.resumePrompt : nil
         let resumePrompt = variables["AD_RESUME_PROMPT"] == nil ? "" : #" "$AD_RESUME_PROMPT""#
@@ -46,9 +61,10 @@ struct AgentLauncher {
 
         // A login + interactive shell picks up the user's PATH (nodenv, ~/.local/bin, …), which a GUI app doesn't inherit.
         // Every user-supplied string goes through an env var, so nothing needs shell quoting.
+        let unset = switches.isEmpty ? "" : "unset " + switches.keys.sorted().joined(separator: " ") + "; "
         return LaunchSpec(
             executable: "/bin/zsh",
-            arguments: ["-lic", command],
+            arguments: ["-lic", unset + command],
             environment: variables.map { "\($0.key)=\($0.value)" },
             directory: session.directory.path
         )
@@ -86,7 +102,7 @@ struct AgentLauncher {
     private func baseEnvironment(for session: AgentSession) -> [String: String] {
         // If Agenticious was started from inside a Claude Code session, its markers would make every agent a
         // "child session" with transcript saving off. The login shell re-exports any CLAUDE_CODE_* the user sets.
-        var variables = ProcessInfo.processInfo.environment.filter { key, _ in
+        var variables = inherited.filter { key, _ in
             key != "CLAUDECODE" && !key.hasPrefix("CLAUDE_CODE_")
         }
         variables["TERM"] = "xterm-256color"

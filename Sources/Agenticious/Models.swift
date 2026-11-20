@@ -12,6 +12,11 @@ enum AgentKind: String, CaseIterable, Identifiable {
         case .codex: "Codex"
         }
     }
+
+    /// What the login shell runs.
+    var command: String { rawValue }
+
+    var npmPackage: String { self == .claude ? "@anthropic-ai/claude-code" : "@openai/codex" }
 }
 
 /// A folder agents work in, or `none` for questions that don't belong to any codebase.
@@ -38,6 +43,8 @@ enum SessionStatus: Equatable {
     case done(String?)
     case ended(String)
     case exited(Int32?)
+    /// The process ended before anything showed the CLI running, so there is no conversation to resume.
+    case notStarted(LaunchFailure)
     /// The human paused the agent. Its conversation and worktree stay, so Resume continues it.
     case paused
     /// Agenticious quit while the agent was still going. Resuming reopens its conversation.
@@ -53,6 +60,7 @@ enum SessionStatus: Equatable {
         case .done: "Done"
         case .ended: "Ended"
         case .exited: "Exited"
+        case .notStarted: "Didn't start"
         case .paused: "Paused"
         case .interrupted: "Interrupted"
         }
@@ -65,16 +73,20 @@ enum SessionStatus: Equatable {
 
     var isFinished: Bool {
         switch self {
-        case .done, .ended, .exited: true
+        case .done, .ended, .exited, .notStarted: true
         default: false
         }
+    }
+
+    var launchFailure: LaunchFailure? {
+        if case let .notStarted(failure) = self { failure } else { nil }
     }
 
     /// Lower sorts first: whatever is blocked on the human floats to the top.
     var sortRank: Int {
         switch self {
         case .needsYou: 0
-        case .yourTurn: 1
+        case .yourTurn, .notStarted: 1
         case .working, .starting, .waiting: 2
         case .paused, .interrupted: 3
         case .done: 4
@@ -154,6 +166,10 @@ final class AgentSession: ObservableObject, Identifiable {
     var transcriptURL: URL?
     var terminalView: AgentTerminalView?
     var terminalBridge: TerminalBridge?
+    /// Something showed the CLI running since this launch: a hook, a CLI screen, or its transcript moving.
+    var cliConfirmed = false
+    /// What a start-up prompt took attention from, given back when it clears.
+    var statusBeforeStartupPrompt: SessionStatus?
 
     init(
         id: UUID = UUID(), task: String, prompt: String? = nil, agent: AgentKind, project: Project, directory: URL,
@@ -194,14 +210,28 @@ final class AgentSession: ObservableObject, Identifiable {
         return false
     }
 
-    func recordExit(_ code: Int32?) {
+    func recordExit(_ code: Int32?, launchFailure: LaunchFailure? = nil) {
         releaseQuestion()
         isRunning = false
         stopSubagents()
         switch status {
         case .done, .ended: break
-        default: status = .exited(code)
+        default: status = launchFailure.map(SessionStatus.notStarted) ?? .exited(code)
         }
+    }
+
+    /// A launch that failed rather than ended: it exited unsuccessfully before anything showed the CLI running.
+    func launchFailure(exitCode: Int32?, output: [String], resuming: Bool) -> LaunchFailure? {
+        guard !cliConfirmed, exitCode != 0 else { return nil }
+        return LaunchFailure(code: exitCode, output: output, resuming: resuming)
+    }
+
+    /// One line for the sidebar and the banner: the likely cause, else the shell's last words.
+    var launchFailureSummary: String? {
+        guard let failure = status.launchFailure else { return nil }
+        if let cause = failure.diagnosis(for: agent)?.cause { return cause }
+        if let last = failure.output.last(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty }) { return TerminalScreen.oneLine(last) }
+        return "\(agent.displayName) ended before it started (\(failure.codeDescription))."
     }
 
     /// Hands a held question back to Claude without answers: its own menu appears in the terminal, or, once the

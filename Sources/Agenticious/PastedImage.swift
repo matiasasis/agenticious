@@ -53,6 +53,13 @@ struct PastedImage: Identifiable {
         }
     }
 
+    /// The images an agent was started with, for starting it again the same way.
+    static func saved(for id: UUID) -> [URL] {
+        guard let folder = try? AgentLauncher.sessionDirectory(for: id).appendingPathComponent("images"),
+              let files = try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil) else { return [] }
+        return files.sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
+    }
+
     /// Codex also gets the files attached with `--image`; Claude reads them from these paths.
     static func instructions(for files: [URL]) -> String {
         guard !files.isEmpty else { return "" }

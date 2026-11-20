@@ -2,7 +2,7 @@ import AppKit
 import UserNotifications
 
 enum AgentAlert: String, CaseIterable {
-    case needsYou, yourTurn, completed, ended, failed
+    case needsYou, yourTurn, completed, ended, failed, notStarted
 
     static func transition(from old: SessionStatus, to new: SessionStatus) -> AgentAlert? {
         switch new {
@@ -19,6 +19,9 @@ enum AgentAlert: String, CaseIterable {
         case .exited(let code) where code != 0:
             if case .exited = old { return nil }
             return .failed
+        case .notStarted:
+            if case .notStarted = old { return nil }
+            return .notStarted
         default: return nil
         }
     }
@@ -30,6 +33,7 @@ enum AgentAlert: String, CaseIterable {
         case .completed: return "Mission complete"
         case .ended: return "Ended"
         case .failed: return "Stopped unexpectedly"
+        case .notStarted: return "Didn't start"
         }
     }
 
@@ -44,14 +48,14 @@ enum AgentAlert: String, CaseIterable {
         switch self {
         case .needsYou, .yourTurn, .ended: return "Glass"
         case .completed: return "Hero"
-        case .failed: return "Basso"
+        case .failed, .notStarted: return "Basso"
         }
     }
 
     /// Buttons on the banner, after the click that opens the agent.
     var actions: [AgentNotificationAction] {
         switch self {
-        case .needsYou: return [.open]
+        case .needsYou, .notStarted: return [.open]
         case .yourTurn: return [.reply, .open]
         case .completed, .ended: return [.archive, .open]
         case .failed: return [.resume, .open]

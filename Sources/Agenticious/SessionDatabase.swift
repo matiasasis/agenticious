@@ -193,6 +193,7 @@ struct SessionDatabase {
         case let .done(summary): ("done", summary)
         case let .ended(reason): ("ended", reason)
         case let .exited(code): ("exited", code.map(String.init))
+        case let .notStarted(failure): ("not_started", (try? JSONEncoder().encode(failure)).map { String(decoding: $0, as: UTF8.self) })
         case .paused: ("paused", nil)
         case .interrupted: ("interrupted", nil)
         }
@@ -203,6 +204,8 @@ struct SessionDatabase {
         case "done": .done(detail)
         case "ended": .ended(detail ?? "Work was stopped.")
         case "exited": .exited(detail.flatMap { Int32($0) })
+        case "not_started": .notStarted(detail.flatMap { try? JSONDecoder().decode(LaunchFailure.self, from: Data($0.utf8)) }
+            ?? LaunchFailure(code: nil, output: [], resuming: false))
         case "needs_you": .needsYou(detail ?? "")
         case "your_turn": .yourTurn
         case "working": .working

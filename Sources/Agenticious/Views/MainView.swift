@@ -295,6 +295,8 @@ private struct SessionRow: View {
             }
             if case let .needsYou(reason) = session.status {
                 Text(reason).scaledFont(.caption).foregroundStyle(.orange).lineLimit(2)
+            } else if let summary = session.launchFailureSummary {
+                Text(summary).scaledFont(.caption).foregroundStyle(.red).lineLimit(2)
             }
         }
     }
@@ -442,6 +444,12 @@ struct SessionCard: View {
                         .foregroundStyle(.orange)
                         .lineLimit(2)
                         .help(reason)
+                } else if let summary = session.launchFailureSummary {
+                    Label(summary, systemImage: "exclamationmark.triangle.fill")
+                        .scaledFont(.callout)
+                        .foregroundStyle(.red)
+                        .lineLimit(2)
+                        .help(summary)
                 }
             }
             Spacer(minLength: 12)
