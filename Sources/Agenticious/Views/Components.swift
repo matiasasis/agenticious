@@ -302,7 +302,8 @@ struct UsageBar: View {
             if isStacked {
                 VStack(alignment: .leading, spacing: 6) { vendors }
             } else {
-                HStack(spacing: 10) { vendors }
+                // As tall as the tallest badge, which every badge then fills: Codex's model quotas take two lines.
+                HStack(spacing: 10) { vendors }.fixedSize(horizontal: false, vertical: true)
             }
         }
         .foregroundStyle(.secondary)
@@ -350,6 +351,7 @@ struct UsageBar: View {
         }
         .fixedSize(horizontal: true, vertical: false)
         .padding(.horizontal, 10).padding(.vertical, 8)
+        .frame(maxHeight: isStacked ? nil : .infinity)
         .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(AgenticiousStyle.violet.opacity(0.25)))
     }
