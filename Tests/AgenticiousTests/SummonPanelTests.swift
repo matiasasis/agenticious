@@ -61,29 +61,16 @@ final class SummonPanelTests: XCTestCase {
         XCTAssertEqual(cancelled, 1)
     }
 
-    func testPanelOpensOverTheFocusedWindowAndStaysOnItsScreen() {
-        let visible = CGRect(x: 0, y: 0, width: 1440, height: 875)
-        let size = CGSize(width: 960, height: 775)
-        XCTAssertEqual(SummonPlacement.frame(size: size, over: nil, in: visible), CGRect(x: 240, y: 50, width: 960, height: 775))
-        XCTAssertEqual(SummonPlacement.frame(size: CGSize(width: 400, height: 300), over: CGRect(x: 100, y: 100, width: 600, height: 500), in: visible),
-                       CGRect(x: 200, y: 200, width: 400, height: 300))
-        // A narrow window at the screen's edge: the panel stays fully on screen.
-        XCTAssertEqual(SummonPlacement.frame(size: size, over: CGRect(x: 1200, y: 600, width: 240, height: 275), in: visible),
-                       CGRect(x: 480, y: 100, width: 960, height: 775))
-        XCTAssertEqual(SummonPlacement.frame(size: CGSize(width: 2000, height: 2000), over: nil, in: visible), visible)
-        // A second display to the left of the primary one.
+    func testPanelOpensInTheMiddleOfTheMainDisplayAndStaysOnIt() {
+        let visible = CGRect(x: 0, y: 25, width: 1440, height: 875)
+        XCTAssertEqual(SummonPlacement.frame(size: CGSize(width: 960, height: 775), in: visible), CGRect(x: 240, y: 75, width: 960, height: 775))
+        XCTAssertEqual(SummonPlacement.frame(size: CGSize(width: 401, height: 301), in: visible), CGRect(x: 520, y: 312, width: 401, height: 301))
+        // Larger than the display: it fills it rather than running past an edge.
+        XCTAssertEqual(SummonPlacement.frame(size: CGSize(width: 2000, height: 2000), in: visible), visible)
+        // A main display that isn't at the origin of the desktop.
         let left = CGRect(x: -1920, y: 0, width: 1920, height: 1055)
-        XCTAssertEqual(SummonPlacement.frame(size: size, over: nil, in: left).midX, left.midX)
-    }
-
-    func testPanelPicksTheScreenOfTheFocusedWindowThenThePointer() {
-        let screens = [CGRect(x: 0, y: 0, width: 1440, height: 900), CGRect(x: 1440, y: 0, width: 1920, height: 1080)]
-        let straddling = CGRect(x: 1300, y: 100, width: 800, height: 600)
-        XCTAssertEqual(SummonPlacement.screen(frames: screens, focusedWindow: straddling, pointer: .zero), 1)
-        XCTAssertEqual(SummonPlacement.screen(frames: screens, focusedWindow: nil, pointer: CGPoint(x: 2000, y: 500)), 1)
-        XCTAssertEqual(SummonPlacement.screen(frames: screens, focusedWindow: CGRect(x: 9000, y: 0, width: 10, height: 10), pointer: CGPoint(x: 10, y: 10)), 0)
-        XCTAssertEqual(SummonPlacement.screen(frames: screens, focusedWindow: nil, pointer: CGPoint(x: -50, y: -50)), 0)
-        XCTAssertEqual(SummonPlacement.cocoaRect(quartz: CGRect(x: 100, y: 50, width: 800, height: 600), primaryHeight: 900),
-                       CGRect(x: 100, y: 250, width: 800, height: 600))
+        let frame = SummonPlacement.frame(size: CGSize(width: 960, height: 775), in: left)
+        XCTAssertEqual(frame.midX, left.midX)
+        XCTAssertTrue(left.contains(frame))
     }
 }
