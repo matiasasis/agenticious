@@ -266,10 +266,10 @@ private struct SessionRow: View {
             }
         }
         .padding(12)
-        .background(session.status.color.opacity(isSelected ? 0.22 : 0.1), in: RoundedRectangle(cornerRadius: 12))
+        .background(session.presentedStatus.color.opacity(isSelected ? 0.22 : 0.1), in: RoundedRectangle(cornerRadius: 12))
         .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12)
-            .stroke(session.status.color.opacity(isSelected ? 1 : isHovered ? 0.8 : 0.45), lineWidth: isSelected ? 2 : 1))
+            .stroke(session.presentedStatus.color.opacity(isSelected ? 1 : isHovered ? 0.8 : 0.45), lineWidth: isSelected ? 2 : 1))
         .backgroundTask(session.backgroundTask, isCompact: true)
         .contentShape(RoundedRectangle(cornerRadius: 12))
         .onHover { isHovered = $0 }
@@ -293,8 +293,8 @@ private struct SessionRow: View {
             if showBranches, let worktree = session.worktree {
                 BranchLabel(worktree: worktree, isRemoved: session.worktreeRemoved)
             }
-            if case let .needsYou(reason) = session.status {
-                Text(reason).scaledFont(.caption).foregroundStyle(.orange).lineLimit(2)
+            if let attention = session.presentedStatus.attention {
+                Text(attention.reason).scaledFont(.caption).foregroundStyle(.orange).lineLimit(2)
             } else if let summary = session.launchFailureSummary {
                 Text(summary).scaledFont(.caption).foregroundStyle(.red).lineLimit(2)
             }
@@ -304,8 +304,8 @@ private struct SessionRow: View {
     private var header: some View {
         let badge = AgentBadge(agent: session.agent, detail: session.modelSummary)
         let status = HStack(spacing: 6) {
-            StatusDot(status: session.status)
-            Text(session.status.label).foregroundStyle(session.status.color)
+            StatusDot(status: session.presentedStatus)
+            Text(session.presentedStatus.label).foregroundStyle(session.presentedStatus.color)
         }.scaledFont(.system(size: 10, weight: .semibold))
 
         return ViewThatFits(in: .horizontal) {
@@ -415,13 +415,13 @@ struct SessionCard: View {
         sizingCard.hidden()
             .overlay(alignment: .top) { content }
             .padding(20)
-            .background(session.status.color.opacity(isHovered ? 0.16 : 0.1), in: RoundedRectangle(cornerRadius: 18))
+            .background(session.presentedStatus.color.opacity(isHovered ? 0.16 : 0.1), in: RoundedRectangle(cornerRadius: 18))
             .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 18))
             .overlay(
                 RoundedRectangle(cornerRadius: 18)
-                    .stroke(session.status.color.opacity(isHovered ? 0.8 : 0.45), lineWidth: 1)
+                    .stroke(session.presentedStatus.color.opacity(isHovered ? 0.8 : 0.45), lineWidth: 1)
             )
-            .shadow(color: session.status.color.opacity(isHovered ? 0.14 : 0), radius: 16)
+            .shadow(color: session.presentedStatus.color.opacity(isHovered ? 0.14 : 0), radius: 16)
             .backgroundTask(session.backgroundTask)
             .contentShape(RoundedRectangle(cornerRadius: 18))
             .onHover { isHovered = $0 }
@@ -438,12 +438,12 @@ struct SessionCard: View {
                     ChunkStrip(chunks: session.chunks, style: .compact, isRunning: session.isRunning)
                     ChunkList(chunks: session.chunks, limit: Self.stepRows)
                 }
-                if case let .needsYou(reason) = session.status {
-                    Label(reason, systemImage: "hand.raised.fill")
+                if let attention = session.presentedStatus.attention {
+                    Label(attention.reason, systemImage: attention.symbol)
                         .scaledFont(.callout)
                         .foregroundStyle(.orange)
                         .lineLimit(2)
-                        .help(reason)
+                        .help(attention.reason)
                 } else if let summary = session.launchFailureSummary {
                     Label(summary, systemImage: "exclamationmark.triangle.fill")
                         .scaledFont(.callout)
@@ -486,7 +486,7 @@ struct SessionCard: View {
         HStack {
             AgentBadge(agent: session.agent, detail: session.modelSummary)
             Spacer()
-            StatusPill(status: session.status)
+            StatusPill(status: session.presentedStatus)
         }
     }
 

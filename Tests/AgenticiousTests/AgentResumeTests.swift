@@ -24,6 +24,48 @@ final class AgentResumeTests: XCTestCase {
     }
 
     @MainActor
+    func testClaudeSettingsHoldPermissionRequestsOpenAndNeverTurnAFailureIntoADecision() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let session = AgentSession(task: "Tidy the build", agent: .claude, project: .none, directory: folder)
+        _ = try AgentLauncher(port: 47990, supportDirectory: folder).spec(for: session)
+        let file = folder.appendingPathComponent("Agenticious/sessions/\(session.id.uuidString)/settings.json")
+        let settings = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any])
+        let hooks = try XCTUnwrap(settings["hooks"] as? [String: [[String: Any]]])
+
+        let entries = try XCTUnwrap(hooks["PermissionRequest"])
+        XCTAssertEqual(entries.count, 1)
+        XCTAssertNil(entries[0]["matcher"], "every tool; the app filters by name")
+        XCTAssertEqual(Set(entries[0].keys), ["hooks"])
+        let commands = try XCTUnwrap(entries[0]["hooks"] as? [[String: Any]])
+        XCTAssertEqual(commands.count, 1)
+        XCTAssertEqual(Set(commands[0].keys), ["type", "command", "timeout"], "no onFailure: a hook that fails must leave Claude's own menu in charge")
+        XCTAssertEqual(commands[0]["type"] as? String, "command")
+        XCTAssertEqual(commands[0]["timeout"] as? Int, 86_400)
+        XCTAssertEqual(commands[0]["command"] as? String,
+                       "curl -s -m 86400 -X POST --data-binary @- 'http://127.0.0.1:47990/hook/\(session.id.uuidString)/PermissionRequest' 2>/dev/null || true",
+                       "the reply reaches Claude as the hook's output; an unreachable app is an empty one")
+
+        let failure = try XCTUnwrap(hooks["PostToolUseFailure"]?.first)
+        XCTAssertEqual(failure["matcher"] as? String, "*")
+        let report = try XCTUnwrap((failure["hooks"] as? [[String: Any]])?.first?["command"] as? String)
+        XCTAssertTrue(report.hasSuffix("/PostToolUseFailure' >/dev/null 2>&1 || true"), "reported, never read back")
+        XCTAssertEqual((hooks["PreToolUse"] ?? []).count, 2, "the question hook is still there")
+
+        // Resuming writes the file again, which is how an agent from an earlier version gets the hook.
+        try FileManager.default.removeItem(at: file)
+        session.conversationID = UUID().uuidString
+        _ = try AgentLauncher(port: 47990, supportDirectory: folder).spec(for: session, resuming: true)
+        let resumed = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any])
+        XCTAssertNotNil((resumed["hooks"] as? [String: Any])?["PermissionRequest"])
+
+        let codex = AgentSession(task: "Tidy the build", agent: .codex, project: .none, directory: folder)
+        let spec = try AgentLauncher(port: 47990, supportDirectory: folder).spec(for: codex)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: folder.appendingPathComponent("Agenticious/sessions/\(codex.id.uuidString)/settings.json").path))
+        XCTAssertFalse((spec.arguments + spec.environment).contains { $0.contains("PermissionRequest") || $0.contains("PostToolUseFailure") })
+    }
+
+    @MainActor
     func testChatsCompletedTasksAndUnknownCodexConversationsDoNotRestartWork() throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: folder) }

@@ -69,16 +69,27 @@ final class SessionStore: ObservableObject {
     let skillLocations = SkillLocations()
     let summon = SummonHotkeys()
     private var server: EventServer?
+    /// Where the event server really listens, which differs from `port` only when a test asked for any free one.
+    var listeningPort: UInt16? { server?.boundPort }
     private var backgroundRefresh: BackgroundRefresh?
     private var database: SessionDatabase?
     private var subscriptions: [UUID: AnyCancellable] = [:]
     private var unsaved: Set<UUID> = []
     private var snapshotter: WindowSnapshotter?
     private var commandLineOptionsPending = true
+    private var keyMonitor: Any?
+    /// Agents whose permission wait began under the human's hands, so it has not alerted yet.
+    private var quietWaits: Set<UUID> = []
+    /// Whether the human is at this agent's terminal, where Claude's menu for the main agent's request already shows.
+    var isAtTerminal: (AgentSession) -> Bool = { session in
+        guard let terminal = session.terminalView, let app = NSApp, app.isActive else { return false }
+        return app.keyWindow?.firstResponder === terminal
+    }
 
-    /// Only the app registers shortcuts: a store built in a test reads the same presets file.
-    init(databaseURL: URL? = nil, registersHotkeys: Bool = false) {
-        port = ProcessInfo.processInfo.environment["AGENTICIOUS_PORT"].flatMap(UInt16.init) ?? Self.defaultPort
+    /// Only the app registers shortcuts and watches keys: a store built in a test reads the same presets file.
+    /// A test may also name its own port, 0 for any free one.
+    init(databaseURL: URL? = nil, registersHotkeys: Bool = false, port: UInt16? = nil) {
+        self.port = port ?? ProcessInfo.processInfo.environment["AGENTICIOUS_PORT"].flatMap(UInt16.init) ?? Self.defaultPort
         favorites = (UserDefaults.standard.stringArray(forKey: Self.favoritesKey) ?? []).map(Project.init(path:))
         promptHistory = PromptHistory { [presets] in presets.loadError == nil ? Set(presets.presets.map(\.id)) : nil }
         openDatabase(url: databaseURL)
@@ -90,7 +101,10 @@ final class SessionStore: ObservableObject {
             .init(check: .providers, lastChecked: { diagnostics.lastChecked }, run: { Task { await diagnostics.refresh() } }),
             .init(check: .usage, lastChecked: { usage.lastChecked }, run: usage.refresh),
         ])
-        if registersHotkeys { summon.start(self) }
+        if registersHotkeys {
+            summon.start(self)
+            watchTerminalKeys()
+        }
     }
 
     // MARK: - Reading
@@ -108,7 +122,7 @@ final class SessionStore: ObservableObject {
         return favorites.first { $0.path == path } ?? favorites.first ?? .none
     }
 
-    var attentionCount: Int { sessions.filter { !$0.isMarkedFinished && $0.status.needsAttention }.count }
+    var attentionCount: Int { sessions.filter { !$0.isMarkedFinished && $0.presentedStatus.needsAttention }.count }
     var workingCount: Int { visibleSessions.filter(\.isWorking).count }
 
     var visibleProjectGroups: [ProjectGroup] { AgentList.queue.groups(from: projectGroups) }
@@ -131,7 +145,7 @@ final class SessionStore: ObservableObject {
     func archive(_ session: AgentSession) {
         guard !session.isArchiving, session.backgroundTask == nil else { return }
         session.isArchiving = true
-        session.releaseQuestion()
+        PermissionInterpreter.releaseForArchive(in: session)
         session.backgroundTask = "Archiving…"
         let id = session.id
         // Once the exit watch has reaped the shell, its pid may belong to another process.
@@ -226,7 +240,7 @@ final class SessionStore: ObservableObject {
     private func group(_ project: Project, isFavorite: Bool) -> ProjectGroup {
         let members = sessions
             .filter { $0.project == project }
-            .sorted { ($0.status.sortRank, $1.startedAt) < ($1.status.sortRank, $0.startedAt) }
+            .sorted { ($0.presentedStatus.sortRank, $1.startedAt) < ($1.presentedStatus.sortRank, $0.startedAt) }
         return ProjectGroup(project: project, sessions: members, isFavorite: isFavorite)
     }
 
@@ -400,7 +414,7 @@ final class SessionStore: ObservableObject {
         let bridge = TerminalBridge { [weak self, weak session, weak terminal] exitCode in
             guard let self, let session, let terminal, !session.isArchiving, session.isRunning,
                   session.terminalView === terminal else { return }
-            let oldStatus = session.status
+            let oldStatus = session.presentedStatus
             let failure = session.launchFailure(exitCode: exitCode, output: TerminalScreen.lastLines(of: terminal.getTerminal()),
                                                 resuming: resuming)
             session.recordExit(exitCode, launchFailure: failure)
@@ -420,7 +434,7 @@ final class SessionStore: ObservableObject {
         let pid = terminal.process.shellPid
         guard terminal.process.running, pid > 0 else {
             // forkpty failed. SwiftTerm 1.11 reports nothing, so this would read Starting forever.
-            let oldStatus = session.status
+            let oldStatus = session.presentedStatus
             session.recordExit(nil, launchFailure: LaunchFailure(code: nil, output: ["Agenticious couldn't open a terminal for the agent."],
                                                                  resuming: resuming))
             notifyTransition(from: oldStatus, for: session)
@@ -577,10 +591,14 @@ final class SessionStore: ObservableObject {
                     guard let self else { return reply(nil) }
                     reply(StreamDeck.answer(request, presets: self.presets.presets) { self.summon.show(presetID: $0.id, in: self) })
                 }
-            }) { [weak self] event, reply in
+            }) { [weak self] event, hook in
                 Task { @MainActor in
-                    guard let self else { return reply(nil) }
-                    if event.name == "AskUserQuestion" { self.hold(event, reply: reply) } else { reply(self.handle(event)) }
+                    guard let self else { return hook.reply(nil) }
+                    switch event.name {
+                    case "AskUserQuestion": self.hold(event) { hook.reply($0) }
+                    case "PermissionRequest": self.holdPermission(event, hook: hook)
+                    default: hook.reply(self.handle(event))
+                    }
                 }
             }
             server.start()
@@ -598,23 +616,30 @@ final class SessionStore: ObservableObject {
         if event.name == "StatusLine" { return statusLine(payload) }
 
         session.lastActivity = Date()
+        let oldStatus = session.presentedStatus
 
         if Self.movesPastQuestion(event.name, payload) { session.releaseQuestion() }
+        PermissionInterpreter.observe(event.name, payload, in: session)
+        if PermissionRequest.agentID(in: payload) == nil { checkTerminalMenus(of: session) }
 
         if event.name == "Stop", let reply = EventInterpreter.stopHookReply(payload, for: session) {
             session.status = .working
+            updateBadge()
             return try? JSONSerialization.data(withJSONObject: reply)
         }
 
-        let oldStatus = session.status
         EventInterpreter.apply(event.name, payload, to: session)
-        notifyTransition(from: oldStatus, for: session)
+        notifyTransition(from: oldStatus, for: session, noticed: event.name == "Notification")
         updateBadge()
         return nil
     }
 
-    private func notifyTransition(from oldStatus: SessionStatus, for session: AgentSession) {
-        guard let event = AgentAlert.transition(from: oldStatus, to: session.status) else { return }
+    /// Alerts on what the human sees change, which a held permission request decides over the hooks' own status.
+    /// Claude's own notice means a wait that began quietly is still unanswered, so that is when it alerts.
+    private func notifyTransition(from oldStatus: SessionStatus, for session: AgentSession, noticed: Bool = false) {
+        if !session.presentedStatus.needsAttention { quietWaits.remove(session.id) }
+        let oldStatus = noticed && quietWaits.remove(session.id) != nil ? .working : oldStatus
+        guard let event = AgentAlert.transition(from: oldStatus, to: session.presentedStatus) else { return }
         notifications.notify(event, sessionID: session.id, message: event.message(task: session.task))
     }
 
@@ -644,7 +669,7 @@ final class SessionStore: ObservableObject {
         session.lastActivity = Date()
         session.pendingQuestion = PendingQuestion(toolUseID: payload["tool_use_id"] as? String ?? "", questions: questions,
                                                   input: input, respond: reply)
-        let oldStatus = session.status
+        let oldStatus = session.presentedStatus
         session.isAwaitingPermission = false
         session.status = .needsYou(first.text)
         notifyTransition(from: oldStatus, for: session)
@@ -668,6 +693,88 @@ final class SessionStore: ObservableObject {
         case "PostToolUse", "Stop", "UserPromptSubmit": return true
         default: return false
         }
+    }
+
+    // MARK: - Permission requests
+
+    /// Keeps Claude's PermissionRequest hook waiting while the request shows in Activity. What Agenticious can't show
+    /// or answer gets no reply, which leaves Claude's own menu in charge.
+    private func holdPermission(_ event: AgentEvent, hook: HookConnection) {
+        let payload = (try? JSONSerialization.jsonObject(with: event.body)) as? [String: Any] ?? [:]
+        guard let session = session(event.sessionID) else { return hook.reply(nil) }
+        // Only a running CLI asks, so its start-up is over, whatever the shell watch last saw.
+        session.cliConfirmed = true
+        let oldStatus = session.presentedStatus
+        guard let id = PermissionInterpreter.hold(payload, in: session, respond: { hook.reply($0) }) else {
+            // Refused straight to the terminal: the status may now say so.
+            notifyTransition(from: oldStatus, for: session)
+            return updateBadge()
+        }
+        hook.onClose { [weak self, weak session] in
+            Task { @MainActor in
+                guard let self, let session else { return }
+                self.changingPermissions(of: session) { PermissionInterpreter.hookClosed(id, in: session) }
+            }
+        }
+        // A subagent's request has no other signal. The main agent's menu is already on screen in its terminal, so
+        // with the human there a prompt answered promptly stays silent, as it was before cards.
+        let isSubagents = PermissionRequest.agentID(in: payload) != nil
+        if !isSubagents, !oldStatus.needsAttention, isAtTerminal(session) {
+            quietWaits.insert(session.id)
+        } else {
+            // Behind a main-agent card that has not alerted, a subagent's is still the first the human hears of.
+            notifyTransition(from: isSubagents && quietWaits.remove(session.id) != nil ? .working : oldStatus, for: session)
+        }
+        updateBadge()
+    }
+
+    /// A subagent stopped while its menu was up sends no hook, which would leave its menu listed, and the reply box
+    /// shut, for the rest of the run. Claude's log of the call's result proves the menu closed. Checked on the main
+    /// agent's hooks, which are what follow such a stop, and read off the main thread.
+    private func checkTerminalMenus(of session: AgentSession) {
+        let menus = session.terminalMenuResults
+        guard !menus.isEmpty else { return }
+        Task {
+            let closed = await Task.detached(priority: .utility) {
+                Set(menus.filter { SubagentCatalog.hasToolResult($0.toolUseID, in: $0.transcript) }.map(\.menu))
+            }.value
+            session.dropTerminalMenus(closed)
+        }
+    }
+
+    /// Runs a change to a session's held requests, then alerts and re-badges on what the human now sees.
+    private func changingPermissions(of session: AgentSession, _ change: () -> Void) {
+        let oldStatus = session.presentedStatus
+        change()
+        notifyTransition(from: oldStatus, for: session)
+        updateBadge()
+    }
+
+    /// The human's click on a permission card. Nothing else may call this: it is the only way a decision is sent.
+    func decide(_ decision: PermissionDecision, on id: UUID, in session: AgentSession) {
+        changingPermissions(of: session) { PermissionInterpreter.decide(decision, on: id, in: session) }
+    }
+
+    func answerInTerminal(_ ids: [UUID], in session: AgentSession) {
+        changingPermissions(of: session) { PermissionInterpreter.handToTerminal(ids, in: session) }
+    }
+
+    /// A key typed into an agent's terminal while Claude's own permission menu is up there means the human is answering
+    /// in the terminal. Watches this app's own key events; it never changes or swallows one.
+    private func watchTerminalKeys() {
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            MainActor.assumeIsolated { self?.typed(in: event.window?.firstResponder, modifiers: event.modifierFlags) }
+            return event
+        }
+    }
+
+    /// A ⌘ shortcut, or a key typed anywhere but an agent's terminal, answers nothing. A subagent's menu is not in
+    /// the terminal while its card is held, so its cards stay.
+    func typed(in responder: NSResponder?, modifiers: NSEvent.ModifierFlags) {
+        guard !modifiers.contains(.command), let terminal = responder as? AgentTerminalView,
+              let session = sessions.first(where: { $0.terminalView === terminal }),
+              session.pendingPermissions.contains(where: { !$0.request.isFromSubagent }) else { return }
+        changingPermissions(of: session) { PermissionInterpreter.typedInTerminal(in: session) }
     }
 
     /// Types the message into the agent's terminal and submits it. Only while the agent sits idle at its prompt:
@@ -694,7 +801,8 @@ final class SessionStore: ObservableObject {
     }
 
     private func updateBadge() {
-        NSApp.dockTile.badgeLabel = attentionCount > 0 ? String(attentionCount) : nil
+        // No application object in a test.
+        NSApp?.dockTile.badgeLabel = attentionCount > 0 ? String(attentionCount) : nil
     }
 }
 

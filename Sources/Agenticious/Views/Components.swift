@@ -98,7 +98,7 @@ extension SessionStatus {
         case .starting: .gray
         case .working: AgenticiousStyle.lime
         case .waiting: .teal
-        case .needsYou: .orange
+        case .needsYou, .permissionRequired: .orange
         case .yourTurn: AgenticiousStyle.violet
         case .done: .green
         case .ended: .gray
