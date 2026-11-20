@@ -30,6 +30,8 @@ A native macOS dashboard for running many coding agents (Claude Code and Codex) 
   checks only run while Agenticious is the active app, at intervals set in **Customize → Preferences → Background refresh**.
 - **Summon from anywhere**: give a task preset a system-wide shortcut, or put every preset behind one Stream Deck key,
   and a floating Summon window opens over whatever you are working on.
+- **Recent inputs**: each task preset remembers what you started it with, and the Summon sheet offers the last five
+  to use again.
 - **Text size**: scale all of the app's text, the terminal included, from 100% to 150%.
 
 ## Run
@@ -82,6 +84,7 @@ settings replace your own `statusLine` there (it shows the model and both limits
 | `Sources/Agenticious/UsageMonitor.swift` | Codex and Claude plan limits |
 | `Sources/Agenticious/HotkeyCenter.swift` | System-wide preset shortcuts (Carbon hot keys, no Accessibility permission) |
 | `Sources/Agenticious/SummonPanelController.swift` | The floating Summon window a shortcut opens over other apps |
+| `Sources/Agenticious/PromptHistory.swift` | The task inputs remembered per preset for the Summon sheet's **Recent** row |
 | `Sources/Agenticious/StreamDeck.swift` | What the Stream Deck plugin asks the app: the presets with their key images, and a Summon window |
 | `streamdeck/` | The Stream Deck plugin (JavaScript on Node.js) |
 | `Sources/agenticious-mcp/main.swift` | Stdio MCP server the agents call |
@@ -111,6 +114,16 @@ so customize their prompts and skill choices for your workflow. The starter set 
 Implement, Resolve & merge, Review PR, Fix CI, Ask for review, and Technical discovery.
 They follow the selected project’s conventions without requiring specific skills, labels, Slack channels,
 or local paths. Existing user configs are not replaced or extended when the app is updated.
+
+**Recent inputs.** Each preset remembers the task inputs it was started with. Under **Task input**, the Summon sheet
+(and the floating Summon window) shows a **Recent** row with the selected preset's last five, newest first: up to
+three lines of each and how long ago it was used. Click one to put it in **Task input** in place of what is there;
+**⌘Z** brings back what you had typed. Hover a box and click **×**, or right-click it and choose **Remove from recent**,
+to forget it. Switching presets, by click or by shortcut, switches the row. An input is remembered when an agent or
+chat starts with it, trimmed and without images or workspace; using the same text again moves it to the front. Up to
+20 per preset are kept in `~/Library/Application Support/Agenticious/prompt-history.json`, and a deleted preset's
+inputs are dropped. They stay on this Mac: the Stream Deck plugin and agent hooks never receive them. A missing or
+damaged file only means no recent inputs.
 
 **Shortcuts.** Give a preset a shortcut in its editor: click **Record shortcut** and press the keys, for example
 `⌃⌥R` (Esc cancels). It needs ⌘, ⌃ or ⌥ unless it is a function key, and standard shortcuts such as ⌘V, ⌘S or

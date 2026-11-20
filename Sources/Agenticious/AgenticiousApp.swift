@@ -77,6 +77,7 @@ extension View {
             .environmentObject(store.usage)
             .environmentObject(store.diagnostics)
             .environmentObject(store.presets)
+            .environmentObject(store.promptHistory)
             .environmentObject(store.skillLocations)
             .environmentObject(store.summon)
             .textScaled()

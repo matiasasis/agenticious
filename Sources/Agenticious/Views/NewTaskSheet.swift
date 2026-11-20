@@ -5,6 +5,7 @@ import Combine
 struct NewTaskSheet: View {
     @EnvironmentObject private var store: SessionStore
     @EnvironmentObject private var presets: TaskPresetStore
+    @EnvironmentObject private var history: PromptHistory
     @Environment(\.dismiss) private var dismiss
     @Environment(\.textScale) private var textScale
 
@@ -27,6 +28,7 @@ struct NewTaskSheet: View {
     @State private var showingModels = false
     @State private var skillPaths: [String] = []
     @State private var task = ""
+    @State private var taskReplacements = PassthroughSubject<String, Never>()
     @State private var launchError: String?
     @State private var images: [PastedImage] = []
     @State private var pasteMonitor: Any?
@@ -123,10 +125,13 @@ struct NewTaskSheet: View {
     private var missionFields: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Task input").scaledFont(.headline)
-            editor($task, minHeight: 100, focusOnAppear: true)
+            SnippetEditor(text: $task, minHeight: 100, focusOnAppear: true, replacements: taskReplacements.eraseToAnyPublisher())
                 .accessibilityLabel("Task input")
             Text("Describe the task and any context. Type ``` for a code snippet.")
                 .scaledFont(.caption).foregroundStyle(.secondary)
+            RecentInputsRow(inputs: history.recent(for: template.id),
+                            use: taskReplacements.send,
+                            remove: { history.remove($0, for: template.id) })
         }
     }
 
@@ -337,10 +342,6 @@ struct NewTaskSheet: View {
         .overlay(alignment: .top) { Rectangle().fill(AgenticiousStyle.violet.opacity(0.2)).frame(height: 1) }
     }
 
-    private func editor(_ text: Binding<String>, minHeight: CGFloat, focusOnAppear: Bool = false) -> some View {
-        SnippetEditor(text: text, minHeight: minHeight, focusOnAppear: focusOnAppear)
-    }
-
     private var canStart: Bool {
         repository.isReady(for: project.path) &&
             !task.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -424,6 +425,7 @@ struct NewTaskSheet: View {
                 select: host?.showsNewAgent() ?? true
             )
             presets.recordUse(of: template)
+            history.record(task, for: template.id)
             close()
         } catch {
             launchError = error.localizedDescription
