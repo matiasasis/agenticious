@@ -126,6 +126,23 @@ enum SubagentCatalog {
         }
     }
 
+    /// Whether the log's last stretch records a result for this call. Claude writes one only once the call's menu has
+    /// closed: answered, denied, or the subagent stopped. Read off the main thread; a log can be long.
+    static func hasToolResult(_ toolUseID: String, in transcript: URL, tail: Int = 256 * 1024) -> Bool {
+        guard let file = try? FileHandle(forReadingFrom: transcript) else { return false }
+        defer { try? file.close() }
+        guard let end = try? file.seekToEnd() else { return false }
+        try? file.seek(toOffset: end > UInt64(tail) ? end - UInt64(tail) : 0)
+        guard let data = try? file.readToEnd() else { return false }
+        let needle = Data(toolUseID.utf8)
+        for line in data.split(separator: UInt8(ascii: "\n")) where line.range(of: needle) != nil {
+            guard let object = (try? JSONSerialization.jsonObject(with: Data(line))) as? [String: Any],
+                  let content = (object["message"] as? [String: Any])?["content"] as? [[String: Any]] else { continue }
+            if content.contains(where: { $0["type"] as? String == "tool_result" && $0["tool_use_id"] as? String == toolUseID }) { return true }
+        }
+        return false
+    }
+
     private static func folder(_ conversation: URL) -> URL {
         conversation.deletingPathExtension().appendingPathComponent("subagents")
     }

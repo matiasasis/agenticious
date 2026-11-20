@@ -138,7 +138,7 @@ final class StartupPromptTests: XCTestCase {
         XCTAssertEqual(session.status, .working)
         EventInterpreter.apply("Notification", ["notification_type": "permission_prompt", "message": "Approve command"], to: session)
         StartupPromptInterpreter.apply(nil, to: session)
-        XCTAssertEqual(session.status, .needsYou("Approve command"))
+        XCTAssertEqual(session.status, .permissionRequired("Approve command"))
         let exited = self.session(agent: .claude)
         StartupPromptInterpreter.apply(.folderTrust(.claude), to: exited)
         exited.recordExit(1)

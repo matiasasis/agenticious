@@ -2,12 +2,15 @@ import AppKit
 import UserNotifications
 
 enum AgentAlert: String, CaseIterable {
-    case needsYou, yourTurn, completed, ended, failed, notStarted
+    case needsYou, permissionRequired, yourTurn, completed, ended, failed, notStarted
 
     static func transition(from old: SessionStatus, to new: SessionStatus) -> AgentAlert? {
         switch new {
+        case .permissionRequired:
+            // One alert per wait: a plan review or question followed by Claude's own notice is still the same wait.
+            return old.needsAttention ? nil : .permissionRequired
         case .needsYou, .yourTurn:
-            if case .needsYou = old { return nil }
+            if old.needsAttention { return nil }
             if case .yourTurn = old { return nil }
             return new == .yourTurn ? .yourTurn : .needsYou
         case .done:
@@ -29,6 +32,7 @@ enum AgentAlert: String, CaseIterable {
     var summary: String {
         switch self {
         case .needsYou: return "Needs you"
+        case .permissionRequired: return "Permission required"
         case .yourTurn: return "Finished its turn"
         case .completed: return "Mission complete"
         case .ended: return "Ended"
@@ -46,16 +50,17 @@ enum AgentAlert: String, CaseIterable {
 
     var sound: String {
         switch self {
-        case .needsYou, .yourTurn, .ended: return "Glass"
+        case .needsYou, .permissionRequired, .yourTurn, .ended: return "Glass"
         case .completed: return "Hero"
         case .failed, .notStarted: return "Basso"
         }
     }
 
-    /// Buttons on the banner, after the click that opens the agent.
+    /// Buttons on the banner, after the click that opens the agent. A permission is never answered from a banner,
+    /// which can't show the command and may be about an earlier request.
     var actions: [AgentNotificationAction] {
         switch self {
-        case .needsYou, .notStarted: return [.open]
+        case .needsYou, .permissionRequired, .notStarted: return [.open]
         case .yourTurn: return [.reply, .open]
         case .completed, .ended: return [.archive, .open]
         case .failed: return [.resume, .open]
@@ -90,6 +95,8 @@ final class AgentNotifications: NSObject, ObservableObject, UNUserNotificationCe
     @Published var requestedSession: UUID?
     /// Runs Reply, Resume and Archive from a banner; the text is what was typed into Reply.
     var perform: (AgentNotificationAction, UUID, String?) -> Void = { _, _, _ in }
+    /// Hears every alert as it is raised, whether or not a banner or a sound follows.
+    var onAlert: (AgentAlert, UUID) -> Void = { _, _ in }
     private let defaults: UserDefaults
     private let center: UNUserNotificationCenter?
     private let summonSound = Bundle.module.url(forResource: "Summon", withExtension: "wav")
@@ -125,6 +132,7 @@ final class AgentNotifications: NSObject, ObservableObject, UNUserNotificationCe
     }
 
     func notify(_ event: AgentAlert, sessionID: UUID, message: String) {
+        onAlert(event, sessionID)
         Task {
             await refreshAuthorization()
             guard bannersEnabled, authorization == .authorized, let center else {

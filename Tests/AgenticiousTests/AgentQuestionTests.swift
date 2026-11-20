@@ -36,10 +36,29 @@ final class AgentQuestionTests: XCTestCase {
     }
 
     @MainActor
-    func testInlineRepliesOnlyWhereTheTerminalWaitsForText() {
+    func testInlineRepliesOnlyWhereTheTerminalWaitsForText() throws {
         let session = AgentSession(task: "Discovery", agent: .claude, project: .none, directory: URL(fileURLWithPath: "/tmp"))
         session.isRunning = true
         session.status = .yourTurn
         XCTAssertFalse(session.canReplyInline, "no terminal to type into")
+
+        // Never shown: only something to type into.
+        session.terminalView = AgentTerminalView(frame: .zero)
+        XCTAssertTrue(session.canReplyInline)
+        session.status = .needsYou("Which branch?")
+        XCTAssertTrue(session.canReplyInline, "asked through need_human, the agent sits at its prompt")
+
+        // Return typed into a permission menu picks Yes, so no reply box wherever one may be up.
+        let id = PermissionInterpreter.hold(["tool_name": "Bash", "tool_input": ["command": "touch build/ready"]], in: session) { _ in }
+        XCTAssertFalse(session.canReplyInline, "a card is held, and Claude's own menu is open beside it")
+        PermissionInterpreter.hookClosed(try XCTUnwrap(id), in: session)
+        XCTAssertFalse(session.canReplyInline, "the hook hung up, which doesn't prove the menu closed")
+        session.isAwaitingPermission = false
+        session.status = .permissionRequired("Run command · touch build/ready · answer in the terminal")
+        XCTAssertFalse(session.canReplyInline, "handed to the terminal")
+        session.status = .yourTurn
+        XCTAssertTrue(session.canReplyInline)
+        PermissionInterpreter.hold(["tool_name": "Bash", "tool_input": ["command": "ls"], "agent_id": "a1"], in: session) { _ in }
+        XCTAssertFalse(session.canReplyInline, "a subagent's request is held too")
     }
 }

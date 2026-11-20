@@ -183,12 +183,13 @@ struct SessionDatabase {
 
     // MARK: - Encoding
 
-    private static func encode(_ status: SessionStatus) -> (String, String?) {
+    static func encode(_ status: SessionStatus) -> (String, String?) {
         switch status {
         case .starting: ("starting", nil)
         case .working: ("working", nil)
         case .waiting: ("waiting", nil)
         case let .needsYou(reason): ("needs_you", reason)
+        case let .permissionRequired(reason): ("permission_required", reason)
         case .yourTurn: ("your_turn", nil)
         case let .done(summary): ("done", summary)
         case let .ended(reason): ("ended", reason)
@@ -199,7 +200,7 @@ struct SessionDatabase {
         }
     }
 
-    private static func decode(_ status: String?, detail: String?) -> SessionStatus {
+    static func decode(_ status: String?, detail: String?) -> SessionStatus {
         switch status {
         case "done": .done(detail)
         case "ended": .ended(detail ?? "Work was stopped.")
@@ -207,6 +208,7 @@ struct SessionDatabase {
         case "not_started": .notStarted(detail.flatMap { try? JSONDecoder().decode(LaunchFailure.self, from: Data($0.utf8)) }
             ?? LaunchFailure(code: nil, output: [], resuming: false))
         case "needs_you": .needsYou(detail ?? "")
+        case "permission_required": .permissionRequired(detail ?? "")
         case "your_turn": .yourTurn
         case "working": .working
         case "waiting": .waiting

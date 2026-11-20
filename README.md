@@ -23,7 +23,9 @@ A native macOS dashboard for running many coding agents (Claude Code and Codex) 
 
 - **One card per agent**, with the original task as the big title.
 - **Chunk boxes**: every agent is told to split its task into 3–8 chunks and to report progress on each.
-- **"Needs you" floats to the top** with the reason. You also get a dock badge, a sound and a menu-bar counter.
+- **"Needs you" and "Permission required" float to the top** with the reason. You also get a dock badge, a sound and a menu-bar counter.
+- **Approve in place**: when Claude asks to run a command or change a file, the request is pinned at the top of
+  Activity with **Allow** and **Deny**. Its own menu stays usable in the terminal.
 - **The real terminal** is one click away. Each agent runs in an embedded terminal (SwiftTerm) that keeps running when you close its window.
 - **Usage**: session and weekly limits for both. Codex's come from its session logs. Claude's come from the status line
   of agents started here (until one has replied, you see an estimate of today's tokens instead). Usage and provider
@@ -61,7 +63,9 @@ agent ──agenticious MCP───┘
 | Signal | Claude Code | Codex |
 |---|---|---|
 | Chunk plan | `agenticious` MCP tools (`set_plan`, `update_chunk`); falls back to mirroring its TodoWrite list | `agenticious` MCP tools |
-| Needs you | `Notification` hook (permission / idle), `need_human` tool | `need_human` tool |
+| Needs you | `Notification` hook (other prompts / idle), `need_human` tool | `need_human` tool |
+| Permission required | `PermissionRequest` hook, held open while its card shows in Activity; `Notification` hook (`permission_prompt`) when only the terminal can answer | — |
+| Tool finished | `PostToolUse` / `PostToolUseFailure` hooks, which also end a permission wait | — |
 | Turn finished | `Stop` hook; background tasks or scheduled wakeups show as Waiting | `notify` (agent-turn-complete) |
 | Plan limits | `statusLine` command (`rate_limits`) | session logs |
 | Done | `finish` tool | `finish` tool |
@@ -97,8 +101,10 @@ a while can show as **Needs you** until it moves on.
 | Path | What |
 |---|---|
 | `Sources/Agenticious/AgentLauncher.swift` | Builds the command line, hooks and MCP config per agent |
-| `Sources/Agenticious/EventServer.swift` | Loopback HTTP listener |
+| `Sources/Agenticious/EventServer.swift` | Loopback HTTP listener; keeps a hook's connection open until it is answered |
 | `Sources/Agenticious/EventInterpreter.swift` | Event → status / chunks |
+| `Sources/Agenticious/AgentPermission.swift` | Permission requests: what a card shows, the hook replies, and when a held request is answered or handed back |
+| `Sources/Agenticious/Views/PermissionCard.swift` | The permission card pinned at the top of Activity |
 | `Sources/Agenticious/SessionStore.swift` | Running sessions, terminal processes, dock badge |
 | `Sources/Agenticious/ShellStartup.swift` | How far an agent's login shell got, and whether it waits for you |
 | `Sources/Agenticious/ProcessExitWatch.swift` | Notices an agent's process ending |
@@ -215,7 +221,7 @@ The sidebar shows active agents grouped by workspace. **History** below the work
 
 The top bar shows Codex model-specific quota availability (such as **GPT-6 Astra: Available** or **Limit reached**) separately from its account percentages. Provider limits stay side by side while there is room, hiding the Control Room label before stacking in a narrow window. Summon agents from the workspace buttons, with **⌘N**, or from any app with a preset's shortcut. The live usage response reports availability and an optional reset time rather than a percentage. It refreshes at the usage-check interval in Preferences using your existing Codex sign-in. If a refresh fails, the last result is explicitly labeled as last reported; account percentages continue to come from local logs.
 
-Below the sidebar branding, **Agents** counts tasks outside history, **Working** counts starting or actively working agents, and **Needs you** counts agents blocked on your input or approval. Waiting and idle processes do not count as working.
+Below the sidebar branding, **Agents** counts tasks outside history, **Working** counts starting or actively working agents, and **Needs you** counts agents blocked on your input or approval, including those showing **Permission required**. Waiting and idle processes do not count as working.
 
 **Customize** keeps task presets, skills, and preferences together while the agent sidebar stays visible. Preferences are split into sections: **General** (sidebar branch names, default worktree behavior, text size, where the Summon window opens), **Notifications**, and **Background refresh** (how often provider connections and usage limits are checked). The macOS menu bar shows a monochrome “A” with a spark, with a count only when agents need your attention.
 
@@ -243,7 +249,7 @@ Step cards use equal heights; hover a card to read its complete title and note.
 
 Agent details default to **Activity**, a structured view of provider messages and tool calls. Command/input blocks include copy controls and working-directory context; long inputs and output can be expanded, errors open automatically, and unknown result statuses remain neutral. Markdown emphasis, links, and fenced code blocks render separately. Use **Terminal** or **Respond in terminal** for replies, approvals, interactive prompts, and raw output. Switching tabs keeps the agent process alive.
 
-When Claude asks with its question tool, the question appears pinned at the top of Activity: each question with its options (single or multiple choice) and an **Other** field. **Send answers** returns them to Claude through a held `PreToolUse` hook, so Claude continues without showing its menu. **Answer in terminal instead** releases the hook and Claude's own menu appears. A held question waits up to a day before falling back to the terminal. When the agent finishes its turn or asks with `need_human`, a reply box at the bottom of Activity types your reply into its prompt. Permission and startup prompts are still answered in the terminal.
+When Claude asks with its question tool, the question appears pinned at the top of Activity: each question with its options (single or multiple choice) and an **Other** field. **Send answers** returns them to Claude through a held `PreToolUse` hook, so Claude continues without showing its menu. **Answer in terminal instead** releases the hook and Claude's own menu appears. A held question waits up to a day before falling back to the terminal. When the agent finishes its turn or asks with `need_human`, a reply box at the bottom of Activity types your reply into its prompt. A card arriving takes the box away until it is answered, and what you had typed is there when the box returns. Claude's permission requests get a card of their own (see **Permission requests** below); startup prompts are still answered in the terminal.
 
 Activity reads the session's local Claude or Codex JSONL log every two seconds while visible. Claude sessions are matched by conversation ID. Codex uses its reported conversation ID or a unique marker added to new Agenticious prompts, never just the workspace folder. Older Codex sessions without a known ID may need to finish a turn before activity becomes available. Private reasoning records are not displayed. Provider log formats may change; when a log is unavailable, use the terminal.
 
@@ -252,6 +258,25 @@ The view reads up to the latest 4 MiB, shows at most 200 entries, and labels con
 The summon sheet remembers the last task preset and workspace, plus provider, model, and effort (model and effort separately per provider). Opening a workspace's **+** button still selects that workspace explicitly. Removed favorites are not restored as the default workspace. A preset's shortcut opens on the last workspace whichever agent is selected. The larger sheet adapts to the available display size and keeps model selection beside the compact provider choices.
 
 Provider icons use monochrome template rendering. The Claude mark comes from the official Claude desktop app (`TrayIconTemplate@3x.png`); the OpenAI mark used for Codex comes from the official ChatGPT app (`webview/assets/openai-logo-regular-ceb75a1754fa.svg` in `app.asar`). Their trademarks belong to Anthropic and OpenAI.
+
+### Permission requests
+
+When Claude Code is about to ask whether it may run a command, edit a file, or use another tool, the request appears as a card pinned at the top of Activity, and the agent's status becomes **Permission required**: orange with a lock, in the sidebar, the overview, the agent's banner, the dock badge, and the menu-bar count. The card shows what Claude sent, as it sent it: the command, the file with the text to replace and its replacement, a new file's contents, the URL, or the raw input of any other tool, plus the folder Claude is working in. Any other field of the input is listed under **Also sent**, because **Allow** approves the whole input, and a command Claude asked to run outside its sandbox says so beside the buttons. Nothing is rendered as Markdown or cut short by lines, and characters that could hide or reorder a command are spelled out as their code points: escape sequences, right-to-left overrides, zero-width and other invisible characters, and every blank other than the ordinary space. Claude's own words (its description of a command, and what it asks of a fetched page) never run, so there the no-break and ideographic spaces, joiners and the emoji selector that ordinary writing uses are left as they are; commands, file paths and file contents are always spelled out. A long block says how long it is at its top.
+
+While the request keeps a fair share of the card above the buttons, at every text size, only the request scrolls and the buttons and any warning stay pinned under it. **Allow** and **Allow, and don't ask again** stay off until the end of the request has been on screen there: a short request needs no scrolling, and a long one says there is more below. In a pane too short for that, the whole card scrolls instead, and since the buttons could then be on screen without the request, **Allow** and **Allow, and don't ask again** are off, with a line saying to make the window taller or answer in the terminal; **Deny**, the note and **Answer in terminal instead** still work. A request with a part too long to draw (over 60,000 characters) can be denied or handed to the terminal from the card, but not allowed.
+
+- **Allow** lets this one call run.
+- **Deny and stop** refuses it and ends Claude's turn, like **No** in its own menu; the reply box then waits for your next message. Type a note first and the button reads **Deny with note**: Claude is told the call was rejected, gets your note, and carries on. A subagent is always told and carries on.
+- **Allow, and don't ask again** is offered only when Claude itself suggests remembering allow rules, and only when all of them are kept for this session or all are saved in the folder's `.claude/settings.local.json`. The row names the rules and where they go, and applies Claude's suggestion unchanged. Suggestions that switch the permission mode, add folders, write to shared or user-wide settings, or mix the two places are not offered here; choose those in the terminal.
+- **Answer in terminal instead** takes the card away and opens the terminal.
+
+The buttons wake a moment after a card appears, so a click meant for the previous card can't answer the next one, and **Allow** has no keyboard shortcut. A decision is sent only by a click on a card that is still waiting. Everything else gets an empty reply, which Claude reads as no answer and leaves to its own menu: a key typed in the terminal, the tool already ran, Claude's turn ended, the agent was paused, archived or ended, a thirteenth request arrived while twelve were waiting, or Agenticious quit. Nothing is ever allowed for you. A note to Claude is sent up to 2,000 characters, and the card says when one runs longer.
+
+A request alerts as soon as its card appears, with one exception: while you are at that agent's own terminal, where Claude's menu is already in front of you, a main-agent request stays silent, and alerts only if it is still unanswered when Claude sends its own notice about six seconds later. A subagent's request always alerts at once. The macOS notification for a request has only **Open**: a banner can't show the command, so it never answers one.
+
+Claude's own menu stays open in the terminal the whole time, and whichever is answered first wins. A key typed in the agent's terminal takes the card away and leaves the status to Claude's own signals: **Working**, then **Permission required** if its menu is still waiting about six seconds later. (If the status underneath would open the reply box, it shows **Permission required** instead until Claude's turn ends, so a reply can't be typed onto a menu the key may have left up.) The tool running because you said yes there removes the card too. **Answer in terminal instead** keeps **Permission required** with the request named until Claude is seen to move on: the tool runs, Claude starts something else, or, for the main agent's own request, its turn ends. If Claude's hook goes away without an answer, the card goes and the status asks you to continue in the terminal. For some commands Claude's menu carries a safety warning that it does not pass on; the card then says so beside the buttons, and it is worth reading in the terminal before allowing. A background subagent's request is the exception: it shows only as a card, titled with the subagent, until you answer it or hand it to the terminal, where its menu then appears. While a subagent's menu handed over that way is unanswered, the reply box stays closed, since a typed reply would land on that menu; it opens again when that call finishes or fails, when the subagent stops, or once Claude has written that call's result to the subagent's log (a subagent stopped mid-run sends no hook), which is checked when the main agent next reports in. The subagent's other calls don't count, since read-only calls run side by side with a menu, and neither do other subagents' calls, which leave any wait handed to the terminal in place. Its **Permission required** then clears at the main agent's next turn end or prompt. Archiving hands held cards back the same way, so if the agent outlives a failed archive, the box stays closed onto the menus that brings up. Requests queue per agent, one card at a time with a count of those waiting, and a held request waits up to a day.
+
+Questions and plan reviews keep their own paths. Startup prompts, sandbox network prompts, and anything else Claude asks without this hook are answered in the terminal; when Claude reports one as a permission prompt, the status still reads **Permission required**. Codex has no approval hook, so its approvals stay in its terminal and show up here only if the agent calls `need_human`. The hook is written when an agent starts or resumes, so an agent from before this version gets cards after its next **Resume**.
 
 ### Subagents
 

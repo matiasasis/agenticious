@@ -33,7 +33,8 @@ enum EventInterpreter {
             session.status = .working
         case "PreToolUse":
             toolStarted(payload, in: session)
-        case "PostToolUse":
+        // A tool that ran and failed reports PostToolUseFailure instead; either way a permission wait is over.
+        case "PostToolUse", "PostToolUseFailure":
             toolFinished(payload, in: session)
         case "Notification":
             notified(payload, session: session)
@@ -140,7 +141,9 @@ enum EventInterpreter {
     }
 
     private static func subagentProgressed(_ session: AgentSession) {
-        guard session.isAwaitingPermission else { return }
+        // A subagent's tool proves only its own menu answered: not the main agent's handed-over wait, nor a menu still
+        // listed as handed over (that subagent's own result or stop has already taken its entry out by now).
+        guard session.isAwaitingPermission, session.status != session.mainAgentTerminalWait, session.terminalMenus.isEmpty else { return }
         session.isAwaitingPermission = false
         session.status = .working
     }
@@ -165,10 +168,21 @@ enum EventInterpreter {
             if !session.status.needsAttention && !session.status.isFinished && session.status != .waiting {
                 session.status = .yourTurn
             }
+        } else if isPermissionPrompt(payload, message: message) {
+            session.isAwaitingPermission = true
+            // A request already named, after a hand-over to the terminal, says more than Claude's general notice.
+            if case .permissionRequired = session.status { return }
+            session.status = .permissionRequired(message)
         } else {
             session.isAwaitingPermission = true
             session.status = .needsYou(message)
         }
+    }
+
+    /// Older Claude Code sends no type, only "Claude needs your permission to use …".
+    private static func isPermissionPrompt(_ payload: [String: Any], message: String) -> Bool {
+        if let type = payload["notification_type"] as? String { return type == "permission_prompt" }
+        return message.localizedCaseInsensitiveContains("permission")
     }
 
     private static func isIdleReminder(_ payload: [String: Any], message: String) -> Bool {

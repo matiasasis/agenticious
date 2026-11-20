@@ -135,6 +135,11 @@ struct AgentLauncher {
                     hookEntry(session, "AskUserQuestion", matcher: "AskUserQuestion", passReplyToClaude: true, timeout: 86_400),
                 ],
                 "PostToolUse": [hookEntry(session, "PostToolUse", matcher: "*")],
+                // A tool that ran and failed sends this instead of PostToolUse.
+                "PostToolUseFailure": [hookEntry(session, "PostToolUseFailure", matcher: "*")],
+                // Held while the request shows in Activity. Claude's own menu stays answerable beside it; whichever
+                // answers first wins. No matcher (every tool) and no `onFailure`, which would turn a failure into a deny.
+                "PermissionRequest": [hookEntry(session, "PermissionRequest", passReplyToClaude: true, timeout: 86_400)],
                 "Notification": [hookEntry(session, "Notification")],
                 "Stop": [hookEntry(session, "Stop", passReplyToClaude: true)],
                 "SubagentStart": [hookEntry(session, "SubagentStart")],

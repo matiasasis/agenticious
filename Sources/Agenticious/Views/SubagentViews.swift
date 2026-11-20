@@ -37,7 +37,7 @@ struct SubagentStack: View {
             }
             .padding(.leading, 16)
             .overlay(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 1).fill(session.status.color.opacity(0.35)).frame(width: 2).padding(.leading, 6)
+                RoundedRectangle(cornerRadius: 1).fill(session.presentedStatus.color.opacity(0.35)).frame(width: 2).padding(.leading, 6)
             }
         }
     }

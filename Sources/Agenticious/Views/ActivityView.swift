@@ -41,6 +41,15 @@ struct ActivityView: View {
                 }
                 .layoutPriority(1)
             }
+            if let front = session.pendingPermissions.first {
+                // Sizes itself: its buttons stay pinned while the request has room, and it scrolls whole in a short pane.
+                PermissionCard(session: session, request: front.request, waiting: session.pendingPermissions.count - 1,
+                               openTerminal: openTerminal)
+                    // A new card for each request: a note typed for one, or a click armed for it, never carries to the next.
+                    .id(front.id)
+                    .padding(.horizontal, 20).padding(.bottom, 12)
+                    .layoutPriority(1)
+            }
             if let question = session.pendingQuestion {
                 // Its own height while there is room; in a short pane it shrinks and scrolls, so every option and
                 // Send answers stay within reach.
@@ -84,7 +93,8 @@ struct ActivityView: View {
                 .onChange(of: entries) { _, _ in if followLatest { proxy.scrollTo("latest", anchor: .bottom) } }
                 .onChange(of: session.isWorking) { _, _ in if followLatest { proxy.scrollTo("latest", anchor: .bottom) } }
             }
-            if session.canReplyInline || (session.isChat && session.isRunning && !session.isMarkedFinished && session.pendingQuestion == nil) {
+            if session.canReplyInline || (session.isChat && session.isRunning && !session.isMarkedFinished
+                                          && session.pendingQuestion == nil && session.pendingPermissions.isEmpty) {
                 ReplyComposer(session: session).id(session.id)
             }
         }

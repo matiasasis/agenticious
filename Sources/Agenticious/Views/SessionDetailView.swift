@@ -15,53 +15,31 @@ struct SessionDetailView: View {
                 TaskHeading(type: session.displayedTaskType, task: session.task, size: .large)
                     .textSelection(.enabled)
 
-                HStack(spacing: 12) {
-                    AgentBadge(agent: session.agent, detail: session.modelSummary)
-                        // Larger text fills this row sooner; the branch and the folder give way before the provider's name.
-                        .layoutPriority(textScale > 1 ? 1 : 0)
-                    StatusPill(status: session.status)
-                        .fixedSize()
-                    if !session.isChat, !session.chunks.isEmpty {
-                        Text("\(session.completedChunks)/\(session.chunks.count) steps")
-                            .foregroundStyle(.secondary)
-                            .fixedSize()
+                if textScale == 1 {
+                    HStack(spacing: 12) { summary; actions; Spacer(); location }
+                } else {
+                    // Larger text: the row wraps rather than make this view wider than its column, which would push
+                    // everything under it, a permission card included, past the column's left edge.
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 12) {
+                            summary; actions
+                            HStack(spacing: 12) { location }.frame(minWidth: 0, idealWidth: 0, maxWidth: .infinity, alignment: .trailing)
+                        }
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 12) { summary; actions }
+                            HStack(spacing: 12) { location }
+                        }
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 12) { summary }
+                            HStack(spacing: 12) { actions }
+                            HStack(spacing: 12) { location }
+                        }
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 12) { summary }
+                            VStack(alignment: .leading, spacing: 8) { actions }
+                            HStack(spacing: 12) { location }
+                        }
                     }
-                    if session.isChat && !session.isMarkedFinished {
-                        Button(session.isArchiving ? "Ending chat…" : "End chat", systemImage: "stop.circle") { store.endChat(session) }
-                            .buttonStyle(PillButtonStyle(tint: AgenticiousStyle.lime))
-                            .disabled(!session.canEndChat)
-                            .help("Stop the agent and save this conversation in Finished.")
-                    } else {
-                        Button(session.isArchiving ? "Archiving…" : "Archive", systemImage: "archivebox") { store.archive(session) }
-                            .buttonStyle(PillButtonStyle())
-                            .disabled(session.isArchiving)
-                            .help(session.isArchiving ? "Archiving…" : "Stop the agent, clean up its worktree, and archive its history.")
-                    }
-                    if session.canStop && !session.isChat {
-                        Button("Pause", systemImage: "pause.fill") { store.pause(session) }
-                            .buttonStyle(PillButtonStyle(tint: AgenticiousStyle.coral))
-                            .disabled(session.isArchiving)
-                            .help("Stop the process but keep its conversation and worktree. Resume continues where it left off.")
-                    }
-                    if session.canEnd {
-                        Button("End agent", systemImage: "stop.fill") { store.end(session) }
-                            .buttonStyle(PillButtonStyle(tint: .red))
-                            .help("Mark the work as ended, stop the agent, and clean up its worktree. History is kept.")
-                    }
-                    if session.showsResumeAction {
-                        let retries = session.status.launchFailure != nil
-                        Button(retries ? "Try again" : "Resume", systemImage: retries ? "arrow.clockwise" : "play.fill") { store.resume(session) }
-                            .buttonStyle(PillButtonStyle(tint: AgenticiousStyle.lime))
-                            .disabled(!session.canResume)
-                            .help(retries ? "Start the agent again after fixing what stopped it." : "Reopen this conversation and continue unfinished work.")
-                    }
-                    Spacer()
-                    if let worktree = session.worktree { BranchLabel(worktree: worktree, isRemoved: session.worktreeRemoved) }
-                    Label(session.project.path ?? "No project", systemImage: session.project.symbol)
-                        .scaledFont(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.head)
                 }
 
                 if !session.pullRequests.isEmpty {
@@ -93,11 +71,14 @@ struct SessionDetailView: View {
                 Button("Terminal", systemImage: "terminal") { showActivity = false }
                     .buttonStyle(AgenticiousButtonStyle(isPrimary: !showActivity, isCompact: true))
                 Spacer()
-                if session.pendingQuestion != nil, !showActivity {
-                    Button("Answer in Activity", systemImage: "questionmark.bubble") { showActivity = true }
+                let hasQuestion = session.pendingQuestion != nil
+                let hasCard = hasQuestion || !session.pendingPermissions.isEmpty
+                if hasCard, !showActivity {
+                    Button(hasQuestion ? "Answer in Activity" : "Review in Activity",
+                           systemImage: hasQuestion ? "questionmark.bubble" : "lock.shield") { showActivity = true }
                         .buttonStyle(AgenticiousButtonStyle(isCompact: true))
-                } else if session.pendingQuestion == nil, !session.canReplyInline,
-                          session.status.needsAttention || session.status == .yourTurn {
+                } else if !hasCard, !session.canReplyInline,
+                          session.presentedStatus.needsAttention || session.presentedStatus == .yourTurn {
                     let title = session.startupPrompt == nil ? "Approve in terminal"
                         : session.startupPrompt?.shellWait != nil ? "Answer in terminal" : "Review startup prompt"
                     Button(title, systemImage: "arrow.right") { showActivity = false }
@@ -142,11 +123,71 @@ struct SessionDetailView: View {
         }
     }
 
+
+    @ViewBuilder
+    private var summary: some View {
+        AgentBadge(agent: session.agent, detail: session.modelSummary)
+            // Larger text fills this row sooner; the branch and the folder give way before the provider's name.
+            .layoutPriority(textScale > 1 ? 1 : 0)
+        StatusPill(status: session.presentedStatus)
+            .fixedSize()
+        if !session.isChat, !session.chunks.isEmpty {
+            Text("\(session.completedChunks)/\(session.chunks.count) steps")
+                .foregroundStyle(.secondary)
+                .fixedSize()
+        }
+    }
+
+    @ViewBuilder
+    private var actions: some View {
+        if session.isChat && !session.isMarkedFinished {
+            Button(session.isArchiving ? "Ending chat…" : "End chat", systemImage: "stop.circle") { store.endChat(session) }
+                .buttonStyle(PillButtonStyle(tint: AgenticiousStyle.lime))
+                .disabled(!session.canEndChat)
+                .help("Stop the agent and save this conversation in Finished.")
+        } else {
+            Button(session.isArchiving ? "Archiving…" : "Archive", systemImage: "archivebox") { store.archive(session) }
+                .buttonStyle(PillButtonStyle())
+                .disabled(session.isArchiving)
+                .help(session.isArchiving ? "Archiving…" : "Stop the agent, clean up its worktree, and archive its history.")
+        }
+        if session.canStop && !session.isChat {
+            Button("Pause", systemImage: "pause.fill") { store.pause(session) }
+                .buttonStyle(PillButtonStyle(tint: AgenticiousStyle.coral))
+                .disabled(session.isArchiving)
+                .help("Stop the process but keep its conversation and worktree. Resume continues where it left off.")
+        }
+        if session.canEnd {
+            Button("End agent", systemImage: "stop.fill") { store.end(session) }
+                .buttonStyle(PillButtonStyle(tint: .red))
+                .help("Mark the work as ended, stop the agent, and clean up its worktree. History is kept.")
+        }
+        if session.showsResumeAction {
+            let retries = session.status.launchFailure != nil
+            Button(retries ? "Try again" : "Resume", systemImage: retries ? "arrow.clockwise" : "play.fill") { store.resume(session) }
+                .buttonStyle(PillButtonStyle(tint: AgenticiousStyle.lime))
+                .disabled(!session.canResume)
+                .help(retries ? "Start the agent again after fixing what stopped it." : "Reopen this conversation and continue unfinished work.")
+        }
+    }
+
+    @ViewBuilder
+    private var location: some View {
+        if let worktree = session.worktree { BranchLabel(worktree: worktree, isRemoved: session.worktreeRemoved) }
+        Label(session.project.path ?? "No project", systemImage: session.project.symbol)
+            .scaledFont(.caption)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .truncationMode(.head)
+    }
+
     @ViewBuilder
     private var statusBanner: some View {
-        switch session.status {
-        case let .needsYou(reason):
-            Banner(title: "Needs you", text: reason, systemImage: "hand.raised.fill", color: .orange)
+        switch session.presentedStatus {
+        case .needsYou, .permissionRequired:
+            if let attention = session.presentedStatus.attention {
+                Banner(title: attention.title, text: attention.reason, systemImage: attention.symbol, color: .orange)
+            }
         case .waiting:
             Banner(title: "Waiting", text: "\(session.agent.displayName) has background work or a scheduled wakeup. No input needed.",
                    systemImage: "clock", color: .teal)

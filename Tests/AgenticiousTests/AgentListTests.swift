@@ -19,7 +19,7 @@ final class AgentListTests: XCTestCase {
         hidden.status = .working
         hidden.isRunning = true
 
-        for status in [SessionStatus.waiting, .yourTurn, .needsYou("Approve"), .done(nil), .ended("Finished"), .exited(0), .interrupted] {
+        for status in [SessionStatus.waiting, .yourTurn, .needsYou("Approve"), .permissionRequired("Run command"), .done(nil), .ended("Finished"), .exited(0), .interrupted] {
             session.status = status
             session.isRunning = true
             XCTAssertEqual(store.visibleSessions.count, 1)
@@ -45,7 +45,7 @@ final class AgentListTests: XCTestCase {
         session.chunks = [Chunk(id: 1, title: "Completed step", status: .done)]
         for isRunning in [false, true] {
             session.isRunning = isRunning
-            for status in [SessionStatus.starting, .working, .waiting, .yourTurn, .needsYou("Approve")] {
+            for status in [SessionStatus.starting, .working, .waiting, .yourTurn, .needsYou("Approve"), .permissionRequired("Run command")] {
                 session.status = status
                 XCTAssertFalse(session.canMarkFinished)
             }
@@ -120,7 +120,7 @@ final class AgentListTests: XCTestCase {
     func testStatusChangesDoNotMoveSessions() async {
         let session = AgentSession(task: "Work", agent: .claude, project: .none, directory: URL(fileURLWithPath: "/tmp"))
         let groups = [ProjectGroup(project: .none, sessions: [session], isFavorite: false)]
-        for status in [SessionStatus.starting, .working, .waiting, .yourTurn, .needsYou("Approve"), .interrupted, .done("Done"), .exited(0), .exited(1)] {
+        for status in [SessionStatus.starting, .working, .waiting, .yourTurn, .needsYou("Approve"), .permissionRequired("Run command"), .interrupted, .done("Done"), .exited(0), .exited(1)] {
             session.status = status
             XCTAssertEqual(AgentList.queue.groups(from: groups)[0].sessions.count, 1)
             XCTAssertTrue(AgentList.finished.groups(from: groups).isEmpty)

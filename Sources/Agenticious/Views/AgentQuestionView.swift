@@ -121,13 +121,19 @@ struct QuestionCard: View {
 struct ReplyComposer: View {
     @EnvironmentObject private var store: SessionStore
     @ObservedObject var session: AgentSession
-    @State private var text = ""
+    @State private var text: String
+
+    /// The box goes away while a card is up, and comes back with what was being typed.
+    init(session: AgentSession) {
+        self.session = session
+        _text = State(initialValue: session.replyDraft)
+    }
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 10) {
             VStack(alignment: .leading, spacing: 6) {
-                if case let .needsYou(reason) = session.status {
-                    Label(reason, systemImage: "hand.raised.fill").scaledFont(.caption.weight(.semibold)).foregroundStyle(.orange).lineLimit(3)
+                if let attention = session.presentedStatus.attention {
+                    Label(attention.reason, systemImage: attention.symbol).scaledFont(.caption.weight(.semibold)).foregroundStyle(.orange).lineLimit(3)
                 }
                 SnippetEditor(text: $text, placeholder: session.isChat ? "Ask a follow-up or share your thoughts…" : "Reply to \(session.agent.displayName)…", minHeight: 40, maxHeight: 160)
                 if session.isChat && !session.canReplyInline {
@@ -142,6 +148,7 @@ struct ReplyComposer: View {
         .padding(14)
         .background(AgenticiousStyle.panel)
         .overlay(alignment: .top) { Rectangle().fill(AgenticiousStyle.violet.opacity(0.2)).frame(height: 1) }
+        .onChange(of: text) { _, text in session.replyDraft = text }
     }
 
     private func send() {

@@ -48,7 +48,7 @@ final class EventInterpreterTests: XCTestCase {
     func testSubagentProgressClearsItsAnsweredPermissionPrompt() async {
         let session = session()
         EventInterpreter.apply("Notification", ["message": "Claude needs your permission to use Bash"], to: session)
-        XCTAssertEqual(session.status, .needsYou("Claude needs your permission to use Bash"))
+        XCTAssertEqual(session.status, .permissionRequired("Claude needs your permission to use Bash"))
         EventInterpreter.apply("PostToolUse", ["tool_name": "Bash", "agent_id": "explore-1"], to: session)
         XCTAssertEqual(session.status, .working)
     }
@@ -124,9 +124,43 @@ final class EventInterpreterTests: XCTestCase {
         let session = session()
         EventInterpreter.apply("Stop", backgroundStop, to: session)
         EventInterpreter.apply("Notification", ["notification_type": "permission_prompt", "message": "Approve command"], to: session)
-        XCTAssertEqual(session.status, .needsYou("Approve command"))
+        XCTAssertEqual(session.status, .permissionRequired("Approve command"))
         EventInterpreter.apply("PreToolUse", ["tool_name": "Bash"], to: session)
         XCTAssertEqual(session.status, .working)
+    }
+
+    @MainActor
+    func testOnlyPermissionPromptsBecomePermissionRequired() async {
+        let session = session()
+        EventInterpreter.apply("Notification", ["notification_type": "elicitation_dialog", "message": "A server asks for your permission"], to: session)
+        XCTAssertEqual(session.status, .needsYou("A server asks for your permission"), "the type decides when there is one")
+        XCTAssertTrue(session.isAwaitingPermission)
+
+        // A request already handed to the terminal says more than Claude's general notice.
+        session.status = .permissionRequired("Run command · touch build/ready · answer in the terminal")
+        EventInterpreter.apply("Notification", ["notification_type": "permission_prompt", "message": "Claude needs your permission"], to: session)
+        XCTAssertEqual(session.status, .permissionRequired("Run command · touch build/ready · answer in the terminal"))
+        XCTAssertTrue(session.isAwaitingPermission)
+
+        // Blocked either way: the turn ending, an idle reminder or a nudge to report must not hide it.
+        XCTAssertNil(EventInterpreter.stopHookReply([:], for: session))
+        EventInterpreter.apply("Stop", [:], to: session)
+        EventInterpreter.apply("Notification", ["notification_type": "idle_prompt"], to: session)
+        XCTAssertEqual(session.status, .permissionRequired("Run command · touch build/ready · answer in the terminal"))
+    }
+
+    @MainActor
+    func testAFailedToolEndsThePermissionWaitLikeOneThatWorked() async {
+        let session = session()
+        EventInterpreter.apply("Notification", ["notification_type": "permission_prompt", "message": "Approve command"], to: session)
+        EventInterpreter.apply("PostToolUseFailure", ["tool_name": "Bash", "tool_input": ["command": "false"]], to: session)
+        XCTAssertEqual(session.status, .working)
+        XCTAssertFalse(session.isAwaitingPermission)
+
+        // A subagent's failed tool clears only a permission wait, as its successful ones do.
+        session.status = .needsYou("Use nine PRs?")
+        EventInterpreter.apply("PostToolUseFailure", ["tool_name": "Bash", "agent_id": "explore-1"], to: session)
+        XCTAssertEqual(session.status, .needsYou("Use nine PRs?"))
     }
 
     @MainActor
