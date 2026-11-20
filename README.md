@@ -114,11 +114,13 @@ or local paths. Existing user configs are not replaced or extended when the app 
 
 **Shortcuts.** Give a preset a shortcut in its editor: click **Record shortcut** and press the keys, for example
 `⌃⌥R` (Esc cancels). It needs ⌘, ⌃ or ⌥ unless it is a function key, and standard shortcuts such as ⌘V, ⌘S or
-⌘Q are refused. From then on, pressing it in any app while Agenticious is running opens a floating Summon window in the
-middle of your main display (the one with the menu bar), over what you are working on, with that preset selected and the workspace you last summoned in. **Start agent**
+⌘Q are refused. From then on, pressing it in any app while Agenticious is running opens a floating Summon window over what you
+are working on, with that preset selected and the workspace you last summoned in. **Start agent**
 (⌘ Return), **Cancel** or Esc closes it and you carry on where you were: the agent starts in the background and
 the main window stays put, still showing what it was showing. Pressing another preset's shortcut while the window
-is open switches the preset and keeps what you typed, and leaves the window where it is. Shortcuts need no Accessibility permission. **Browse…** makes Agenticious the active app for the
+is open switches the preset and keeps what you typed, and leaves the window where it is. **Customize → Preferences →
+General → Summon window opens** decides where it appears: in the middle of the main display (the one with the menu
+bar; the default), in the middle of the display you are using, or over the window you are working in. Shortcuts need no Accessibility permission. **Browse…** makes Agenticious the active app for the
 folder picker; closing the Summon window hands you back to the app you were in. Pressed while Agenticious itself is
 in front, a shortcut works like **⌘N** and the main window turns to the new agent.
 
@@ -181,7 +183,7 @@ The top bar shows Codex model-specific quota availability (such as **GPT-6 Astra
 
 Below the sidebar branding, **Agents** counts tasks outside history, **Working** counts starting or actively working agents, and **Needs you** counts agents blocked on your input or approval. Waiting and idle processes do not count as working.
 
-**Customize** keeps task presets, skills, and preferences together while the agent sidebar stays visible. Preferences are split into sections: **General** (sidebar branch names, default worktree behavior, text size), **Notifications**, and **Background refresh** (how often provider connections and usage limits are checked). The macOS menu bar shows a monochrome “A” with a spark, with a count only when agents need your attention.
+**Customize** keeps task presets, skills, and preferences together while the agent sidebar stays visible. Preferences are split into sections: **General** (sidebar branch names, default worktree behavior, text size, where the Summon window opens), **Notifications**, and **Background refresh** (how often provider connections and usage limits are checked). The macOS menu bar shows a monochrome “A” with a spark, with a count only when agents need your attention.
 
 Every agent has an **Archive** button beside its status and step count, plus an archive action in its right-click menu. Archiving stops its process, descendants, and owned terminal process group (escalating to kill if needed), releases the terminal, removes its per-session launch configuration, and attempts to remove its worktree. Known leftover provider processes are identified by this session's exact launch markers after a restart. **Mark as finished** uses the same cleanup. History and Git branches are preserved; worktrees with uncommitted changes or another queued agent are kept, with a warning. The main checkout and shared scratch folder are never removed. Archived activity is read once without background polling. Use the Archive button or **Retry archive cleanup** to retry worktree cleanup on older finished tasks.
 

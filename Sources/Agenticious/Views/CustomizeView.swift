@@ -95,6 +95,7 @@ private struct GeneralPreferencesView: View {
     @AppStorage("sidebarShowBranches") private var showBranches = true
     @AppStorage("useWorktree") private var useWorktree = true
     @AppStorage(TextScale.key) private var storedTextScale = 1.0
+    @AppStorage(SummonPosition.defaultsKey) private var summonPosition = SummonPosition.mainDisplay
     @Environment(\.textScale) private var textScale
 
     /// A size between two steps (from `-textScale`) shows as the nearer one.
@@ -110,28 +111,41 @@ private struct GeneralPreferencesView: View {
             Text("Applies to git projects. You can change this for each mission when summoning an agent.")
                 .scaledFont(.caption).foregroundStyle(.secondary)
             Divider()
-            let sizeTitle = Text("Text size")
-            let sizePicker = Picker("Text size", selection: textSize) {
+            menuRow("Text size", Picker("Text size", selection: textSize) {
                 ForEach(TextScale.steps, id: \.self) { step in
                     Text(TextScale.label(step) + (step == 1 ? " (default)" : "")).scaledFont(.body, textScale).tag(step)
                 }
-            }
-            .labelsHidden().pickerStyle(.menu).fixedSize(horizontal: textScale == 1, vertical: true)
-            let sideBySide = HStack(alignment: .firstTextBaseline) { sizeTitle; Spacer(); sizePicker.fixedSize() }
-            // With larger text in a narrow window the pop-up goes under its title instead of squeezing it out.
-            if textScale == 1 {
-                sideBySide
-            } else {
-                ViewThatFits(in: .horizontal) {
-                    sideBySide
-                    VStack(alignment: .leading, spacing: 12) { sizeTitle; sizePicker }.frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
+            })
             Text("Scales all text in Agenticious, the terminal included. ⌘+ and ⌘− change it too; ⌘0 puts it back.")
+                .scaledFont(.caption).foregroundStyle(.secondary)
+            Divider()
+            menuRow("Summon window opens", Picker("Summon window opens", selection: $summonPosition) {
+                ForEach(SummonPosition.allCases) { position in
+                    Text(position.title + (position == .mainDisplay ? " (default)" : "")).scaledFont(.body, textScale).tag(position)
+                }
+            })
+            Text("Where a preset's shortcut or a Stream Deck key opens the floating Summon window. The main display is the one with the menu bar.")
                 .scaledFont(.caption).foregroundStyle(.secondary)
         }
         .toggleStyle(.switch).padding(20)
         .background(AgenticiousStyle.panel, in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    /// A title with its pop-up beside it. With larger text in a narrow window the pop-up goes under its title instead
+    /// of squeezing it out.
+    @ViewBuilder
+    private func menuRow(_ title: String, _ picker: some View) -> some View {
+        let title = Text(title)
+        let picker = picker.labelsHidden().pickerStyle(.menu).fixedSize(horizontal: textScale == 1, vertical: true)
+        let sideBySide = HStack(alignment: .firstTextBaseline) { title; Spacer(); picker.fixedSize() }
+        if textScale == 1 {
+            sideBySide
+        } else {
+            ViewThatFits(in: .horizontal) {
+                sideBySide
+                VStack(alignment: .leading, spacing: 12) { title; picker }.frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
     }
 }
 

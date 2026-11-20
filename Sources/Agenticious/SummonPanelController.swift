@@ -50,9 +50,9 @@ final class SummonPanelController {
             return true
         }
         Self.borrowedFrom = nil
-        let display = SummonPlacement.mainDisplay
+        let target = SummonPlacement.target()
         let panel = SummonPanel()
-        let host = SummonWindowHost(window: panel, visibleFrame: display,
+        let host = SummonWindowHost(window: panel, visibleFrame: target.visible,
                                     showsNewAgent: { [weak self] in self?.isOverAnotherApp == false },
                                     close: { [weak self] in self?.close() })
         let sheet = NewTaskSheet(project: store.lastUsedProject, template: store.presets.preset(id: presetID), host: host)
@@ -60,7 +60,7 @@ final class SummonPanelController {
         // The sheet draws its own header under the hidden title bar, instead of leaving a strip for it.
         hosting.safeAreaRegions = []
         panel.contentView = hosting
-        panel.setFrame(SummonPlacement.frame(size: hosting.fittingSize, in: display), display: false)
+        panel.setFrame(SummonPlacement.frame(size: hosting.fittingSize, over: target.window, in: target.visible), display: false)
         panel.onCancel = { [weak self] in self?.close() }
         self.panel = panel
         self.host = host
@@ -115,16 +115,77 @@ extension NSApplication {
     }
 }
 
-enum SummonPlacement {
-    /// The middle of the screen, never past its edges.
-    static func frame(size: CGSize, in visible: CGRect) -> CGRect {
-        let size = CGSize(width: min(size.width, visible.width), height: min(size.height, visible.height))
-        return CGRect(x: (visible.midX - size.width / 2).rounded(), y: (visible.midY - size.height / 2).rounded(),
-                      width: size.width, height: size.height)
+/// Where a preset's shortcut opens the floating Summon window. Chosen in Customize → Preferences → General.
+enum SummonPosition: String, CaseIterable, Identifiable {
+    case mainDisplay, currentDisplay, currentWindow
+
+    static let defaultsKey = "summonPosition"
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .mainDisplay: "Middle of the main display"
+        case .currentDisplay: "Middle of the display in use"
+        case .currentWindow: "Over the window in use"
+        }
     }
 
-    /// The main display's usable area: the one with the menu bar, set in System Settings → Displays. It is where the
-    /// window always opens, whichever app or display was in use.
+    static var chosen: SummonPosition {
+        UserDefaults.standard.string(forKey: defaultsKey).flatMap(SummonPosition.init) ?? .mainDisplay
+    }
+}
+
+enum SummonPlacement {
+    /// Centred over `window`, or in the middle of the screen without one; never past the screen's edges.
+    static func frame(size: CGSize, over window: CGRect? = nil, in visible: CGRect) -> CGRect {
+        let size = CGSize(width: min(size.width, visible.width), height: min(size.height, visible.height))
+        let center = window.map { CGPoint(x: $0.midX, y: $0.midY) } ?? CGPoint(x: visible.midX, y: visible.midY)
+        let x = min(max(center.x - size.width / 2, visible.minX), visible.maxX - size.width)
+        let y = min(max(center.y - size.height / 2, visible.minY), visible.maxY - size.height)
+        return CGRect(x: x.rounded(), y: y.rounded(), width: size.width, height: size.height)
+    }
+
+    /// The screen to open on and, for `.currentWindow`, the window to centre over. The main display is the first
+    /// screen, the one with the menu bar; the display in use is the one holding most of the front window, else the
+    /// one under the pointer.
+    static func target(_ position: SummonPosition, screens: [(frame: CGRect, visible: CGRect)], focusedWindow: CGRect?,
+                       pointer: CGPoint) -> (visible: CGRect, window: CGRect?) {
+        guard !screens.isEmpty else { return (CGRect(x: 0, y: 0, width: 1040, height: 950), nil) }
+        guard position != .mainDisplay else { return (screens[0].visible, nil) }
+        let screen = screens[Self.screen(frames: screens.map(\.frame), focusedWindow: focusedWindow, pointer: pointer)]
+        return (screen.visible, position == .currentWindow ? focusedWindow : nil)
+    }
+
+    /// The screen holding most of the window being worked in; without one, the screen under the pointer.
+    static func screen(frames: [CGRect], focusedWindow: CGRect?, pointer: CGPoint) -> Int {
+        if let focusedWindow {
+            let overlaps = frames.map { $0.intersection(focusedWindow) }.map { $0.isNull ? 0 : $0.width * $0.height }
+            if let best = overlaps.indices.max(by: { overlaps[$0] < overlaps[$1] }), overlaps[best] > 0 { return best }
+        }
+        return frames.firstIndex { $0.contains(pointer) } ?? 0
+    }
+
+    /// Quartz measures from the top-left of the primary display; AppKit from its bottom-left.
+    static func cocoaRect(quartz: CGRect, primaryHeight: CGFloat) -> CGRect {
+        CGRect(x: quartz.minX, y: primaryHeight - quartz.maxY, width: quartz.width, height: quartz.height)
+    }
+
+    /// The frontmost app's front window, from the window list: `NSScreen.main` isn't a sure answer while another app
+    /// has the keyboard. Window bounds, unlike titles and contents, need no Screen Recording permission.
     @MainActor
-    static var mainDisplay: CGRect { NSScreen.screens.first?.visibleFrame ?? CGRect(x: 0, y: 0, width: 1040, height: 950) }
+    static func focusedWindowFrame() -> CGRect? {
+        guard let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier, let primary = NSScreen.screens.first,
+              let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[CFString: Any]],
+              let front = windows.first(where: { $0[kCGWindowOwnerPID] as? pid_t == pid && $0[kCGWindowLayer] as? Int == 0 }),
+              let bounds = front[kCGWindowBounds] as? NSDictionary, let quartz = CGRect(dictionaryRepresentation: bounds)
+        else { return nil }
+        return cocoaRect(quartz: quartz, primaryHeight: primary.frame.height)
+    }
+
+    /// Where the window goes right now, by the chosen position. The front window is only looked up when it matters.
+    @MainActor
+    static func target(_ position: SummonPosition = .chosen) -> (visible: CGRect, window: CGRect?) {
+        target(position, screens: NSScreen.screens.map { ($0.frame, $0.visibleFrame) },
+               focusedWindow: position == .mainDisplay ? nil : focusedWindowFrame(), pointer: NSEvent.mouseLocation)
+    }
 }
