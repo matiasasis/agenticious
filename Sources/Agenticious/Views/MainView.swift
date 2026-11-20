@@ -9,7 +9,7 @@ struct MainView: View {
     var body: some View {
         NavigationSplitView {
             Sidebar()
-                // Wider with the text, or the project names and the wordmark beside the icon are cut short.
+                // Wider with the text, or the project names and the wordmark are cut short.
                 .navigationSplitViewColumnWidth(min: 260 * textScale, ideal: 300 * textScale, max: 420 * textScale)
         } detail: {
             detail
@@ -121,10 +121,6 @@ private struct Sidebar: View {
         .safeAreaInset(edge: .top) {
             VStack(alignment: .trailing, spacing: 8) {
                 HStack(spacing: 10) {
-                    if let icon = Bundle.module.url(forResource: "AppIcon", withExtension: "png").flatMap(NSImage.init(contentsOf:)) {
-                        Image(nsImage: icon).resizable().interpolation(.high).scaledToFit().frame(width: 96, height: 96)
-                            .accessibilityHidden(true)
-                    }
                     VStack(alignment: .leading, spacing: 3) {
                         Text("AGENTICIOUS").scaledFont(.system(size: 17, weight: .black, design: .rounded))
                         Text("A LITTLE CHAOS. A LOT DONE.")

@@ -11,7 +11,9 @@ let package = Package(
         .executableTarget(
             name: "Agenticious",
             dependencies: [.product(name: "SwiftTerm", package: "SwiftTerm")],
-            resources: [.copy("Resources/task-presets.json"), .copy("Resources/AppIcon.png"), .copy("Resources/BundleIcon.png"), .copy("Resources/ClaudeIcon.png"), .copy("Resources/CodexIcon.svg"), .copy("Resources/Summon.wav")]
+            // AppIcon.png is the artwork the design scripts draw the bundle icon from; the app doesn't show it.
+            exclude: ["Resources/AppIcon.png"],
+            resources: [.copy("Resources/task-presets.json"), .copy("Resources/BundleIcon.png"), .copy("Resources/ClaudeIcon.png"), .copy("Resources/CodexIcon.svg"), .copy("Resources/Summon.wav")]
         ),
         .executableTarget(name: "agenticious-mcp"),
         .testTarget(name: "AgenticiousTests", dependencies: ["Agenticious"]),
