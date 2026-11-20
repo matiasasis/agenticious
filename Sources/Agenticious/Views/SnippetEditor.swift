@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import Combine
 
 /// A text box where ``` starts a code snippet: typing it at the start of a line adds the closing fence, and fenced blocks
 /// and `inline code` show in monospace. Smart quotes and dashes are off, so code reaches the agent exactly as typed.
@@ -10,11 +11,14 @@ struct SnippetEditor: View {
     var minHeight: CGFloat = 40
     var maxHeight: CGFloat = 320
     var focusOnAppear = false
+    /// Text sent here replaces what's typed as one edit, so ⌘Z brings the typing back, and the box takes focus.
+    var replacements: AnyPublisher<String, Never>?
     @Environment(\.textScale) private var textScale
 
     var body: some View {
         let font = font.scaled(textScale)
-        SnippetTextArea(text: $text, font: font, minHeight: minHeight, maxHeight: maxHeight, focusOnAppear: focusOnAppear)
+        SnippetTextArea(text: $text, font: font, minHeight: minHeight, maxHeight: maxHeight, focusOnAppear: focusOnAppear,
+                        replacements: replacements)
             .overlay(alignment: .topLeading) {
                 if text.isEmpty {
                     Text(placeholder).font(Font(font)).foregroundStyle(.tertiary)
@@ -35,6 +39,7 @@ private struct SnippetTextArea: NSViewRepresentable {
     let minHeight: CGFloat
     let maxHeight: CGFloat
     let focusOnAppear: Bool
+    let replacements: AnyPublisher<String, Never>?
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -58,6 +63,11 @@ private struct SnippetTextArea: NSViewRepresentable {
         textView.textContainer?.widthTracksTextView = true
         textView.string = text
         context.coordinator.highlight(textView)
+        context.coordinator.replacing = replacements?.sink { [weak textView] text in
+            guard let textView else { return }
+            textView.window?.makeFirstResponder(textView)
+            textView.replaceAllUndoably(with: text)
+        }
 
         let scrollView = NSScrollView()
         scrollView.documentView = textView
@@ -86,6 +96,7 @@ private struct SnippetTextArea: NSViewRepresentable {
 
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: SnippetTextArea
+        var replacing: AnyCancellable?
         private var isClosingFence = false
 
         init(_ parent: SnippetTextArea) { self.parent = parent }
@@ -120,6 +131,24 @@ private struct SnippetTextArea: NSViewRepresentable {
             storage.endEditing()
             textView.typingAttributes = [.font: parent.font, .foregroundColor: NSColor.labelColor]
         }
+    }
+}
+
+extension NSTextView {
+    /// Goes through `shouldChangeText` and `didChangeText` as typing does, so the text view records the undo and
+    /// tells its delegate; the explicit group keeps it a single ⌘Z apart from what was typed before.
+    func replaceAllUndoably(with text: String, actionName: String = "Use Recent Input") {
+        let all = NSRange(location: 0, length: (string as NSString).length)
+        breakUndoCoalescing()
+        undoManager?.beginUndoGrouping()
+        if shouldChangeText(in: all, replacementString: text) {
+            replaceCharacters(in: all, with: text)
+            didChangeText()
+        }
+        undoManager?.setActionName(actionName)
+        undoManager?.endUndoGrouping()
+        setSelectedRange(NSRange(location: (text as NSString).length, length: 0))
+        scrollRangeToVisible(selectedRange())
     }
 }
 

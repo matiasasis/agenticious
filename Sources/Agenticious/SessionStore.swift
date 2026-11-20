@@ -65,6 +65,7 @@ final class SessionStore: ObservableObject {
     let usage = UsageMonitor()
     let diagnostics = ProviderDiagnostics()
     let presets = TaskPresetStore()
+    let promptHistory: PromptHistory
     let skillLocations = SkillLocations()
     let summon = SummonHotkeys()
     private var server: EventServer?
@@ -79,6 +80,7 @@ final class SessionStore: ObservableObject {
     init(databaseURL: URL? = nil, registersHotkeys: Bool = false) {
         port = ProcessInfo.processInfo.environment["AGENTICIOUS_PORT"].flatMap(UInt16.init) ?? Self.defaultPort
         favorites = (UserDefaults.standard.stringArray(forKey: Self.favoritesKey) ?? []).map(Project.init(path:))
+        promptHistory = PromptHistory { [presets] in presets.loadError == nil ? Set(presets.presets.map(\.id)) : nil }
         openDatabase(url: databaseURL)
         startServer()
         snapshotter = LaunchOptions.current.snapshotDirectory.map(WindowSnapshotter.init)
