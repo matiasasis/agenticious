@@ -114,12 +114,11 @@ or local paths. Existing user configs are not replaced or extended when the app 
 
 **Shortcuts.** Give a preset a shortcut in its editor: click **Record shortcut** and press the keys, for example
 `⌃⌥R` (Esc cancels). It needs ⌘, ⌃ or ⌥ unless it is a function key, and standard shortcuts such as ⌘V, ⌘S or
-⌘Q are refused. From then on, pressing it in any app while Agenticious is running opens a floating Summon window over
-what you are working on, with that preset selected and the workspace you last summoned in. **Start agent**
+⌘Q are refused. From then on, pressing it in any app while Agenticious is running opens a floating Summon window in the
+middle of your main display (the one with the menu bar), over what you are working on, with that preset selected and the workspace you last summoned in. **Start agent**
 (⌘ Return), **Cancel** or Esc closes it and you carry on where you were: the agent starts in the background and
 the main window stays put, still showing what it was showing. Pressing another preset's shortcut while the window
-is open switches the preset and keeps what you typed; pressed from an app on another display, the window comes to
-that display. Shortcuts need no Accessibility permission. **Browse…** makes Agenticious the active app for the
+is open switches the preset and keeps what you typed, and leaves the window where it is. Shortcuts need no Accessibility permission. **Browse…** makes Agenticious the active app for the
 folder picker; closing the Summon window hands you back to the app you were in. Pressed while Agenticious itself is
 in front, a shortcut works like **⌘N** and the main window turns to the new agent.
 

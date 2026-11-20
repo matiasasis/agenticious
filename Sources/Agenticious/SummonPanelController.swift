@@ -6,7 +6,7 @@ import SwiftUI
 struct SummonWindowHost {
     /// Weak: the window holds the sheet, which holds this.
     weak var window: NSWindow?
-    var visibleFrame: CGRect
+    let visibleFrame: CGRect
     /// A shortcut pressed while the window is open switches the task and keeps what's typed.
     let presetRequests = PassthroughSubject<String, Never>()
     /// Whether the main window should turn to the agent that was just started, as it does for the sheet.
@@ -23,8 +23,6 @@ final class SummonPanelController {
 
     private var panel: SummonPanel?
     private var host: SummonWindowHost?
-    /// Moves the open window to another screen; the sheet is told the screen first, so it sizes itself to fit.
-    private var place: (((visible: CGRect, window: CGRect?)) -> Void)?
     private var resigned: AnyCancellable?
 
     init() {
@@ -46,40 +44,24 @@ final class SummonPanelController {
             return false
         }
         if let panel, let host {
+            // Pressed again while open: switch the task and stay where it is, so a window moved by hand stays put.
             host.presetRequests.send(presetID)
-            // Left open and pressed again from another app: come to the screen in use now. A window dragged
-            // somewhere on the same screen stays where it was put.
-            if !NSRunningApplication.current.isActive, !panel.isKeyWindow {
-                let target = SummonPlacement.target()
-                if panel.screen?.visibleFrame != target.visible { place?(target) }
-            }
             present(panel)
             return true
         }
         Self.borrowedFrom = nil
-        let target = SummonPlacement.target()
+        let display = SummonPlacement.mainDisplay
         let panel = SummonPanel()
-        let host = SummonWindowHost(window: panel, visibleFrame: target.visible,
+        let host = SummonWindowHost(window: panel, visibleFrame: display,
                                     showsNewAgent: { [weak self] in self?.isOverAnotherApp == false },
                                     close: { [weak self] in self?.close() })
-        let project = store.lastUsedProject, template = store.presets.preset(id: presetID)
-        func root(_ host: SummonWindowHost) -> some View {
-            NewTaskSheet(project: project, template: template, host: host).agenticiousEnvironment(store)
-        }
-        let hosting = NSHostingView(rootView: root(host))
+        let sheet = NewTaskSheet(project: store.lastUsedProject, template: store.presets.preset(id: presetID), host: host)
+        let hosting = NSHostingView(rootView: sheet.agenticiousEnvironment(store))
         // The sheet draws its own header under the hidden title bar, instead of leaving a strip for it.
         hosting.safeAreaRegions = []
         panel.contentView = hosting
-        panel.setFrame(SummonPlacement.frame(size: hosting.fittingSize, over: target.window, in: target.visible), display: false)
+        panel.setFrame(SummonPlacement.frame(size: hosting.fittingSize, in: display), display: false)
         panel.onCancel = { [weak self] in self?.close() }
-        place = { [weak self, weak panel, weak hosting] target in
-            guard let self, let panel, let hosting, var host = self.host else { return }
-            host.visibleFrame = target.visible
-            self.host = host
-            // The same view in the same place: what's typed, the images and the chosen task all stay.
-            hosting.rootView = root(host)
-            panel.setFrame(SummonPlacement.frame(size: hosting.fittingSize, over: target.window, in: target.visible), display: true)
-        }
         self.panel = panel
         self.host = host
         present(panel)
@@ -90,7 +72,6 @@ final class SummonPanelController {
         guard let panel else { return }
         self.panel = nil
         host = nil
-        place = nil
         let borrowedFrom = Self.borrowedFrom
         Self.borrowedFrom = nil
         // Taking the views out ends the sheet, so its paste monitor goes with it. On the next turn, because Cancel
@@ -135,47 +116,15 @@ extension NSApplication {
 }
 
 enum SummonPlacement {
-    /// Over the window being worked in, or the middle of its screen when that isn't known; never off the screen's edge.
-    static func frame(size: CGSize, over window: CGRect?, in visible: CGRect) -> CGRect {
+    /// The middle of the screen, never past its edges.
+    static func frame(size: CGSize, in visible: CGRect) -> CGRect {
         let size = CGSize(width: min(size.width, visible.width), height: min(size.height, visible.height))
-        let center = window.map { CGPoint(x: $0.midX, y: $0.midY) } ?? CGPoint(x: visible.midX, y: visible.midY)
-        let x = min(max(center.x - size.width / 2, visible.minX), visible.maxX - size.width)
-        let y = min(max(center.y - size.height / 2, visible.minY), visible.maxY - size.height)
-        return CGRect(x: x.rounded(), y: y.rounded(), width: size.width, height: size.height)
+        return CGRect(x: (visible.midX - size.width / 2).rounded(), y: (visible.midY - size.height / 2).rounded(),
+                      width: size.width, height: size.height)
     }
 
-    /// The screen holding most of the window being worked in; without one, the screen under the pointer.
-    static func screen(frames: [CGRect], focusedWindow: CGRect?, pointer: CGPoint) -> Int {
-        if let focusedWindow {
-            let overlaps = frames.map { $0.intersection(focusedWindow) }.map { $0.isNull ? 0 : $0.width * $0.height }
-            if let best = overlaps.indices.max(by: { overlaps[$0] < overlaps[$1] }), overlaps[best] > 0 { return best }
-        }
-        return frames.firstIndex { $0.contains(pointer) } ?? 0
-    }
-
-    /// Quartz measures from the top-left of the primary display; AppKit from its bottom-left.
-    static func cocoaRect(quartz: CGRect, primaryHeight: CGFloat) -> CGRect {
-        CGRect(x: quartz.minX, y: primaryHeight - quartz.maxY, width: quartz.width, height: quartz.height)
-    }
-
-    /// The frontmost app's front window, from the window list: `NSScreen.main` isn't a sure answer while another app
-    /// has the keyboard. Window bounds, unlike titles and contents, need no Screen Recording permission.
+    /// The main display's usable area: the one with the menu bar, set in System Settings → Displays. It is where the
+    /// window always opens, whichever app or display was in use.
     @MainActor
-    static func focusedWindowFrame() -> CGRect? {
-        guard let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier, let primary = NSScreen.screens.first,
-              let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[CFString: Any]],
-              let front = windows.first(where: { $0[kCGWindowOwnerPID] as? pid_t == pid && $0[kCGWindowLayer] as? Int == 0 }),
-              let bounds = front[kCGWindowBounds] as? NSDictionary, let quartz = CGRect(dictionaryRepresentation: bounds)
-        else { return nil }
-        return cocoaRect(quartz: quartz, primaryHeight: primary.frame.height)
-    }
-
-    /// Where the window goes right now, and the screen space the sheet may size itself for.
-    @MainActor
-    static func target() -> (visible: CGRect, window: CGRect?) {
-        let screens = NSScreen.screens
-        let window = focusedWindowFrame()
-        guard !screens.isEmpty else { return (CGRect(x: 0, y: 0, width: 1040, height: 950), window) }
-        return (screens[screen(frames: screens.map(\.frame), focusedWindow: window, pointer: NSEvent.mouseLocation)].visibleFrame, window)
-    }
+    static var mainDisplay: CGRect { NSScreen.screens.first?.visibleFrame ?? CGRect(x: 0, y: 0, width: 1040, height: 950) }
 }
