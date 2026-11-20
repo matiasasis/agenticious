@@ -55,6 +55,12 @@ enum ActivityTranscript {
             .appendingPathComponent("projects")
     }
 
+    /// Whether Claude ever wrote this conversation: its log is `<project folder>/<id>.jsonl`, one level down.
+    static func claudeConversationExists(_ id: String?, in root: URL = claudeProjects) -> Bool {
+        guard let id, let folders = try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil) else { return false }
+        return folders.contains { FileManager.default.fileExists(atPath: $0.appendingPathComponent("\(id).jsonl").path) }
+    }
+
     /// With the `stamp` of the last read and an unchanged log, returns at once without reading it.
     static func read(agent: AgentKind, sessionID: UUID, conversationID: String?, directory: String, cached: URL?,
                      stamp previous: TranscriptStamp? = nil, chatPrompt: String? = nil, isSubagent: Bool = false) -> TranscriptResult {

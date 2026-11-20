@@ -132,7 +132,8 @@ final class SessionStore: ObservableObject {
         session.releaseQuestion()
         session.backgroundTask = "Archiving…"
         let id = session.id
-        let processID = session.terminalView?.process.running == true ? session.terminalView?.process.shellPid : nil
+        // Once the exit watch has reaped the shell, its pid may belong to another process.
+        let processID = session.isRunning && session.terminalView?.process.running == true ? session.terminalView?.process.shellPid : nil
         let worktree = session.worktreeRemoved ? nil : session.worktree
         let tasks = session.cleanupTasks + WorkspaceCleanup.tasks(for: session.project)
         let directory = session.directory
@@ -284,7 +285,7 @@ final class SessionStore: ObservableObject {
             } else {
                 session.directory = try directory(for: session.project)
             }
-            attachTerminal(to: session, running: try AgentLauncher(port: port).spec(for: session, images: images))
+            attachTerminal(to: session, running: try AgentLauncher(port: port).spec(for: session, images: images), resuming: false)
             session.backgroundTask = nil
             track(session)
             save(session)
@@ -299,6 +300,7 @@ final class SessionStore: ObservableObject {
     }
 
     /// Starts the agent again on its earlier conversation, in the same folder, still reporting to this session.
+    /// After a launch that didn't start, Try again repeats that launch: a first start has no conversation to reopen.
     func resume(_ session: AgentSession) {
         guard session.showsResumeAction else { return }
         guard session.canResume else {
@@ -306,13 +308,21 @@ final class SessionStore: ObservableObject {
             return
         }
 
+        // Paused or quit before Claude ever ran, there is no conversation to resume: start it afresh instead.
+        let resuming = session.status.launchFailure?.resuming
+            ?? (session.agent != .claude || session.transcriptURL != nil
+                || ActivityTranscript.claudeConversationExists(session.conversationID))
         do {
-            let spec = try AgentLauncher(port: port).spec(for: session, resuming: true)
+            let launcher = AgentLauncher(port: port)
+            let spec = resuming
+                ? try launcher.spec(for: session, resuming: true)
+                : try launcher.spec(for: session, images: PastedImage.saved(for: session.id))
             session.prepareToResume()
-            attachTerminal(to: session, running: spec)
+            if !resuming { session.status = .starting }
+            attachTerminal(to: session, running: spec, resuming: resuming)
             selection = .session(session.id)
         } catch {
-            alert = "Couldn't resume the agent: \(error.localizedDescription)"
+            alert = "Couldn't \(resuming ? "resume" : "start") the agent: \(error.localizedDescription)"
         }
     }
 
@@ -381,36 +391,79 @@ final class SessionStore: ObservableObject {
         return scratch
     }
 
-    private func attachTerminal(to session: AgentSession, running spec: LaunchSpec) {
+    private func attachTerminal(to session: AgentSession, running spec: LaunchSpec, resuming: Bool) {
         let terminal = AgentTerminalView(frame: NSRect(x: 0, y: 0, width: 900, height: 500))
         // Before the process exists, so the CLI starts on the grid it will keep.
         terminal.setFontSize(NSFont.systemFontSize * TextScale.clamped(UserDefaults.standard.double(forKey: TextScale.key)))
         let bridge = TerminalBridge { [weak self, weak session, weak terminal] exitCode in
-            guard let session, !session.isArchiving, session.isRunning, session.terminalView === terminal else { return }
+            guard let self, let session, let terminal, !session.isArchiving, session.isRunning,
+                  session.terminalView === terminal else { return }
             let oldStatus = session.status
-            session.recordExit(exitCode)
-            self?.notifyTransition(from: oldStatus, for: session)
-            self?.updateBadge()
+            let failure = session.launchFailure(exitCode: exitCode, output: TerminalScreen.lastLines(of: terminal.getTerminal()),
+                                                resuming: resuming)
+            session.recordExit(exitCode, launchFailure: failure)
+            notifyTransition(from: oldStatus, for: session)
+            updateBadge()
+            if failure != nil { rereadLaunchFailure(of: session, in: terminal) }
         }
 
         terminal.processDelegate = bridge
+        session.cliConfirmed = false
+        session.statusBeforeStartupPrompt = nil
         terminal.startProcess(executable: spec.executable, args: spec.arguments, environment: spec.environment, currentDirectory: spec.directory)
 
         session.terminalView = terminal
         session.terminalBridge = bridge
         session.isRunning = true
-        if terminal.process.running { notifications.playSummonSound() }
-        Task { await monitorStartup(of: session, terminal: terminal) }
+        let pid = terminal.process.shellPid
+        guard terminal.process.running, pid > 0 else {
+            // forkpty failed. SwiftTerm 1.11 reports nothing, so this would read Starting forever.
+            let oldStatus = session.status
+            session.recordExit(nil, launchFailure: LaunchFailure(code: nil, output: ["Agenticious couldn't open a terminal for the agent."],
+                                                                 resuming: resuming))
+            notifyTransition(from: oldStatus, for: session)
+            updateBadge()
+            return
+        }
+        bridge.watch(pid)
+        notifications.playSummonSound()
+        Task { await monitorStartup(of: session, terminal: terminal, shellPath: spec.executable) }
     }
 
-    private func monitorStartup(of session: AgentSession, terminal: LocalProcessTerminalView) async {
+    /// SwiftTerm feeds output on the main queue from its read queue, so the exit can arrive before the last lines are drawn.
+    private func rereadLaunchFailure(of session: AgentSession, in terminal: AgentTerminalView) {
+        Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(300))
+            guard case var .notStarted(failure) = session.status, session.terminalView === terminal else { return }
+            let output = TerminalScreen.lastLines(of: terminal.getTerminal())
+            guard output != failure.output else { return }
+            failure.output = output
+            session.status = .notStarted(failure)
+            self?.save(session)
+        }
+    }
+
+    /// Watches a launch until the CLI is plainly running: the login shell's start-up (waits for the human, see
+    /// ShellStartup), the CLI's own start-up screens, and its transcript for the first sign of work.
+    private func monitorStartup(of session: AgentSession, terminal: AgentTerminalView, shellPath: String) async {
         var cached: URL?
         var stamp: TranscriptStamp?
         var previousID = session.conversationID
+        var shell: (probe: ShellStartupProbe, watch: ShellStartupWatch)? = (ShellStartupProbe(shellPath: shellPath), ShellStartupWatch())
+        // The first read of a resumed conversation is its old transcript, which says nothing about this launch.
+        var isBaseline = true
         while session.isRunning, !session.status.isFinished,
-              session.chunks.isEmpty || session.status == .starting || session.startupPrompt != nil,
+              session.chunks.isEmpty || session.status == .starting || session.startupPrompt != nil || shell != nil,
               session.terminalView === terminal, self.session(session.id) != nil {
-            updateStartupPrompt(of: session, terminal: terminal)
+            var wait: ShellWait?
+            // A CLI that answered (a hook, its transcript, its own screen) ended start-up, even when a zsh wrapper
+            // script keeps the shell's image: an idle CLI must never read as a shell waiting.
+            if session.cliConfirmed { shell = nil }
+            if var current = shell {
+                wait = current.watch.observe(current.probe.sample(terminal.process, terminal.getTerminal()))
+                shell = current.watch.isFinished ? nil : current
+            }
+            updateStartupPrompt(of: session, terminal: terminal, shellWait: wait)
             if !session.chunks.isEmpty {
                 do { try await Task.sleep(for: .seconds(2)) } catch { return }
                 continue
@@ -431,6 +484,8 @@ final class SessionStore: ObservableObject {
             if session.conversationID != conversation { continue }
             cached = result.url
             stamp = result.stamp
+            if !isBaseline, !result.isUnchanged { session.cliConfirmed = true }
+            isBaseline = false
             if !result.isUnchanged {
                 session.startupProgress.update(from: result)
                 if session.status == .starting, !result.entries.isEmpty { session.status = .working }
@@ -443,11 +498,13 @@ final class SessionStore: ObservableObject {
         }
     }
 
-    private func updateStartupPrompt(of session: AgentSession, terminal: LocalProcessTerminalView) {
-        guard session.status == .starting || session.startupPrompt != nil else { return }
+    /// The shell's wait is deterministic text, so a reason that stops matching hands attention back as usual.
+    private func updateStartupPrompt(of session: AgentSession, terminal: AgentTerminalView, shellWait: ShellWait?) {
+        guard session.status == .starting || session.startupPrompt != nil || shellWait != nil else { return }
         let oldStatus = session.status
-        let prompt = StartupPrompt.detect(in: terminal.getTerminal(), agent: session.agent)
-        StartupPromptInterpreter.apply(prompt, to: session)
+        let detected = StartupPrompt.detect(in: terminal.getTerminal(), agent: session.agent)
+        if detected != nil { session.cliConfirmed = true }
+        StartupPromptInterpreter.apply(detected ?? shellWait.map { .shellWaiting(session.agent, $0) }, to: session)
         guard session.status != oldStatus else { return }
         notifyTransition(from: oldStatus, for: session)
         updateBadge()
@@ -533,6 +590,7 @@ final class SessionStore: ObservableObject {
 
     private func handle(_ event: AgentEvent) -> Data? {
         guard let session = session(event.sessionID), !session.isArchiving, !session.isMarkedFinished else { return nil }
+        session.cliConfirmed = true
 
         let payload = (try? JSONSerialization.jsonObject(with: event.body)) as? [String: Any] ?? [:]
         if event.name == "StatusLine" { return statusLine(payload) }
@@ -579,6 +637,7 @@ final class SessionStore: ObservableObject {
         guard let session = session(event.sessionID), session.isRunning, !session.isArchiving,
               payload["agent_id"] == nil, let first = questions.first else { return reply(nil) }
 
+        session.cliConfirmed = true
         session.releaseQuestion()
         session.lastActivity = Date()
         session.pendingQuestion = PendingQuestion(toolUseID: payload["tool_use_id"] as? String ?? "", questions: questions,
@@ -640,13 +699,22 @@ final class SessionStore: ObservableObject {
 /// SwiftTerm's delegate for the child process; we only care about it exiting.
 final class TerminalBridge: NSObject, LocalProcessTerminalViewDelegate {
     private let onExit: @MainActor (Int32?) -> Void
+    private var exitWatch: ProcessExitWatch?
 
     init(onExit: @escaping @MainActor (Int32?) -> Void) {
         self.onExit = onExit
     }
 
+    /// SwiftTerm misses most exits (see ProcessExitWatch). Whichever watch fires first reports; the session's
+    /// isRunning guard drops the other.
+    func watch(_ pid: pid_t) {
+        exitWatch = ProcessExitWatch(pid: pid) { [weak self] in self?.onExit($0) }
+    }
+
     func processTerminated(source: TerminalView, exitCode: Int32?) {
-        Task { @MainActor in onExit(exitCode) }
+        // SwiftTerm 1.11 passes the raw wait status: 32512 for exit 127.
+        let code = exitCode.flatMap(ProcessExitWatch.exitCode(fromWaitStatus:))
+        Task { @MainActor in onExit(code) }
     }
 
     func sizeChanged(source: LocalProcessTerminalView, newCols: Int, newRows: Int) {}

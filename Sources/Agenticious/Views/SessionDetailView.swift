@@ -49,10 +49,11 @@ struct SessionDetailView: View {
                             .help("Mark the work as ended, stop the agent, and clean up its worktree. History is kept.")
                     }
                     if session.showsResumeAction {
-                        Button("Resume", systemImage: "play.fill") { store.resume(session) }
+                        let retries = session.status.launchFailure != nil
+                        Button(retries ? "Try again" : "Resume", systemImage: retries ? "arrow.clockwise" : "play.fill") { store.resume(session) }
                             .buttonStyle(PillButtonStyle(tint: AgenticiousStyle.lime))
                             .disabled(!session.canResume)
-                            .help("Reopen this conversation and continue unfinished work.")
+                            .help(retries ? "Start the agent again after fixing what stopped it." : "Reopen this conversation and continue unfinished work.")
                     }
                     Spacer()
                     if let worktree = session.worktree { BranchLabel(worktree: worktree, isRemoved: session.worktreeRemoved) }
@@ -70,7 +71,7 @@ struct SessionDetailView: View {
 
                 if !session.isChat, !session.startupSteps.isEmpty {
                     StartupProgressView(steps: session.startupSteps)
-                } else if !session.isChat, session.backgroundTask == nil, session.startupPrompt == nil {
+                } else if !session.isChat, session.backgroundTask == nil, session.startupPrompt == nil, session.status.launchFailure == nil {
                     ChunkStrip(chunks: session.chunks, style: .expanded, isRunning: session.isRunning)
                 }
                 if let task = session.backgroundTask {
@@ -97,7 +98,9 @@ struct SessionDetailView: View {
                         .buttonStyle(AgenticiousButtonStyle(isCompact: true))
                 } else if session.pendingQuestion == nil, !session.canReplyInline,
                           session.status.needsAttention || session.status == .yourTurn {
-                    Button(session.startupPrompt == nil ? "Approve in terminal" : "Review startup prompt", systemImage: "arrow.right") { showActivity = false }
+                    let title = session.startupPrompt == nil ? "Approve in terminal"
+                        : session.startupPrompt?.shellWait != nil ? "Answer in terminal" : "Review startup prompt"
+                    Button(title, systemImage: "arrow.right") { showActivity = false }
                         .buttonStyle(AgenticiousButtonStyle(isCompact: true))
                 }
             }.padding(12).background(AgenticiousStyle.panel)
@@ -109,7 +112,9 @@ struct SessionDetailView: View {
                 }
             } else if session.terminalView == nil {
                 ContentUnavailableView { Label("Not running", systemImage: "moon.zzz").scaledFont(.largeTitle.bold()) } description: {
-                    Text("Resume to reopen \(session.agent.displayName)'s conversation, with everything it already knows.").scaledFont(.body)
+                    Text(session.status.launchFailure == nil
+                         ? "Resume to reopen \(session.agent.displayName)'s conversation, with everything it already knows."
+                         : "\(session.agent.displayName) didn't start. Try again once what stopped it is fixed.").scaledFont(.body)
                 }
             } else {
                 TerminalContainer(session: session)
@@ -152,6 +157,8 @@ struct SessionDetailView: View {
             Banner(title: "Done", text: summary ?? "The agent marked the task complete.", systemImage: "checkmark.seal.fill", color: .green)
         case let .ended(reason):
             Banner(title: "Ended", text: reason, systemImage: "stop.circle.fill", color: .gray)
+        case .notStarted:
+            Banner(title: "Didn't start", text: session.launchFailureSummary ?? "", systemImage: "exclamationmark.triangle.fill", color: .red)
         case let .exited(code):
             Banner(title: "Exited", text: "The agent process ended (code \(code.map(String.init) ?? "?")).",
                    systemImage: "stop.circle", color: .secondary)

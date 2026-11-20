@@ -204,4 +204,77 @@ final class StartupPromptTests: XCTestCase {
         XCTAssertNil(exited.startupPrompt)
         XCTAssertEqual(AgentAlert.transition(from: .needsYou(StartupPrompt.folderTrust(.codex).reason), to: exited.status), .failed)
     }
+
+    func testEachCLIScreenNeedsAllItsFragments() {
+        for screen in CLIScreen.allCases {
+            let host = terminal(columns: 120)
+            feed(screen.fragments.joined(separator: "\n"), to: host)
+            XCTAssertEqual(StartupPrompt.detect(in: host.terminal, agent: screen.agent), .cliScreen(screen.agent, screen))
+            XCTAssertNil(StartupPrompt.detect(in: host.terminal, agent: screen.agent == .claude ? .codex : .claude))
+            guard screen.fragments.count > 1 else { continue }
+            let partial = terminal(columns: 120)
+            feed(screen.fragments[0], to: partial)
+            XCTAssertNil(StartupPrompt.detect(in: partial.terminal, agent: screen.agent))
+        }
+    }
+
+    private let shellWait = StartupPrompt.shellWaiting(.claude, ShellWait(kind: .key, text: "Continue? [y/N]", program: nil))
+
+    @MainActor
+    func testAShellWaitTakesAttentionAndGivesBackWhatItTook() {
+        for status in [SessionStatus.starting, .working, .yourTurn] {
+            let session = session(agent: .claude)
+            session.status = status
+            StartupPromptInterpreter.apply(shellWait, to: session)
+            XCTAssertEqual(session.status, .needsYou(shellWait.reason))
+            XCTAssertEqual(session.startupPrompt?.shellWait?.text, "Continue? [y/N]")
+            XCTAssertFalse(session.canReplyInline)
+            StartupPromptInterpreter.apply(shellWait, to: session)
+            XCTAssertEqual(session.status, .needsYou(shellWait.reason))
+            StartupPromptInterpreter.apply(nil, to: session)
+            XCTAssertEqual(session.status, status)
+            XCTAssertNil(session.startupPrompt)
+        }
+    }
+
+    @MainActor
+    func testACLIScreenOnlyInterruptsStarting() {
+        let working = session(agent: .claude)
+        working.status = .working
+        StartupPromptInterpreter.apply(.cliScreen(.claude, .claudeLogin), to: working)
+        XCTAssertEqual(working.status, .working)
+        let starting = session(agent: .claude)
+        StartupPromptInterpreter.apply(.cliScreen(.claude, .claudeLogin), to: starting)
+        XCTAssertEqual(starting.status, .needsYou(CLIScreen.claudeLogin.reason))
+        // The shell's wait gives way to the CLI's screen and still hands back the status from before either.
+        let resumed = session(agent: .claude)
+        resumed.status = .working
+        StartupPromptInterpreter.apply(shellWait, to: resumed)
+        StartupPromptInterpreter.apply(.folderTrust(.claude), to: resumed)
+        XCTAssertEqual(resumed.status, .needsYou(StartupPrompt.folderTrust(.claude).reason))
+        StartupPromptInterpreter.apply(nil, to: resumed)
+        XCTAssertEqual(resumed.status, .working)
+    }
+
+    @MainActor
+    func testAShellWaitNeverReplacesAQuestionOrAPermission() {
+        for status in [SessionStatus.needsYou("Approve command"), .needsYou("Which branch?"), .waiting, .exited(1)] {
+            let session = session(agent: .claude)
+            session.status = status
+            StartupPromptInterpreter.apply(shellWait, to: session)
+            XCTAssertEqual(session.status, status)
+            XCTAssertNil(session.startupPrompt)
+        }
+    }
+
+    @MainActor
+    func testArchivingOrFinishingClearsAShellWait() {
+        for finish in [{ (s: AgentSession) in s.isArchiving = true }, { (s: AgentSession) in s.isMarkedFinished = true }] {
+            let session = session(agent: .claude)
+            StartupPromptInterpreter.apply(shellWait, to: session)
+            finish(session)
+            StartupPromptInterpreter.apply(shellWait, to: session)
+            XCTAssertNil(session.startupPrompt)
+        }
+    }
 }

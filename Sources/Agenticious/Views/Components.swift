@@ -103,6 +103,7 @@ extension SessionStatus {
         case .done: .green
         case .ended: .gray
         case .exited: .secondary
+        case .notStarted: .red
         case .paused, .interrupted: .brown
         }
     }

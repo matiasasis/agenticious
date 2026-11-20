@@ -31,6 +31,8 @@ A native macOS dashboard for running many coding agents (Claude Code and Codex) 
 - **Summon from anywhere**: give a task preset a system-wide shortcut, or put every preset behind one Stream Deck key,
   and a floating Summon window opens over whatever you are working on.
 - **Text size**: scale all of the app's text, the terminal included, from 100% to 150%.
+- **Start-up problems in plain sight**: if your shell's start-up stops to ask something, or the CLI can't start,
+  the agent says so with what the terminal shows, instead of sitting at Starting.
 
 ## Run
 
@@ -44,7 +46,7 @@ In **Customize → Preferences → Notifications**, enable macOS notifications a
 Notifications open the relevant agent; sounds and notifications can be toggled separately. Existing
 settings from the bare executable are imported on first bundled launch.
 
-Requires macOS 14+ and the `claude` / `codex` CLIs on your login shell's PATH.
+Requires macOS 14+ and the `claude` / `codex` CLIs on your login shell's PATH. If it can't start from there, the agent says why.
 
 ## How it knows what the agent is doing
 
@@ -63,6 +65,7 @@ agent ──agenticious MCP───┘
 | Done | `finish` tool | `finish` tool |
 | Cleanup on end | `add_cleanup` tool | `add_cleanup` tool |
 | Subagents | `SubagentStart` / `SubagentStop` hooks and tool hooks carrying `agent_id` | — |
+| Start-up | Until the login shell runs the CLI: its process, terminal mode and screen (waiting for an answer, or ended before the CLI started). Then the folder-trust, sign-in and update screens | same |
 
 The built-in "skill" is `Sources/Agenticious/ChunkingPrompt.swift`. Claude gets it through `--append-system-prompt`. Codex gets it prepended to the task.
 
@@ -70,6 +73,22 @@ Nothing in your global config changes. Per-session Claude settings and MCP confi
 `~/Library/Application Support/Agenticious/sessions/<id>/` and passed with `--settings` / `--mcp-config`. Codex uses `-c` overrides.
 Note: those Codex overrides replace your own `notify` setting for sessions started from Agenticious, and the Claude
 settings replace your own `statusLine` there (it shows the model and both limits instead).
+
+### When an agent doesn't start
+
+Agents start in your login shell (`zsh -lic`), so they get your PATH. In agent terminals Agenticious skips Oh My Zsh's
+update question and its tmux autostart (unless `ZSH_TMUX_AUTOSTART_ONCE=false`), by setting `DISABLE_AUTO_UPDATE` and `ZSH_TMUX_AUTOSTARTED` for start-up only.
+The command unsets them before the CLI runs, and your own terminals are unaffected. A `zstyle ':omz:update' mode` in
+your .zshrc still wins.
+
+If start-up stops to ask something (an update question, a passphrase, a password), the agent shows **Needs you** with
+the question as the terminal shows it; answer it in the terminal. If Claude Code or Codex can't start, the agent shows
+**Didn't start** with the terminal's last lines, the exit code, and the likely cause and fix when it is recognised (for
+example a nodenv Node version without the CLI). **Try again** starts it again once fixed. Agenticious never answers for
+you and never switches to another copy of the CLI on its own.
+
+A start-up file that leaves the cursor after text ending in a colon, question mark or bracket and then works quietly for
+a while can show as **Needs you** until it moves on.
 
 ## Layout
 
@@ -79,6 +98,8 @@ settings replace your own `statusLine` there (it shows the model and both limits
 | `Sources/Agenticious/EventServer.swift` | Loopback HTTP listener |
 | `Sources/Agenticious/EventInterpreter.swift` | Event → status / chunks |
 | `Sources/Agenticious/SessionStore.swift` | Running sessions, terminal processes, dock badge |
+| `Sources/Agenticious/ShellStartup.swift` | How far an agent's login shell got, and whether it waits for you |
+| `Sources/Agenticious/ProcessExitWatch.swift` | Notices an agent's process ending |
 | `Sources/Agenticious/UsageMonitor.swift` | Codex and Claude plan limits |
 | `Sources/Agenticious/HotkeyCenter.swift` | System-wide preset shortcuts (Carbon hot keys, no Accessibility permission) |
 | `Sources/Agenticious/SummonPanelController.swift` | The floating Summon window a shortcut opens over other apps |

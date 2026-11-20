@@ -33,6 +33,14 @@ struct ActivityView: View {
                 Toggle("Follow latest", isOn: $followLatest).toggleStyle(.checkbox).scaledFont(.caption)
                 Button("Respond in terminal", action: openTerminal).buttonStyle(AgenticiousButtonStyle(isPrimary: false, isCompact: true))
             }.padding(12)
+            if StartupProblemCard.shows(for: session) {
+                HugUpTo(limit: 460) {
+                    ScrollView {
+                        StartupProblemCard(session: session, openTerminal: openTerminal).padding(.horizontal, 20).padding(.bottom, 12)
+                    }
+                }
+                .layoutPriority(1)
+            }
             if let question = session.pendingQuestion {
                 // Its own height while there is room; in a short pane it shrinks and scrolls, so every option and
                 // Send answers stay within reach.
