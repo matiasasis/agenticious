@@ -17,6 +17,8 @@ $SWIFT_BUILD --product agenticious-mcp "$@"
 $SWIFT_BUILD --product Agenticious "$@"
 BINARY_DIR=$($SWIFT_BUILD --show-bin-path "$@")
 APP_DIR="$PWD/.build/Agenticious.app"
+# Start from an empty bundle, so nothing from an earlier build (a resource since removed) ships again.
+rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 cp "$BINARY_DIR/Agenticious" "$BINARY_DIR/agenticious-mcp" "$APP_DIR/Contents/MacOS/"
 ditto "$BINARY_DIR/Agenticious_Agenticious.bundle" "$APP_DIR/Contents/Resources/Agenticious_Agenticious.bundle"
