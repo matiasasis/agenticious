@@ -13,6 +13,14 @@ If macOS blocks the first launch and you trust the download, try opening it once
 **System Settings → Privacy & Security → Open Anyway** and confirm.
 See [Apple's instructions](https://support.apple.com/en-us/102445). Organization policies may prevent this override.
 
+### What's new in 1.1.1
+
+- **Preferences** keeps to the left in a wide window, with a new **Appearance** section for text size and the
+  sidebar's branch names.
+- **Back to queue** in Customize returns to the agent overview.
+- The Claude and Codex usage badges in the top bar share one height, and the sidebar shows the Agenticious name
+  without the logo.
+
 ### What's new in 1.1.0
 
 - **Permission requests in Activity**: Allow or Deny what Claude asks to run from a card, with a **Permission required** status.
