@@ -20,6 +20,8 @@ See [Apple's instructions](https://support.apple.com/en-us/102445). Organization
 - **Back to queue** in Customize returns to the agent overview.
 - The Claude and Codex usage badges in the top bar share one height, and the sidebar shows the Agenticious name
   without the logo.
+- At larger text sizes in a short window, Customize and an agent's reply field stay in view; a tall plan scrolls
+  on its own.
 
 ### What's new in 1.1.0
 
