@@ -11,57 +11,11 @@ struct SessionDetailView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 12) {
-                TaskHeading(type: session.displayedTaskType, task: session.task, size: .large)
-                    .textSelection(.enabled)
-
-                if textScale == 1 {
-                    HStack(spacing: 12) { summary; actions; Spacer(); location }
-                } else {
-                    // Larger text: the row wraps rather than make this view wider than its column, which would push
-                    // everything under it, a permission card included, past the column's left edge.
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 12) {
-                            summary; actions
-                            HStack(spacing: 12) { location }.frame(minWidth: 0, idealWidth: 0, maxWidth: .infinity, alignment: .trailing)
-                        }
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(spacing: 12) { summary; actions }
-                            HStack(spacing: 12) { location }
-                        }
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(spacing: 12) { summary }
-                            HStack(spacing: 12) { actions }
-                            HStack(spacing: 12) { location }
-                        }
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(spacing: 12) { summary }
-                            VStack(alignment: .leading, spacing: 8) { actions }
-                            HStack(spacing: 12) { location }
-                        }
-                    }
-                }
-
-                if !session.pullRequests.isEmpty {
-                    PullRequestLinks(references: session.pullRequests).id(session.id)
-                }
-                CleanupTaskList(session: session)
-
-                if !session.isChat, !session.startupSteps.isEmpty {
-                    StartupProgressView(steps: session.startupSteps)
-                } else if !session.isChat, session.backgroundTask == nil, session.startupPrompt == nil, session.status.launchFailure == nil {
-                    ChunkStrip(chunks: session.chunks, style: .expanded, isRunning: session.isRunning)
-                }
-                if let task = session.backgroundTask {
-                    BackgroundTaskLabel(task: task)
-                } else {
-                    statusBanner
-                }
+            HugUpTo(limit: .infinity) {
+                ScrollView { header }
+                    .scrollBounceBehavior(.basedOnSize)
             }
-            .padding(20)
             .background(AgenticiousStyle.panel)
-            // Larger text makes the header taller than its even share; the scrolling activity below gives way, not the banner.
-            .layoutPriority(textScale > 1 ? 1 : 0)
 
             Divider()
 
@@ -123,6 +77,56 @@ struct SessionDetailView: View {
         }
     }
 
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            TaskHeading(type: session.displayedTaskType, task: session.task, size: .large)
+                .textSelection(.enabled)
+
+            if textScale == 1 {
+                HStack(spacing: 12) { summary; actions; Spacer(); location }
+            } else {
+                // Larger text: the row wraps rather than make this view wider than its column, which would push
+                // everything under it, a permission card included, past the column's left edge.
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 12) {
+                        summary; actions
+                        HStack(spacing: 12) { location }.frame(minWidth: 0, idealWidth: 0, maxWidth: .infinity, alignment: .trailing)
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 12) { summary; actions }
+                        HStack(spacing: 12) { location }
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 12) { summary }
+                        HStack(spacing: 12) { actions }
+                        HStack(spacing: 12) { location }
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 12) { summary }
+                        VStack(alignment: .leading, spacing: 8) { actions }
+                        HStack(spacing: 12) { location }
+                    }
+                }
+            }
+
+            if !session.pullRequests.isEmpty {
+                PullRequestLinks(references: session.pullRequests).id(session.id)
+            }
+            CleanupTaskList(session: session)
+
+            if !session.isChat, !session.startupSteps.isEmpty {
+                StartupProgressView(steps: session.startupSteps)
+            } else if !session.isChat, session.backgroundTask == nil, session.startupPrompt == nil, session.status.launchFailure == nil {
+                ChunkStrip(chunks: session.chunks, style: .expanded, isRunning: session.isRunning)
+            }
+            if let task = session.backgroundTask {
+                BackgroundTaskLabel(task: task)
+            } else {
+                statusBanner
+            }
+        }
+        .padding(20)
+    }
 
     @ViewBuilder
     private var summary: some View {

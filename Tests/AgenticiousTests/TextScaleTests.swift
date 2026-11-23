@@ -4,6 +4,52 @@ import XCTest
 @testable import Agenticious
 
 final class TextScaleTests: XCTestCase {
+    @MainActor
+    func testReplyEditorFitsAShortWindowWithLargeTextAndSeveralRowsOfSteps() throws {
+        _ = NSApplication.shared
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let databaseURL = folder.appendingPathComponent("test.sqlite")
+        let saved = AgentSession(task: "Review the release checklist", agent: .codex, project: .none, directory: folder)
+        try SessionDatabase(url: databaseURL).save(saved)
+        let store = SessionStore(databaseURL: databaseURL, port: 0)
+        let session = try XCTUnwrap(store.session(saved.id))
+        session.isRunning = true
+        session.status = .yourTurn
+        session.terminalView = AgentTerminalView(frame: .zero)
+        session.chunks = (1...8).map { Chunk(id: $0, title: "Review step \($0)", status: .pending) }
+        store.selection = .session(session.id)
+
+        let defaults = UserDefaults.standard
+        let original = defaults.object(forKey: TextScale.key)
+        defer { defaults.set(original, forKey: TextScale.key) }
+        defaults.set(1.0, forKey: TextScale.key)
+        let view = NSHostingView(rootView: MainView().agenticiousEnvironment(store).frame(minWidth: 960, minHeight: 600))
+        let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 1100, height: 600),
+                              styleMask: [.titled, .resizable], backing: .buffered, defer: false)
+        window.contentView = view
+        window.orderBack(nil)
+        defer { window.orderOut(nil) }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.25))
+        window.setContentSize(CGSize(width: 1100, height: 600))
+
+        func editor(in view: NSView) -> NSTextView? {
+            if let text = view as? NSTextView, text.isEditable { return text }
+            return view.subviews.lazy.compactMap { editor(in: $0) }.first
+        }
+
+        for scale in TextScale.steps + [1.0] {
+            defaults.set(scale, forKey: TextScale.key)
+            RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+            view.layoutSubtreeIfNeeded()
+            XCTAssertEqual(view.bounds.height, 600, "Window height at text scale \(scale)")
+            let field = try XCTUnwrap(editor(in: view)?.enclosingScrollView)
+            let frame = view.convert(field.bounds, from: field)
+            XCTAssertGreaterThanOrEqual(frame.height, 40)
+            XCTAssertTrue(view.bounds.contains(frame), "Reply field \(frame) outside \(view.bounds)")
+        }
+    }
+
     func testStoredSizesStayWithinTheSteps() {
         XCTAssertEqual(TextScale.steps, [1.0, 1.1, 1.2, 1.3, 1.4, 1.5])
         XCTAssertEqual(TextScale.range, 1.0...1.5)
