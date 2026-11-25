@@ -28,7 +28,7 @@ See [Apple's instructions](https://support.apple.com/en-us/102445). Organization
 - **Permission requests in Activity**: Allow or Deny what Claude asks to run from a card, with a **Permission required** status.
 - **Agents that never start**: a missing CLI or a failed launch shows **Didn't start** with what the terminal said, and
   a shell start-up waiting for you (an update prompt, a password) shows as **Needs you**. **Try again** relaunches.
-- **Recent task inputs**: the Summon sheet offers each preset's recent inputs, ready to use again.
+- **Recent task inputs**: the Summon sheet offers the selected project's recent inputs for each preset, ready to use again.
 - **Summon from anywhere**: give a preset a system-wide shortcut; choose whether its floating window opens on the main
   display, the current display, or over the current window.
 - **Stream Deck plugin**: every preset behind one key, now a download of its own.
@@ -55,7 +55,7 @@ A native macOS dashboard for running many coding agents (Claude Code and Codex) 
   checks only run while Agenticious is the active app, at intervals set in **Customize → Preferences → Background refresh**.
 - **Summon from anywhere**: give a task preset a system-wide shortcut, or put every preset behind one Stream Deck key,
   and a floating Summon window opens over whatever you are working on.
-- **Recent inputs**: each task preset remembers what you started it with, and the Summon sheet offers the last five
+- **Recent inputs**: each task preset remembers what you started it with in each project, and the Summon sheet offers the last five
   to use again.
 - **Text size**: scale all of the app's text, the terminal included, from 100% to 150%.
 - **Start-up problems in plain sight**: if your shell's start-up stops to ask something, or the CLI can't start,
@@ -165,15 +165,15 @@ Implement, Resolve & merge, Review PR, Fix CI, Ask for review, and Technical dis
 They follow the selected project’s conventions without requiring specific skills, labels, Slack channels,
 or local paths. Existing user configs are not replaced or extended when the app is updated.
 
-**Recent inputs.** Each preset remembers the task inputs it was started with. Under **Task input**, the Summon sheet
-(and the floating Summon window) shows a **Recent** row with the selected preset's last five, newest first: up to
+**Recent inputs.** Summon remembers inputs for each project and preset. **No project** has its own history. Under **Task input**,
+the Summon sheet and floating window show the last five inputs for that selection, newest first, with up to
 three lines of each and how long ago it was used. Click one to put it in **Task input** in place of what is there;
 **⌘Z** brings back what you had typed. Hover a box and click **×**, or right-click it and choose **Remove from recent**,
-to forget it. Switching presets, by click or by shortcut, switches the row. An input is remembered when an agent or
-chat starts with it, trimmed and without images or workspace; using the same text again moves it to the front. Up to
-20 per preset are kept in `~/Library/Application Support/Agenticious/prompt-history.json`, and a deleted preset's
-inputs are dropped. They stay on this Mac: the Stream Deck plugin and agent hooks never receive them. A missing or
-damaged file only means no recent inputs.
+to forget it. Switching projects or presets switches the row. An input is remembered when an agent or
+chat starts with it. The app trims whitespace and skips images. Reusing an input moves it to the front.
+The app keeps 20 inputs per project and preset in `~/Library/Application Support/Agenticious/project-prompt-history.json`.
+Deleting a preset drops its history across projects. Inputs stay on this Mac. A missing or damaged file leaves the row empty.
+Older versions saved inputs without project information, so project histories start empty after upgrading.
 
 **Shortcuts.** Give a preset a shortcut in its editor: click **Record shortcut** and press the keys, for example
 `⌃⌥R` (Esc cancels). It needs ⌘, ⌃ or ⌥ unless it is a function key, and standard shortcuts such as ⌘V, ⌘S or

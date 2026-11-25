@@ -18,27 +18,44 @@ final class PromptHistoryTests: XCTestCase {
     }
 
     @MainActor
+    func testProjectsWithTheSameNameAndNoProjectHaveIndependentHistory() {
+        let first = Project(path: "/work/app")
+        let second = Project(path: "/personal/app")
+        let history = PromptHistory(url: url)
+        history.record("Shared input", for: "custom", in: first)
+        history.record("First project only", for: "custom", in: first)
+        history.record("Shared input", for: "custom", in: second)
+        history.record("Unfiled", for: "custom", in: .none)
+        history.remove("Shared input", for: "custom", in: first)
+
+        let reopened = PromptHistory(url: url)
+        XCTAssertEqual(reopened.recent(for: "custom", in: first).map(\.text), ["First project only"])
+        XCTAssertEqual(reopened.recent(for: "custom", in: second).map(\.text), ["Shared input"])
+        XCTAssertEqual(reopened.recent(for: "custom", in: .none).map(\.text), ["Unfiled"])
+    }
+
+    @MainActor
     func testInputsAreSavedPerPresetMostRecentFirstAndSurviveRelaunch() {
         let history = PromptHistory(url: url)
-        history.record("Fix the flaky login spec", for: "fixCI", at: start)
-        history.record("Review #123", for: "reviewPR", at: start.addingTimeInterval(60))
-        history.record("Speed up the nightly build", for: "fixCI", at: start.addingTimeInterval(120))
+        history.record("Fix the flaky login spec", for: "fixCI", in: .none, at: start)
+        history.record("Review #123", for: "reviewPR", in: .none, at: start.addingTimeInterval(60))
+        history.record("Speed up the nightly build", for: "fixCI", in: .none, at: start.addingTimeInterval(120))
 
         let relaunched = PromptHistory(url: url)
-        XCTAssertEqual(relaunched.recent(for: "fixCI").map(\.text), ["Speed up the nightly build", "Fix the flaky login spec"])
-        XCTAssertEqual(relaunched.recent(for: "reviewPR").map(\.text), ["Review #123"])
-        XCTAssertEqual(relaunched.recent(for: "reviewPR").first?.usedAt, start.addingTimeInterval(60))
-        XCTAssertEqual(relaunched.recent(for: "custom"), [])
+        XCTAssertEqual(relaunched.recent(for: "fixCI", in: .none).map(\.text), ["Speed up the nightly build", "Fix the flaky login spec"])
+        XCTAssertEqual(relaunched.recent(for: "reviewPR", in: .none).map(\.text), ["Review #123"])
+        XCTAssertEqual(relaunched.recent(for: "reviewPR", in: .none).first?.usedAt, start.addingTimeInterval(60))
+        XCTAssertEqual(relaunched.recent(for: "custom", in: .none), [])
     }
 
     @MainActor
     func testTheSameInputUsedAgainMovesToTheTopInsteadOfRepeating() {
         let history = PromptHistory(url: url)
-        history.record("Fix the flaky login spec", for: "fixCI", at: start)
-        history.record("Speed up the nightly build", for: "fixCI", at: start.addingTimeInterval(60))
-        history.record("  Fix the flaky login spec\n", for: "fixCI", at: start.addingTimeInterval(120))
+        history.record("Fix the flaky login spec", for: "fixCI", in: .none, at: start)
+        history.record("Speed up the nightly build", for: "fixCI", in: .none, at: start.addingTimeInterval(60))
+        history.record("  Fix the flaky login spec\n", for: "fixCI", in: .none, at: start.addingTimeInterval(120))
 
-        let recent = PromptHistory(url: url).recent(for: "fixCI")
+        let recent = PromptHistory(url: url).recent(for: "fixCI", in: .none)
         XCTAssertEqual(recent.map(\.text), ["Fix the flaky login spec", "Speed up the nightly build"])
         XCTAssertEqual(recent.first?.usedAt, start.addingTimeInterval(120))
     }
@@ -46,52 +63,52 @@ final class PromptHistoryTests: XCTestCase {
     @MainActor
     func testInputsAreTrimmedAndEmptyOnesAreNotSaved() {
         let history = PromptHistory(url: url)
-        history.record("   \n\t ", for: "custom", at: start)
+        history.record("   \n\t ", for: "custom", in: .none, at: start)
         XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
-        history.record("\n  Tidy the README  \n", for: "custom", at: start)
-        XCTAssertEqual(PromptHistory(url: url).recent(for: "custom").map(\.text), ["Tidy the README"])
+        history.record("\n  Tidy the README  \n", for: "custom", in: .none, at: start)
+        XCTAssertEqual(PromptHistory(url: url).recent(for: "custom", in: .none).map(\.text), ["Tidy the README"])
     }
 
     @MainActor
     func testTwentyAreKeptPerPresetAndFiveAreShown() {
         let history = PromptHistory(url: url)
-        for index in 1...25 { history.record("Task \(index)", for: "custom", at: start.addingTimeInterval(Double(index))) }
+        for index in 1...25 { history.record("Task \(index)", for: "custom", in: .none, at: start.addingTimeInterval(Double(index))) }
         let relaunched = PromptHistory(url: url)
-        XCTAssertEqual(relaunched.recent(for: "custom", limit: .max).map(\.text), (6...25).reversed().map { "Task \($0)" })
-        XCTAssertEqual(relaunched.recent(for: "custom").map(\.text), ["Task 25", "Task 24", "Task 23", "Task 22", "Task 21"])
+        XCTAssertEqual(relaunched.recent(for: "custom", in: .none, limit: .max).map(\.text), (6...25).reversed().map { "Task \($0)" })
+        XCTAssertEqual(relaunched.recent(for: "custom", in: .none).map(\.text), ["Task 25", "Task 24", "Task 23", "Task 22", "Task 21"])
     }
 
     /// The order is the order of use: a clock set back mustn't reshuffle it.
     @MainActor
     func testOrderFollowsUseNotTimestamps() {
         let history = PromptHistory(url: url)
-        history.record("First", for: "custom", at: start)
-        history.record("Second", for: "custom", at: start.addingTimeInterval(-3600))
-        history.record("Third", for: "custom", at: start.addingTimeInterval(-7200))
-        XCTAssertEqual(PromptHistory(url: url).recent(for: "custom").map(\.text), ["Third", "Second", "First"])
+        history.record("First", for: "custom", in: .none, at: start)
+        history.record("Second", for: "custom", in: .none, at: start.addingTimeInterval(-3600))
+        history.record("Third", for: "custom", in: .none, at: start.addingTimeInterval(-7200))
+        XCTAssertEqual(PromptHistory(url: url).recent(for: "custom", in: .none).map(\.text), ["Third", "Second", "First"])
     }
 
     @MainActor
     func testRemovingAnInputIsSavedAndLeavesTheOthers() {
         let history = PromptHistory(url: url)
-        history.record("Review #123", for: "reviewPR", at: start)
-        history.record("Review #124", for: "reviewPR", at: start)
-        history.record("Review #124", for: "custom", at: start)
-        history.remove("Review #124", for: "reviewPR")
+        history.record("Review #123", for: "reviewPR", in: .none, at: start)
+        history.record("Review #124", for: "reviewPR", in: .none, at: start)
+        history.record("Review #124", for: "custom", in: .none, at: start)
+        history.remove("Review #124", for: "reviewPR", in: .none)
 
-        XCTAssertEqual(history.recent(for: "reviewPR").map(\.text), ["Review #123"])
+        XCTAssertEqual(history.recent(for: "reviewPR", in: .none).map(\.text), ["Review #123"])
         let relaunched = PromptHistory(url: url)
-        XCTAssertEqual(relaunched.recent(for: "reviewPR").map(\.text), ["Review #123"])
-        XCTAssertEqual(relaunched.recent(for: "custom").map(\.text), ["Review #124"])
+        XCTAssertEqual(relaunched.recent(for: "reviewPR", in: .none).map(\.text), ["Review #123"])
+        XCTAssertEqual(relaunched.recent(for: "custom", in: .none).map(\.text), ["Review #124"])
     }
 
     @MainActor
     func testAnUnreadableFileIsNoHistoryAndIsReplacedOnTheNextSave() throws {
         try Data("not json".utf8).write(to: url)
         let history = PromptHistory(url: url)
-        XCTAssertEqual(history.recent(for: "custom"), [])
-        history.record("Tidy the README", for: "custom", at: start)
-        XCTAssertEqual(PromptHistory(url: url).recent(for: "custom").map(\.text), ["Tidy the README"])
+        XCTAssertEqual(history.recent(for: "custom", in: .none), [])
+        history.record("Tidy the README", for: "custom", in: .none, at: start)
+        XCTAssertEqual(PromptHistory(url: url).recent(for: "custom", in: .none).map(\.text), ["Tidy the README"])
     }
 
     @MainActor
@@ -99,28 +116,28 @@ final class PromptHistoryTests: XCTestCase {
         let blocked = directory.appendingPathComponent("file")
         try Data().write(to: blocked)
         let history = PromptHistory(url: blocked.appendingPathComponent("prompt-history.json"))
-        history.record("Tidy the README", for: "custom", at: start)
-        XCTAssertEqual(history.recent(for: "custom").map(\.text), ["Tidy the README"])
+        history.record("Tidy the README", for: "custom", in: .none, at: start)
+        XCTAssertEqual(history.recent(for: "custom", in: .none).map(\.text), ["Tidy the README"])
     }
 
     @MainActor
     func testDeletedPresetsLoseTheirHistoryOnTheNextLoadOrSave() throws {
         var presets: Set<String>? = ["custom", "fixCI", "reviewPR"]
         let history = PromptHistory(url: url) { presets }
-        history.record("Fix the flaky login spec", for: "fixCI", at: start)
-        history.record("Review #123", for: "reviewPR", at: start)
+        history.record("Fix the flaky login spec", for: "fixCI", in: .none, at: start)
+        history.record("Review #123", for: "reviewPR", in: .none, at: start)
 
         presets = ["custom", "reviewPR"]
-        XCTAssertEqual(PromptHistory(url: url) { presets }.recent(for: "fixCI"), [], "dropped on load")
+        XCTAssertEqual(PromptHistory(url: url) { presets }.recent(for: "fixCI", in: .none), [], "dropped on load")
         XCTAssertTrue(try String(contentsOf: url, encoding: .utf8).contains("flaky"), "still in the file until a save")
 
-        history.record("Tidy the README", for: "custom", at: start)
+        history.record("Tidy the README", for: "custom", in: .none, at: start)
         XCTAssertFalse(try String(contentsOf: url, encoding: .utf8).contains("flaky"), "dropped on save")
-        XCTAssertEqual(PromptHistory(url: url).recent(for: "reviewPR").map(\.text), ["Review #123"])
+        XCTAssertEqual(PromptHistory(url: url).recent(for: "reviewPR", in: .none).map(\.text), ["Review #123"])
 
         // While the presets are unknown (their file didn't load), nothing is dropped on a guess.
         presets = nil
-        XCTAssertEqual(PromptHistory(url: url) { presets }.recent(for: "reviewPR").map(\.text), ["Review #123"])
+        XCTAssertEqual(PromptHistory(url: url) { presets }.recent(for: "reviewPR", in: .none).map(\.text), ["Review #123"])
     }
 
     func testAgeIsShortAndNamesYesterday() throws {

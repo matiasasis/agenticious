@@ -63,7 +63,7 @@ final class PromptHistory: ObservableObject {
     /// The presets that exist; nil while that isn't known (the presets file didn't load), so nothing is dropped on a guess.
     private let presetIDs: () -> Set<String>?
     /// Read the first time it's needed: a store built in a test or by the app doesn't touch the file until the sheet opens.
-    private lazy var log = load()
+    private lazy var projects = load()
 
     init(url: URL = PromptHistory.defaultURL, presetIDs: @escaping () -> Set<String>? = { nil }) {
         self.url = url
@@ -72,38 +72,46 @@ final class PromptHistory: ObservableObject {
 
     nonisolated static var defaultURL: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Agenticious/prompt-history.json")
+            .appendingPathComponent("Agenticious/project-prompt-history.json")
     }
 
-    func recent(for presetID: String, limit: Int = PromptHistory.shown) -> [RecentInput] {
-        Array(log.recent(for: presetID).prefix(limit))
+    func recent(for presetID: String, in project: Project, limit: Int = PromptHistory.shown) -> [RecentInput] {
+        Array((projects[project.id]?.recent(for: presetID) ?? []).prefix(limit))
     }
 
-    func record(_ input: String, for presetID: String, at date: Date = .now) {
-        var updated = log
-        guard updated.record(input, for: presetID, at: date) else { return }
+    func record(_ input: String, for presetID: String, in project: Project, at date: Date = .now) {
+        var log = projects[project.id] ?? PromptHistoryLog()
+        guard log.record(input, for: presetID, at: date) else { return }
         objectWillChange.send()
-        log = updated
+        projects[project.id] = log
         save()
     }
 
-    func remove(_ text: String, for presetID: String) {
+    func remove(_ text: String, for presetID: String, in project: Project) {
         objectWillChange.send()
-        log.remove(text, for: presetID)
+        projects[project.id]?.remove(text, for: presetID)
         save()
     }
 
-    /// History is a convenience: a missing or unreadable file is no history, and the next save replaces it.
-    private func load() -> PromptHistoryLog {
-        guard var saved = try? Self.decoder.decode(PromptHistoryLog.self, from: Data(contentsOf: url)) else { return PromptHistoryLog() }
-        if let ids = presetIDs() { saved.prune(keeping: ids) }
-        return saved
+    private func load() -> [String: PromptHistoryLog] {
+        guard let data = try? Data(contentsOf: url),
+              let saved = try? Self.decoder.decode([String: PromptHistoryLog].self, from: data) else { return [:] }
+        return pruned(saved)
+    }
+
+    private func pruned(_ saved: [String: PromptHistoryLog]) -> [String: PromptHistoryLog] {
+        let ids = presetIDs()
+        return saved.compactMapValues { log in
+            var kept = log
+            if let ids { kept.prune(keeping: ids) }
+            return kept.inputs.isEmpty ? nil : kept
+        }
     }
 
     /// Never throws: failing to remember an input mustn't stand in the way of the agent it started.
     private func save() {
-        if let ids = presetIDs() { log.prune(keeping: ids) }
-        guard let data = try? Self.encoder.encode(log) else { return }
+        projects = pruned(projects)
+        guard let data = try? Self.encoder.encode(projects) else { return }
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? data.write(to: url, options: .atomic)
     }

@@ -129,9 +129,9 @@ struct NewTaskSheet: View {
                 .accessibilityLabel("Task input")
             Text("Describe the task and any context. Type ``` for a code snippet.")
                 .scaledFont(.caption).foregroundStyle(.secondary)
-            RecentInputsRow(inputs: history.recent(for: template.id),
+            RecentInputsRow(inputs: history.recent(for: template.id, in: project),
                             use: taskReplacements.send,
-                            remove: { history.remove($0, for: template.id) })
+                            remove: { history.remove($0, for: template.id, in: project) })
         }
     }
 
@@ -425,7 +425,7 @@ struct NewTaskSheet: View {
                 select: host?.showsNewAgent() ?? true
             )
             presets.recordUse(of: template)
-            history.record(task, for: template.id)
+            history.record(task, for: template.id, in: project)
             close()
         } catch {
             launchError = error.localizedDescription
